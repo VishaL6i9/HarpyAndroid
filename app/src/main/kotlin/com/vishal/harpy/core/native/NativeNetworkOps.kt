@@ -1,7 +1,7 @@
 package com.vishal.harpy.core.native
 
 /**
- * JNI interface for native network operations using libpcap/libnet
+ * JNI interface for native network operations using raw sockets
  * Provides low-level ARP manipulation and packet capture capabilities
  */
 object NativeNetworkOps {
@@ -21,6 +21,19 @@ object NativeNetworkOps {
     external fun initializeNativeOps(): Boolean
 
     /**
+     * Scan network using native raw sockets for ARP discovery
+     * @param interfaceName Network interface name (e.g., "wlan0")
+     * @param subnet Subnet to scan (e.g., "192.168.29.0/24")
+     * @param timeoutSeconds Timeout in seconds
+     * @return Array of discovered device IPs
+     */
+    external fun scanNetworkNative(
+        interfaceName: String,
+        subnet: String,
+        timeoutSeconds: Int
+    ): Array<String>
+
+    /**
      * Perform ARP spoofing to block a device
      * @param targetIP IP address of the device to block
      * @param targetMAC MAC address of the device to block
@@ -34,19 +47,6 @@ object NativeNetworkOps {
         gatewayIP: String,
         ourMAC: String
     ): Boolean
-
-    /**
-     * Scan network using libpcap for ARP packets
-     * @param interface Network interface name (e.g., "wlan0")
-     * @param subnet Subnet to scan (e.g., "192.168.1.0/24")
-     * @param timeoutSeconds Timeout in seconds
-     * @return Array of discovered device IPs
-     */
-    external fun scanNetworkNative(
-        interfaceName: String,
-        subnet: String,
-        timeoutSeconds: Int
-    ): Array<String>
 
     /**
      * Get MAC address for a given IP using ARP
