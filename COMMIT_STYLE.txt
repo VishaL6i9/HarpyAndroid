@@ -1,0 +1,55 @@
+# Git Commit Message Style Guide
+
+This project follows the Conventional Commits specification with specific categories for different types of changes.
+
+## Format
+```
+<type>[optional scope]: <description>
+
+[optional body]
+
+[optional footer(s)]
+```
+
+## Types
+- **feat**: A new feature or enhancement to existing functionality
+- **fix**: A bug fix 
+- **docs**: Documentation only changes
+- **style**: Changes that do not affect the meaning of the code (white-space, formatting, etc.)
+- **refactor**: A code change that neither fixes a bug nor adds a feature
+- **perf**: A code change that improves performance
+- **test**: Adding missing tests or correcting existing tests
+- **build**: Changes that affect the build system or external dependencies
+- **ci**: Changes to CI configuration files and scripts
+- **chore**: Other changes that don't modify src or test files
+
+## Scope (Optional)
+The scope provides additional contextual information and can be any of:
+- Module names: `network_monitor`, `device_manager`, `core`, etc.
+- Component types: `ui`, `data`, `domain`, `presentation`, etc.
+
+## Examples
+```
+feat: add network device discovery functionality
+```
+```
+fix: resolve compilation errors in error handling implementation
+```
+```
+docs: update roadmap to reflect completed error handling improvements
+```
+```
+refactor: implement Hilt dependency injection for network monitoring feature
+```
+```
+build: update project to use Hilt dependency injection configuration
+```
+
+## Rules
+1. Use imperative mood ("add" not "adds" or "added")
+2. Don't capitalize the first letter of the description
+3. Don't end the description with a period
+4. Limit the subject line to 72 characters
+5. Separate the subject from the body with a blank line (when using body)
+6. Wrap the body at 72 characters
+7. Use the body to explain what and why vs. how
