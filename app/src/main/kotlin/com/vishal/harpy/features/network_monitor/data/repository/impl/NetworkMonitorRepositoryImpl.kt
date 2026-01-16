@@ -40,24 +40,66 @@ class NetworkMonitorRepositoryImpl : NetworkMonitorRepository {
 
     override suspend fun isDeviceRooted(): NetworkResult<Boolean> {
         return try {
-            val process = Runtime.getRuntime().exec("su")
-            val outputStream = process.outputStream
-            val inputStream = process.inputStream
+            // Try multiple methods to detect root
+            
+            // Method 1: Try su command
+            try {
+                val process = Runtime.getRuntime().exec("su")
+                val outputStream = process.outputStream
+                val inputStream = process.inputStream
 
-            outputStream.write("id\n".toByteArray())
-            outputStream.flush()
-            outputStream.close()
+                outputStream.write("id\n".toByteArray())
+                outputStream.flush()
+                outputStream.close()
 
-            val reader = BufferedReader(InputStreamReader(inputStream))
-            val response = reader.readLine()
-            reader.close()
-            inputStream.close()
+                val reader = BufferedReader(InputStreamReader(inputStream))
+                val response = reader.readLine()
+                reader.close()
+                inputStream.close()
 
-            process.waitFor()
-            process.destroy()
+                process.waitFor()
+                process.destroy()
 
-            val isRooted = response != null && response.contains("uid=0")
-            NetworkResult.success(isRooted)
+                if (response != null && response.contains("uid=0")) {
+                    Log.d(TAG, "Device is rooted (su method)")
+                    return NetworkResult.success(true)
+                }
+            } catch (e: Exception) {
+                Log.d(TAG, "su method failed: ${e.message}")
+            }
+
+            // Method 2: Check for Magisk
+            try {
+                val magiskProcess = Runtime.getRuntime().exec("which magisk")
+                val magiskReader = BufferedReader(InputStreamReader(magiskProcess.inputStream))
+                val magiskPath = magiskReader.readLine()
+                magiskReader.close()
+                magiskProcess.waitFor()
+
+                if (!magiskPath.isNullOrEmpty()) {
+                    Log.d(TAG, "Device is rooted (Magisk detected at: $magiskPath)")
+                    return NetworkResult.success(true)
+                }
+            } catch (e: Exception) {
+                Log.d(TAG, "Magisk check failed: ${e.message}")
+            }
+
+            // Method 3: Check for /system/xbin/su or /system/bin/su
+            try {
+                val suFile1 = java.io.File("/system/xbin/su")
+                val suFile2 = java.io.File("/system/bin/su")
+                val suFile3 = java.io.File("/data/adb/magisk/magisk")
+                
+                if (suFile1.exists() || suFile2.exists() || suFile3.exists()) {
+                    Log.d(TAG, "Device is rooted (su binary found)")
+                    return NetworkResult.success(true)
+                }
+            } catch (e: Exception) {
+                Log.d(TAG, "File check failed: ${e.message}")
+            }
+
+            Log.d(TAG, "Device is not rooted")
+            NetworkResult.success(false)
         } catch (e: IOException) {
             Log.d(TAG, "Device is not rooted: ${e.message}")
             val rootError = RootError.RootAccessDeniedError(e)
