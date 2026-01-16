@@ -54,7 +54,7 @@ To build the project, ensure you have the Android SDK properly configured with t
 
 ### Phase 2: Core Network Functionality (In Progress 🔄)
 - [x] Root access validation improvements
-- [ ] ARP scanning implementation
+- [x] ARP scanning implementation
 - [ ] Device identification algorithms
 - [ ] Network topology mapping
 - [ ] Real-time device monitoring

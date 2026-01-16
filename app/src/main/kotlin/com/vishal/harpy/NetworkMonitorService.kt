@@ -5,6 +5,7 @@ import java.io.BufferedReader
 import java.io.DataOutputStream
 import java.io.IOException
 import java.io.InputStreamReader
+import kotlin.text.Regex
 
 /**
  * Service to handle network monitoring and device management
@@ -81,25 +82,82 @@ class NetworkMonitorService {
      */
     private fun scanNetworkWithRoot(): List<NetworkDevice> {
         val devices = mutableListOf<NetworkDevice>()
-        
+
         try {
-            val process = Runtime.getRuntime().exec("su")
-            val outputStream = DataOutputStream(process.outputStream)
-            
-            // Execute network scanning commands
-            // This is a simplified example - actual implementation would be more complex
-            outputStream.writeBytes("ip neigh show\n")
-            outputStream.writeBytes("exit\n")
-            outputStream.flush()
-            
-            // Process the output to extract device information
-            // This would parse the ARP table to find connected devices
-            
-            process.waitFor()
+            // First, get the current network interface information
+            val ipProcess = Runtime.getRuntime().exec("su -c \"ip route | grep -E '^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+' | head -n 1\"")
+            val ipReader = BufferedReader(InputStreamReader(ipProcess.inputStream))
+            val routeLine = ipReader.readLine()
+            ipReader.close()
+            ipProcess.waitFor()
+
+            if (routeLine != null) {
+                // Extract the subnet from the route line
+                val subnetPattern = Regex("""([0-9]+\.[0-9]+\.[0-9]+)\.0""")
+                val matchResult = subnetPattern.find(routeLine)
+
+                if (matchResult != null) {
+                    val subnet = matchResult.groupValues[1]
+
+                    // Ping sweep to populate ARP table
+                    for (i in 1..254) {
+                        val pingProcess = Runtime.getRuntime().exec("su -c \"ping -c 1 -W 1 ${subnet}.${i}\"")
+                        pingProcess.waitFor()
+                    }
+
+                    // Now read the ARP table to get connected devices
+                    val arpProcess = Runtime.getRuntime().exec("su -c \"cat /proc/net/arp\"")
+                    val arpReader = BufferedReader(InputStreamReader(arpProcess.inputStream))
+
+                    var line: String?
+                    while (arpReader.readLine().also { line = it } != null) {
+                        val fields = line?.split("\\s+".toRegex())
+                        if (fields != null && fields.size >= 6) {
+                            val ip = fields[0]  // IP address
+                            val hwType = fields[1]  // Hardware type
+                            val flags = fields[2]  // Flags
+                            val mac = fields[3]  // MAC address
+                            val mask = fields[4]  // Mask
+                            val device = fields[5]  // Device name
+
+                            // Only add entries that are marked as reachable (flags contain 0x2)
+                            if (flags.contains("0x2") || flags.contains("0x6")) {
+                                if (mac != "00:00:00:00:00:00" && mac != "<incomplete>") {
+                                    // Attempt to get hostname (this might not always work)
+                                    var hostname: String? = null
+                                    try {
+                                        val hostnameProcess = Runtime.getRuntime().exec("su -c \"nslookup $ip\"")
+                                        val hostnameReader = BufferedReader(InputStreamReader(hostnameProcess.inputStream))
+                                        var hostnameLine: String?
+                                        while (hostnameReader.readLine().also { hostnameLine = it } != null) {
+                                            if (hostnameLine!!.contains("name = ")) {
+                                                val nameMatch = Regex("name = (.+)").find(hostnameLine!!)
+                                                if (nameMatch != null) {
+                                                    hostname = nameMatch.groupValues[1].trimEnd('.')
+                                                    break
+                                                }
+                                            }
+                                        }
+                                        hostnameReader.close()
+                                        hostnameProcess.waitFor()
+                                    } catch (e: Exception) {
+                                        Log.d(TAG, "Could not resolve hostname for $ip: ${e.message}")
+                                    }
+
+                                    devices.add(NetworkDevice(ip, mac, hostname))
+                                }
+                            }
+                        }
+                    }
+
+                    arpReader.close()
+                    arpProcess.waitFor()
+                }
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Error scanning network: ${e.message}", e)
         }
-        
+
         return devices
     }
     
