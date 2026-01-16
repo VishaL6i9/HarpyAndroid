@@ -6,6 +6,16 @@ out/
 ### Android Studio ###
 .idea/
 
+### Local configuration file (sdk path) ###
+local.properties
+
+### Android Studio ###
+.idea/*
+!.idea/codeStyles
+!.idea/inspectionProfiles
+!.idea/markdown
+!.idea/runConfigurations
+
 ### Kotlin ###
 .kotlin
 
