@@ -19,13 +19,26 @@ A network monitoring and control application for Android, inspired by the iOS ja
 
 ## Technical Implementation
 
-The root-based implementation is built using native Kotlin for the Android application layer, with native C/C++ code using libpcap/libnet libraries accessed through JNI for low-level network operations when root access is available. The app leverages root access to execute ARP spoofing techniques similar to the original iOS Harpy tweak.
+The root-based implementation is built using native Kotlin for the Android application layer, with plans for native C/C++ code using libpcap/libnet libraries accessed through JNI for low-level network operations when root access is available. The app leverages root access to execute ARP spoofing techniques similar to the original iOS Harpy tweak.
 
 ## Requirements
 
 - Android device with root access
 - Android 7.0 (API level 24) or higher recommended
+- Android SDK 36 (Android 16 "Baklava")
+- AGP 8.13.2
+- Gradle 8.13
 
 ## Legal Notice
 
 This tool should only be used on networks you own or have explicit permission to manage. Unauthorized network interference may violate local laws.
+
+## Development
+
+The project follows a modular structure:
+- `app/` - Main Android application module
+- `app/src/main/kotlin/com/vishal/harpy/` - Kotlin source code
+- `app/src/main/res/` - Resource files
+- `app/src/main/AndroidManifest.xml` - Application manifest
+
+To build the project, ensure you have the Android SDK properly configured with the required API level and build tools.
