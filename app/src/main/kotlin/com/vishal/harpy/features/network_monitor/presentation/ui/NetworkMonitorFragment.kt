@@ -50,6 +50,9 @@ class NetworkMonitorFragment : Fragment() {
         scanButton.setOnClickListener {
             viewModel.scanNetwork()
         }
+
+        val debugButton = binding.findViewById<android.widget.ImageButton>(R.id.debugButton)
+        debugButton.setOnClickListener { showDebugMenu(it) }
     }
 
     private fun setupRecyclerView() {
@@ -59,7 +62,8 @@ class NetworkMonitorFragment : Fragment() {
             onBlockClick = { device -> viewModel.blockDevice(device) },
             onUnblockClick = { device -> viewModel.unblockDevice(device) },
             onPinClick = { device -> viewModel.toggleDevicePin(device) },
-            onEditNameClick = { device -> showEditNameDialog(device) }
+            onEditNameClick = { device -> showEditNameDialog(device) },
+            onLongPress = { device, view -> showContextMenu(device, view) }
         )
         recyclerView.adapter = adapter
     }
@@ -173,32 +177,98 @@ class NetworkMonitorFragment : Fragment() {
         android.widget.Toast.makeText(requireContext(), "Error details copied to clipboard", android.widget.Toast.LENGTH_SHORT).show()
     }
 
+    private fun showContextMenu(device: NetworkDevice, view: View) {
+        androidx.appcompat.widget.PopupMenu(requireContext(), view).apply {
+            menu.add(0, 1, 0, if (device.isPinned) "Unpin" else "Pin")
+            menu.add(0, 2, 1, "Set Name")
+            menu.add(0, 3, 2, if (device.isBlocked) "Unblock" else "Block")
+            
+            setOnMenuItemClickListener { item ->
+                when (item.itemId) {
+                    1 -> {
+                        viewModel.toggleDevicePin(device)
+                        android.widget.Toast.makeText(
+                            requireContext(),
+                            if (device.isPinned) "Device unpinned" else "Device pinned",
+                            android.widget.Toast.LENGTH_SHORT
+                        ).show()
+                        true
+                    }
+                    2 -> {
+                        showEditNameDialog(device)
+                        true
+                    }
+                    3 -> {
+                        if (device.isBlocked) {
+                            viewModel.unblockDevice(device)
+                        } else {
+                            viewModel.blockDevice(device)
+                        }
+                        true
+                    }
+                    else -> false
+                }
+            }
+            show()
+        }
+    }
+
+    private fun showDebugMenu(view: View) {
+        androidx.appcompat.widget.PopupMenu(requireContext(), view).apply {
+            menu.add(0, 1, 0, "Clear all custom names")
+            
+            setOnMenuItemClickListener { item ->
+                when (item.itemId) {
+                    1 -> {
+                        androidx.appcompat.app.AlertDialog.Builder(requireContext())
+                            .setTitle("Clear all custom names?")
+                            .setMessage("This will remove all custom device names you've set.")
+                            .setPositiveButton("Clear") { _, _ ->
+                                viewModel.clearAllDeviceNames()
+                                android.widget.Toast.makeText(
+                                    requireContext(),
+                                    "All custom names cleared",
+                                    android.widget.Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                            .setNegativeButton("Cancel") { _, _ -> }
+                            .create()
+                            .show()
+                        true
+                    }
+                    else -> false
+                }
+            }
+            show()
+        }
+    }
+
     private fun showEditNameDialog(device: NetworkDevice) {
         val editText = android.widget.EditText(requireContext()).apply {
-            setText(device.customName ?: "")
-            hint = "Enter custom name"
+            setText(device.deviceName ?: "")
+            hint = "Enter device name (e.g., My Laptop, Guest Phone)"
             setSingleLine()
         }
 
         androidx.appcompat.app.AlertDialog.Builder(requireContext())
-            .setTitle("Rename Device")
-            .setMessage("Current: ${device.getDisplayName()}")
+            .setTitle("Set Device Name")
+            .setMessage("Device: ${device.ipAddress}")
             .setView(editText)
             .setPositiveButton("Save") { _, _ ->
                 val newName = editText.text.toString().trim().takeIf { it.isNotEmpty() }
-                viewModel.setDeviceCustomName(device, newName)
+                viewModel.setDeviceName(device, newName)
                 android.widget.Toast.makeText(
                     requireContext(),
-                    "Device renamed to: ${newName ?: device.vendor ?: "Unknown"}",
+                    "Device name set to: ${newName ?: "default"}",
                     android.widget.Toast.LENGTH_SHORT
                 ).show()
             }
             .setNegativeButton("Cancel") { _, _ -> }
             .setNeutralButton("Clear") { _, _ ->
-                viewModel.setDeviceCustomName(device, null)
+                viewModel.setDeviceName(device, null)
                 android.widget.Toast.makeText(
                     requireContext(),
-                    "Custom name cleared",
+                    "Device name cleared",
                     android.widget.Toast.LENGTH_SHORT
                 ).show()
             }

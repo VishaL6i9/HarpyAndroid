@@ -98,7 +98,7 @@ class NetworkMonitorViewModel @Inject constructor(
                         val devicesWithPreferences = result.data.map { device ->
                             val preference = devicePreferenceRepository.getDevicePreference(device.macAddress)
                             device.copy(
-                                customName = preference?.customName,
+                                deviceName = preference?.deviceName,
                                 isPinned = preference?.isPinned ?: false
                             )
                         }
@@ -240,15 +240,15 @@ class NetworkMonitorViewModel @Inject constructor(
     }
 
     /**
-     * Set custom name for a device
+     * Set device name for a device
      */
-    fun setDeviceCustomName(device: NetworkDevice, customName: String?) {
+    fun setDeviceName(device: NetworkDevice, deviceName: String?) {
         viewModelScope.launch {
-            devicePreferenceRepository.setCustomName(device.macAddress, customName)
+            devicePreferenceRepository.setDeviceName(device.macAddress, deviceName)
             // Update the device in the list
             _networkDevices.value = _networkDevices.value.map {
                 if (it.macAddress == device.macAddress) {
-                    it.copy(customName = customName)
+                    it.copy(deviceName = deviceName)
                 } else {
                     it
                 }
@@ -275,6 +275,21 @@ class NetworkMonitorViewModel @Inject constructor(
                 compareBy({ !it.isPinned }, { it.ipAddress })
             )
             _networkDevices.value = sortedDevices
+        }
+    }
+
+    /**
+     * Clear all custom device names
+     */
+    fun clearAllDeviceNames() {
+        viewModelScope.launch {
+            _networkDevices.value.forEach { device ->
+                devicePreferenceRepository.setDeviceName(device.macAddress, null)
+            }
+            // Update all devices to remove names
+            _networkDevices.value = _networkDevices.value.map {
+                it.copy(deviceName = null)
+            }
         }
     }
 }

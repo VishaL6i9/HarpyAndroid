@@ -40,7 +40,7 @@ class DevicePreferenceRepository(context: Context) {
                 val key = KEY_PREFIX + preference.macAddress.replace(":", "_")
                 val json = JSONObject().apply {
                     put("macAddress", preference.macAddress)
-                    put("customName", preference.customName)
+                    put("deviceName", preference.deviceName)
                     put("isPinned", preference.isPinned)
                     put("lastSeen", preference.lastSeen)
                 }.toString()
@@ -54,11 +54,11 @@ class DevicePreferenceRepository(context: Context) {
     }
     
     /**
-     * Set custom name for a device
+     * Set device name for a device
      */
-    suspend fun setCustomName(macAddress: String, customName: String?) {
+    suspend fun setDeviceName(macAddress: String, deviceName: String?) {
         val preference = getDevicePreference(macAddress) ?: DevicePreference(macAddress)
-        saveDevicePreference(preference.copy(customName = customName))
+        saveDevicePreference(preference.copy(deviceName = deviceName))
     }
     
     /**
@@ -124,7 +124,7 @@ class DevicePreferenceRepository(context: Context) {
             val obj = JSONObject(json)
             DevicePreference(
                 macAddress = obj.getString("macAddress"),
-                customName = obj.optString("customName", "").takeIf { it.isNotEmpty() },
+                deviceName = obj.optString("deviceName", "").takeIf { it.isNotEmpty() },
                 isPinned = obj.optBoolean("isPinned", false),
                 lastSeen = obj.optLong("lastSeen", System.currentTimeMillis())
             )

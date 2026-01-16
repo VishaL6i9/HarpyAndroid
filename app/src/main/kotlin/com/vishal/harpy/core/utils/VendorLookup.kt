@@ -57,6 +57,7 @@ object VendorLookup {
     /**
      * Look up vendor name by MAC address OUI (first 3 octets)
      * Uses cached results, common vendors, and local OUI database
+     * Also tries 4-octet (MA-M) and 5-octet (MA-S) lookups for more specific matches
      */
     fun getVendor(macAddress: String): String? {
         if (macAddress.length < 8) return null
@@ -75,8 +76,21 @@ object VendorLookup {
             return vendor
         }
         
-        // Try to query local OUI database
-        val lookedUpVendor = queryLocalOuiDatabase(oui)
+        // Try to query local OUI database with multiple prefix lengths
+        // First try 5-octet (MA-S), then 4-octet (MA-M), then 3-octet (OUI)
+        var lookedUpVendor = queryLocalOuiDatabase(macAddress.substring(0, 14).uppercase()) // 5 octets
+        if (lookedUpVendor != null) {
+            ouiCache[oui] = lookedUpVendor
+            return lookedUpVendor
+        }
+        
+        lookedUpVendor = queryLocalOuiDatabase(macAddress.substring(0, 11).uppercase()) // 4 octets
+        if (lookedUpVendor != null) {
+            ouiCache[oui] = lookedUpVendor
+            return lookedUpVendor
+        }
+        
+        lookedUpVendor = queryLocalOuiDatabase(oui) // 3 octets
         if (lookedUpVendor != null) {
             ouiCache[oui] = lookedUpVendor
             return lookedUpVendor

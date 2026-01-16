@@ -6,11 +6,11 @@ package com.vishal.harpy.core.utils
  */
 data class DevicePreference(
     val macAddress: String,
-    val customName: String? = null,
+    val deviceName: String? = null,
     val isPinned: Boolean = false,
     val lastSeen: Long = System.currentTimeMillis()
 ) {
     fun getDisplayName(defaultVendor: String?): String {
-        return customName ?: defaultVendor ?: "Unknown Device"
+        return deviceName ?: defaultVendor ?: "Unknown Device"
     }
 }

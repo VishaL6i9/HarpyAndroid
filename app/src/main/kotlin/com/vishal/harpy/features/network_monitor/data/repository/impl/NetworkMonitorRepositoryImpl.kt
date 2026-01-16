@@ -303,16 +303,19 @@ class NetworkMonitorRepositoryImpl : NetworkMonitorRepository {
         val vendor = device.vendor ?: identifyVendor(device.macAddress)
 
         return when {
-            vendor?.contains("Apple", ignoreCase = true) == true -> "Phone/Tablet"
-            vendor?.contains("Samsung", ignoreCase = true) == true -> "Phone/Tablet"
+            vendor?.contains("Apple", ignoreCase = true) == true -> "iPhone/iPad"
+            vendor?.contains("Samsung", ignoreCase = true) == true -> "Samsung Phone/Tablet"
             vendor?.contains("Intel", ignoreCase = true) == true -> "Computer"
-            vendor?.contains("Dell", ignoreCase = true) == true -> "Computer"
+            vendor?.contains("Dell", ignoreCase = true) == true -> "Dell Computer"
             vendor?.contains("HP", ignoreCase = true) == true ||
-            vendor?.contains("Hewlett", ignoreCase = true) == true -> "Computer/Printer"
-            vendor?.contains("Raspberry", ignoreCase = true) == true -> "IoT/Single-board computer"
+            vendor?.contains("Hewlett", ignoreCase = true) == true -> "HP Computer/Printer"
+            vendor?.contains("Raspberry", ignoreCase = true) == true -> "Raspberry Pi"
             vendor?.contains("TP-Link", ignoreCase = true) == true ||
-            vendor?.contains("Ubiquiti", ignoreCase = true) == true ||
-            vendor?.contains("Realtek", ignoreCase = true) == true -> "Router/Network equipment"
+            vendor?.contains("Ubiquiti", ignoreCase = true) == true -> "Router/Network Equipment"
+            vendor?.contains("Realtek", ignoreCase = true) == true -> "Network Device"
+            vendor?.contains("Mediatek", ignoreCase = true) == true -> "Mobile Device"
+            vendor?.contains("AzureWave", ignoreCase = true) == true -> "WiFi Module/Adapter"
+            vendor?.contains("Broadcom", ignoreCase = true) == true -> "WiFi Module"
             device.hwType?.contains("WiFi", ignoreCase = true) == true -> "Wireless Device"
             device.hwType?.contains("Ethernet", ignoreCase = true) == true -> "Wired Device"
             else -> null

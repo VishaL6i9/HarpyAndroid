@@ -15,7 +15,8 @@ class NetworkDeviceAdapter(
     private val onBlockClick: (NetworkDevice) -> Unit,
     private val onUnblockClick: (NetworkDevice) -> Unit,
     private val onPinClick: (NetworkDevice) -> Unit,
-    private val onEditNameClick: (NetworkDevice) -> Unit
+    private val onEditNameClick: (NetworkDevice) -> Unit,
+    private val onLongPress: (NetworkDevice, View) -> Unit
 ) : ListAdapter<NetworkDevice, NetworkDeviceAdapter.DeviceViewHolder>(DeviceDiffCallback) {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): DeviceViewHolder {
@@ -36,26 +37,42 @@ class NetworkDeviceAdapter(
             val ipAddress = view.findViewById<TextView>(R.id.ipAddress)
             val macAddress = view.findViewById<TextView>(R.id.macAddress)
             val hostname = view.findViewById<TextView>(R.id.hostname)
+            val deviceNameHeader = view.findViewById<TextView>(R.id.deviceNameHeader)
             val deviceType = view.findViewById<TextView>(R.id.deviceType)
+            val deviceName = view.findViewById<TextView>(R.id.deviceName)
             val vendor = view.findViewById<TextView>(R.id.vendor)
             val blockedStatus = view.findViewById<TextView>(R.id.blockedStatus)
             val blockButton = view.findViewById<Button>(R.id.blockButton)
             val unblockButton = view.findViewById<Button>(R.id.unblockButton)
-            val pinButton = view.findViewById<Button>(R.id.pinButton)
-            val editNameButton = view.findViewById<Button>(R.id.editNameButton)
 
             ipAddress.text = item.ipAddress
             macAddress.text = item.macAddress
-            hostname.text = item.hostname ?: "Unknown"
+            
+            // Show hostname only if it's not "Unknown"
+            if (item.hostname != null && item.hostname != "Unknown") {
+                hostname.text = item.hostname
+                hostname.visibility = View.VISIBLE
+            } else {
+                hostname.visibility = View.GONE
+            }
+            
+            // Show device name in header if set
+            if (item.deviceName != null) {
+                deviceNameHeader.text = item.deviceName
+                deviceNameHeader.visibility = View.VISIBLE
+            } else {
+                deviceNameHeader.visibility = View.GONE
+            }
+            
             deviceType.text = item.deviceType ?: "Unknown"
-            vendor.text = item.getDisplayName()
+            deviceName.text = item.deviceName ?: "(not set)"
+            vendor.text = item.vendor ?: "Unknown"
 
-            // Pin button
-            pinButton.text = if (item.isPinned) "📌 Pinned" else "📍 Pin"
-            pinButton.setOnClickListener { onPinClick(item) }
-
-            // Edit name button
-            editNameButton.setOnClickListener { onEditNameClick(item) }
+            // Long press to show context menu
+            view.setOnLongClickListener {
+                onLongPress(item, view)
+                true
+            }
 
             if (item.isBlocked) {
                 blockedStatus.visibility = View.VISIBLE
