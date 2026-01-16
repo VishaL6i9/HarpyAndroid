@@ -41,6 +41,9 @@ captures/
 .idea/assetWizardSettings.xml
 .idea/deploymentTargetSelector.xml
 
+### Android App Generated ###
+app/build/
+
 ### NetBeans ###
 /nbproject/private/
 /nbbuild/
