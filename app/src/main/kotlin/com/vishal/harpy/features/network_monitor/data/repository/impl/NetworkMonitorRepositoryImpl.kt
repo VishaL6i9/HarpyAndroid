@@ -188,93 +188,116 @@ class NetworkMonitorRepositoryImpl : NetworkMonitorRepository {
                     val subnet = matchResult.groupValues[1]
                     Log.d(TAG, "Scanning subnet: $subnet.0/24")
 
-                    // Read ARP table directly without pinging
+                    // Perform network discovery using multiple methods
+                    Log.d(TAG, "Performing network discovery...")
+                    try {
+                        val discoveryProcess = Runtime.getRuntime().exec("su")
+                        val discoveryOutput = DataOutputStream(discoveryProcess.outputStream)
+                        
+                        // Method 1: Broadcast ping to trigger ARP responses
+                        discoveryOutput.writeBytes("ping -b -c 1 -W 1 $subnet.255 > /dev/null 2>&1\n")
+                        
+                        // Method 2: Parallel TCP/UDP probes to common ports (faster than ICMP)
+                        // This triggers ARP responses from devices even if they don't respond to ping
+                        discoveryOutput.writeBytes("for i in {1..254}; do timeout 0.1 bash -c \"</dev/tcp/$subnet.\$i/22\" > /dev/null 2>&1 & done\n")
+                        discoveryOutput.writeBytes("for i in {1..254}; do timeout 0.1 bash -c \"</dev/tcp/$subnet.\$i/80\" > /dev/null 2>&1 & done\n")
+                        discoveryOutput.writeBytes("for i in {1..254}; do timeout 0.1 bash -c \"</dev/tcp/$subnet.\$i/443\" > /dev/null 2>&1 & done\n")
+                        
+                        // Method 3: Use arping if available
+                        discoveryOutput.writeBytes("for i in {1..254}; do arping -c 1 -w 10 $subnet.\$i > /dev/null 2>&1 & done\n")
+                        
+                        discoveryOutput.writeBytes("wait\n")
+                        discoveryOutput.writeBytes("exit\n")
+                        discoveryOutput.flush()
+                        discoveryOutput.close()
+                        
+                        val completed = discoveryProcess.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)
+                        if (!completed) {
+                            discoveryProcess.destroyForcibly()
+                        }
+                        Log.d(TAG, "Network discovery completed")
+                    } catch (e: Exception) {
+                        Log.d(TAG, "Network discovery failed: ${e.message}")
+                    }
+
+                    // Now read ARP table after discovery using 'ip neigh' which is more comprehensive
                     Log.d(TAG, "Reading ARP table...")
                     val arpProcess = Runtime.getRuntime().exec("su")
                     val arpOutput = DataOutputStream(arpProcess.outputStream)
-                    arpOutput.writeBytes("cat /proc/net/arp\n")
+                    
+                    // Use 'ip neigh' which is more comprehensive than /proc/net/arp
+                    arpOutput.writeBytes("ip neigh show\n")
                     arpOutput.writeBytes("exit\n")
                     arpOutput.flush()
                     arpOutput.close()
                     
                     val arpReader = BufferedReader(InputStreamReader(arpProcess.inputStream))
 
-                    var lineNumber = 0
                     var line: String?
+                    val seenMacs = mutableSetOf<String>()  // Track seen MACs to avoid duplicates
+                    
                     while (arpReader.readLine().also { line = it } != null) {
-                        lineNumber++
-                        // Skip header line
-                        if (lineNumber == 1) {
-                            Log.d(TAG, "ARP table header: $line")
-                            continue
-                        }
-
-                        val fields = line?.trim()?.split(FIELDS_SPLIT_PATTERN)
-                        Log.d(TAG, "ARP line $lineNumber: fields=${fields?.size}, content=$line")
+                        Log.d(TAG, "ARP entry: $line")
                         
-                        if (fields != null && fields.size >= 6) {
-                            val ip = fields[0]  // IP address
-                            val hwType = fields[1]  // Hardware type
-                            val flags = fields[2]  // Flags
-                            val mac = fields[3]  // MAC address
-                            val mask = fields[4]  // Mask
-                            val deviceInterface = fields[5]  // Device name
-
-                            Log.d(TAG, "Parsed: IP=$ip, HW=$hwType, Flags=$flags, MAC=$mac, Mask=$mask, Device=$deviceInterface")
-
-                            if (flags.contains("0x2") || flags.contains("0x6")) {
-                                if (mac != "00:00:00:00:00:00" && mac != "<incomplete>") {
-                                    var hostname: String? = null
-                                    try {
-                                        val hostnameProcess = Runtime.getRuntime().exec(arrayOf("sh", "-c", "nslookup $ip"))
-                                        val hostnameReader = BufferedReader(InputStreamReader(hostnameProcess.inputStream))
-                                        var hostnameLine: String?
-                                        while (hostnameReader.readLine().also { hostnameLine = it } != null) {
-                                            if (hostnameLine!!.contains("name = ")) {
-                                                val nameMatch = HOSTNAME_PATTERN.find(hostnameLine!!)
-                                                if (nameMatch != null) {
-                                                    hostname = nameMatch.groupValues[1].trimEnd('.')
-                                                    break
-                                                }
+                        // Parse 'ip neigh' output format: "192.168.29.1 dev wlan0 lladdr b4:8c:9d:8c:ef:09 REACHABLE"
+                        val parts = line?.trim()?.split(Regex("\\s+"))
+                        
+                        if (parts != null && parts.size >= 5) {
+                            val ip = parts[0]
+                            val mac = parts.getOrNull(4)  // lladdr value
+                            val state = parts.getOrNull(5)  // State (REACHABLE, STALE, etc.)
+                            val deviceInterface = parts.getOrNull(2)  // dev value
+                            
+                            Log.d(TAG, "Parsed: IP=$ip, MAC=$mac, State=$state, Device=$deviceInterface")
+                            
+                            // Only accept IPv4 addresses (skip IPv6 like fe80:: or 2405:)
+                            val isIPv4 = ip.matches(Regex("^\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}$"))
+                            
+                            // Accept devices with valid MAC addresses, IPv4 only, and not already seen
+                            if (isIPv4 && mac != null && mac.matches(Regex("^([0-9A-Fa-f]{2}:){5}([0-9A-Fa-f]{2})$")) && 
+                                mac != "00:00:00:00:00:00" && mac != "<incomplete>" && !seenMacs.contains(mac)) {
+                                
+                                seenMacs.add(mac)
+                                
+                                var hostname: String? = null
+                                try {
+                                    val hostnameProcess = Runtime.getRuntime().exec(arrayOf("sh", "-c", "nslookup $ip"))
+                                    val hostnameReader = BufferedReader(InputStreamReader(hostnameProcess.inputStream))
+                                    var hostnameLine: String?
+                                    while (hostnameReader.readLine().also { hostnameLine = it } != null) {
+                                        if (hostnameLine!!.contains("name = ")) {
+                                            val nameMatch = HOSTNAME_PATTERN.find(hostnameLine!!)
+                                            if (nameMatch != null) {
+                                                hostname = nameMatch.groupValues[1].trimEnd('.')
+                                                break
                                             }
                                         }
-                                        hostnameReader.close()
-                                        hostnameProcess.waitFor(3, java.util.concurrent.TimeUnit.SECONDS)
-                                        hostnameProcess.destroyForcibly()
-                                    } catch (e: Exception) {
-                                        Log.d(TAG, "Could not resolve hostname for $ip: ${e.message}")
                                     }
-
-                                    val hwTypeDescription = when(hwType.lowercase()) {
-                                        "0x1" -> "Ethernet"
-                                        "0x19" -> "WiFi"
-                                        "0x420" -> "Bridge"
-                                        else -> "Unknown"
-                                    }
-
-                                    val vendor = identifyVendor(mac)
-                                    val deviceType = identifyDeviceType(NetworkDevice(ip, mac, hostname, vendor, hwTypeDescription))
-
-                                    val networkDevice = NetworkDevice(
-                                        ipAddress = ip,
-                                        macAddress = mac,
-                                        hostname = hostname,
-                                        vendor = vendor,
-                                        deviceType = deviceType,
-                                        hwType = hwTypeDescription,
-                                        mask = mask,
-                                        deviceInterface = deviceInterface
-                                    )
-                                    devices.add(networkDevice)
-                                    Log.d(TAG, "Found device: $ip ($mac) - $vendor")
-                                } else {
-                                    Log.d(TAG, "Skipping device with invalid MAC: $mac")
+                                    hostnameReader.close()
+                                    hostnameProcess.waitFor(3, java.util.concurrent.TimeUnit.SECONDS)
+                                    hostnameProcess.destroyForcibly()
+                                } catch (e: Exception) {
+                                    Log.d(TAG, "Could not resolve hostname for $ip: ${e.message}")
                                 }
+
+                                val vendor = identifyVendor(mac)
+                                val deviceType = identifyDeviceType(NetworkDevice(ip, mac, hostname, vendor, "Unknown"))
+
+                                val networkDevice = NetworkDevice(
+                                    ipAddress = ip,
+                                    macAddress = mac,
+                                    hostname = hostname,
+                                    vendor = vendor,
+                                    deviceType = deviceType,
+                                    hwType = "Unknown",
+                                    mask = "*",
+                                    deviceInterface = deviceInterface ?: "unknown"
+                                )
+                                devices.add(networkDevice)
+                                Log.d(TAG, "Found device: $ip ($mac) - $vendor (state=$state)")
                             } else {
-                                Log.d(TAG, "Skipping device with flags: $flags (not 0x2 or 0x6)")
+                                Log.d(TAG, "Skipping entry with invalid MAC: $mac")
                             }
-                        } else {
-                            Log.d(TAG, "Skipping line with insufficient fields: ${fields?.size}")
                         }
                     }
 

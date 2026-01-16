@@ -53,6 +53,18 @@ class NetworkMonitorFragment : Fragment() {
 
         val debugButton = binding.findViewById<android.widget.ImageButton>(R.id.debugButton)
         debugButton.setOnClickListener { showDebugMenu(it) }
+
+        // Setup filter buttons
+        val filterIPv4 = binding.findViewById<com.google.android.material.button.MaterialButton>(R.id.filterIPv4)
+        val filterIPv6 = binding.findViewById<com.google.android.material.button.MaterialButton>(R.id.filterIPv6)
+
+        filterIPv4.setOnClickListener {
+            viewModel.toggleIPv4Filter()
+        }
+
+        filterIPv6.setOnClickListener {
+            viewModel.toggleIPv6Filter()
+        }
     }
 
     private fun setupRecyclerView() {
@@ -71,7 +83,7 @@ class NetworkMonitorFragment : Fragment() {
     private fun observeViewModel() {
         viewLifecycleOwner.lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.networkDevices.collect { devices ->
+                viewModel.filteredDevices.collect { devices ->
                     adapter.submitList(devices)
                     updateDeviceCount(devices.size)
                     updateEmptyState(devices.isEmpty())
@@ -96,6 +108,24 @@ class NetworkMonitorFragment : Fragment() {
                 }
             }
         }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.filterIPv4.collect { isChecked ->
+                    val filterIPv4 = binding.findViewById<com.google.android.material.button.MaterialButton>(R.id.filterIPv4)
+                    filterIPv4.isChecked = isChecked
+                }
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.filterIPv6.collect { isChecked ->
+                    val filterIPv6 = binding.findViewById<com.google.android.material.button.MaterialButton>(R.id.filterIPv6)
+                    filterIPv6.isChecked = isChecked
+                }
+            }
+        }
     }
 
     private fun updateLoadingState(isLoading: Boolean) {
@@ -113,13 +143,16 @@ class NetworkMonitorFragment : Fragment() {
 
     private fun updateDeviceCount(count: Int) {
         val deviceCountSection = binding.findViewById<LinearLayout>(R.id.deviceCountSection)
+        val filterSection = binding.findViewById<LinearLayout>(R.id.filterSection)
         val deviceCountText = binding.findViewById<TextView>(R.id.deviceCount)
         
         if (count > 0) {
             deviceCountSection.visibility = View.VISIBLE
+            filterSection.visibility = View.VISIBLE
             deviceCountText.text = count.toString()
         } else {
             deviceCountSection.visibility = View.GONE
+            filterSection.visibility = View.GONE
         }
     }
 

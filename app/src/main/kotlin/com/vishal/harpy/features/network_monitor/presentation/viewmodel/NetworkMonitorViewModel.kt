@@ -52,6 +52,15 @@ class NetworkMonitorViewModel @Inject constructor(
     private val _lastError = MutableStateFlow<NetworkError?>(null)
     val lastError: StateFlow<NetworkError?> = _lastError.asStateFlow()
     
+    private val _filterIPv4 = MutableStateFlow(true)
+    val filterIPv4: StateFlow<Boolean> = _filterIPv4.asStateFlow()
+    
+    private val _filterIPv6 = MutableStateFlow(false)
+    val filterIPv6: StateFlow<Boolean> = _filterIPv6.asStateFlow()
+    
+    private val _filteredDevices = MutableStateFlow<List<NetworkDevice>>(emptyList())
+    val filteredDevices: StateFlow<List<NetworkDevice>> = _filteredDevices.asStateFlow()
+    
     init {
         checkRootAccess()
     }
@@ -109,6 +118,7 @@ class NetworkMonitorViewModel @Inject constructor(
                         )
                         
                         _networkDevices.value = sortedDevices
+                        applyFilters()
                         if (sortedDevices.isEmpty()) {
                             _error.value = "No devices found on the network"
                         }
@@ -292,4 +302,32 @@ class NetworkMonitorViewModel @Inject constructor(
             }
         }
     }
-}
+
+    /**
+     * Toggle IPv4 filter
+     */
+    fun toggleIPv4Filter() {
+        _filterIPv4.value = !_filterIPv4.value
+        applyFilters()
+    }
+
+    /**
+     * Toggle IPv6 filter
+     */
+    fun toggleIPv6Filter() {
+        _filterIPv6.value = !_filterIPv6.value
+        applyFilters()
+    }
+
+    /**
+     * Apply current filters to the device list
+     */
+    private fun applyFilters() {
+        val filtered = _networkDevices.value.filter { device ->
+            val isIPv4 = device.ipAddress.matches(Regex("^\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}$"))
+            val isIPv6 = !isIPv4
+            
+            (isIPv4 && _filterIPv4.value) || (isIPv6 && _filterIPv6.value)
+        }
+        _filteredDevices.value = filtered
+    }
