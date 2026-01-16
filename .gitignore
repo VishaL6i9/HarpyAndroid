@@ -3,6 +3,9 @@ out/
 !**/src/main/**/out/
 !**/src/test/**/out/
 
+### Android Studio ###
+.idea/
+
 ### Kotlin ###
 .kotlin
 
