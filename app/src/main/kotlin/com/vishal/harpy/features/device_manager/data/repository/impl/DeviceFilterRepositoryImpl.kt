@@ -14,39 +14,43 @@ class DeviceFilterRepositoryImpl : DeviceFilterRepository {
     private val whitelist = mutableSetOf<String>() // IP addresses
     
     override suspend fun addToBlacklist(device: NetworkDevice): Boolean {
-        synchronized(blacklist) {
-            val result = blacklist.add(device.ipAddress)
-            // Remove from whitelist if it was there
-            removeFromWhitelist(device)
-            Log.d(TAG, "Added ${device.ipAddress} to blacklist")
-            return result
+        val result = synchronized(blacklist) {
+            val addResult = blacklist.add(device.ipAddress)
+            addResult
         }
+        // Remove from whitelist if it was there
+        removeFromWhitelist(device)
+        Log.d(TAG, "Added ${device.ipAddress} to blacklist")
+        return result
     }
-    
+
     override suspend fun addToWhitelist(device: NetworkDevice): Boolean {
-        synchronized(whitelist) {
-            val result = whitelist.add(device.ipAddress)
-            // Remove from blacklist if it was there
-            removeFromBlacklist(device)
-            Log.d(TAG, "Added ${device.ipAddress} to whitelist")
-            return result
+        val result = synchronized(whitelist) {
+            val addResult = whitelist.add(device.ipAddress)
+            addResult
         }
+        // Remove from blacklist if it was there
+        removeFromBlacklist(device)
+        Log.d(TAG, "Added ${device.ipAddress} to whitelist")
+        return result
     }
-    
+
     override suspend fun removeFromBlacklist(device: NetworkDevice): Boolean {
-        synchronized(blacklist) {
-            val result = blacklist.remove(device.ipAddress)
-            Log.d(TAG, "Removed ${device.ipAddress} from blacklist")
-            return result
+        val result = synchronized(blacklist) {
+            val removeResult = blacklist.remove(device.ipAddress)
+            removeResult
         }
+        Log.d(TAG, "Removed ${device.ipAddress} from blacklist")
+        return result
     }
-    
+
     override suspend fun removeFromWhitelist(device: NetworkDevice): Boolean {
-        synchronized(whitelist) {
-            val result = whitelist.remove(device.ipAddress)
-            Log.d(TAG, "Removed ${device.ipAddress} from whitelist")
-            return result
+        val result = synchronized(whitelist) {
+            val removeResult = whitelist.remove(device.ipAddress)
+            removeResult
         }
+        Log.d(TAG, "Removed ${device.ipAddress} from whitelist")
+        return result
     }
     
     override suspend fun isBlacklisted(device: NetworkDevice): Boolean {
