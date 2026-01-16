@@ -47,11 +47,11 @@ class NetworkDeviceAdapter(
             val unblockButton = view.findViewById<Button>(R.id.unblockButton)
 
             ipAddress.text = item.ipAddress
-            if (item.isCurrentDevice) {
+            if (item.isBlocked) {
+                ipAddress.setTextColor(Color.parseColor("#FF5252")) // Material Red
+            } else if (item.isCurrentDevice) {
                 ipAddress.setTextColor(Color.parseColor("#2196F3")) // Standard Blue
             } else {
-                // Return to default (usually black or primary text color)
-                // We should ideally use a resource color, but for simplicity:
                 ipAddress.setTextColor(macAddress.textColors) 
             }
             macAddress.text = item.macAddress
