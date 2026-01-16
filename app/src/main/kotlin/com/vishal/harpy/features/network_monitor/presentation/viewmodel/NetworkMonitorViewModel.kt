@@ -1,5 +1,6 @@
 package com.vishal.harpy.features.network_monitor.presentation.viewmodel
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.vishal.harpy.features.network_monitor.domain.usecases.ScanNetworkUseCase
@@ -12,7 +13,9 @@ import com.vishal.harpy.core.utils.NetworkTopology
 import com.vishal.harpy.core.utils.NetworkResult
 import com.vishal.harpy.core.utils.NetworkError
 import com.vishal.harpy.core.utils.NetworkErrorMapper
+import com.vishal.harpy.core.utils.DevicePreferenceRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -25,8 +28,11 @@ class NetworkMonitorViewModel @Inject constructor(
     private val isDeviceRootedUseCase: IsDeviceRootedUseCase,
     private val blockDeviceUseCase: BlockDeviceUseCase,
     private val unblockDeviceUseCase: UnblockDeviceUseCase,
-    private val mapNetworkTopologyUseCase: MapNetworkTopologyUseCase
+    private val mapNetworkTopologyUseCase: MapNetworkTopologyUseCase,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
+    
+    private val devicePreferenceRepository = DevicePreferenceRepository(context)
     
     private val _networkDevices = MutableStateFlow<List<NetworkDevice>>(emptyList())
     val networkDevices: StateFlow<List<NetworkDevice>> = _networkDevices.asStateFlow()
@@ -88,8 +94,22 @@ class NetworkMonitorViewModel @Inject constructor(
                 val result = scanNetworkUseCase()
                 when (result) {
                     is NetworkResult.Success -> {
-                        _networkDevices.value = result.data
-                        if (result.data.isEmpty()) {
+                        // Load preferences for each device
+                        val devicesWithPreferences = result.data.map { device ->
+                            val preference = devicePreferenceRepository.getDevicePreference(device.macAddress)
+                            device.copy(
+                                customName = preference?.customName,
+                                isPinned = preference?.isPinned ?: false
+                            )
+                        }
+                        
+                        // Sort: pinned devices first, then by IP
+                        val sortedDevices = devicesWithPreferences.sortedWith(
+                            compareBy({ !it.isPinned }, { it.ipAddress })
+                        )
+                        
+                        _networkDevices.value = sortedDevices
+                        if (sortedDevices.isEmpty()) {
                             _error.value = "No devices found on the network"
                         }
                     }
@@ -217,5 +237,44 @@ class NetworkMonitorViewModel @Inject constructor(
      */
     fun getErrorStackTrace(): String {
         return _lastError.value?.getStackTrace() ?: "No stack trace available"
+    }
+
+    /**
+     * Set custom name for a device
+     */
+    fun setDeviceCustomName(device: NetworkDevice, customName: String?) {
+        viewModelScope.launch {
+            devicePreferenceRepository.setCustomName(device.macAddress, customName)
+            // Update the device in the list
+            _networkDevices.value = _networkDevices.value.map {
+                if (it.macAddress == device.macAddress) {
+                    it.copy(customName = customName)
+                } else {
+                    it
+                }
+            }
+        }
+    }
+
+    /**
+     * Toggle pin status for a device
+     */
+    fun toggleDevicePin(device: NetworkDevice) {
+        viewModelScope.launch {
+            devicePreferenceRepository.togglePin(device.macAddress)
+            // Update the device in the list and re-sort
+            val updatedDevices = _networkDevices.value.map {
+                if (it.macAddress == device.macAddress) {
+                    it.copy(isPinned = !it.isPinned)
+                } else {
+                    it
+                }
+            }
+            // Re-sort: pinned devices first
+            val sortedDevices = updatedDevices.sortedWith(
+                compareBy({ !it.isPinned }, { it.ipAddress })
+            )
+            _networkDevices.value = sortedDevices
+        }
     }
 }

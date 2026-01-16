@@ -12,8 +12,17 @@ data class NetworkDevice(
     val hwType: String? = null,    // Hardware type (ethernet, wifi, etc.)
     val mask: String? = null,      // Network mask
     val deviceInterface: String? = null, // Network interface (wlan0, eth0, etc.)
-    var isBlocked: Boolean = false
-)
+    var isBlocked: Boolean = false,
+    var customName: String? = null, // User-defined custom name
+    var isPinned: Boolean = false   // Whether device is pinned
+) {
+    /**
+     * Get display name - prioritizes custom name over vendor
+     */
+    fun getDisplayName(): String {
+        return customName ?: vendor ?: "Unknown Device"
+    }
+}
 
 /**
  * Data class representing network topology
