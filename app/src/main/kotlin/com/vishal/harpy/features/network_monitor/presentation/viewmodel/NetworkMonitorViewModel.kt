@@ -52,6 +52,9 @@ class NetworkMonitorViewModel @Inject constructor(
     private val _lastError = MutableStateFlow<NetworkError?>(null)
     val lastError: StateFlow<NetworkError?> = _lastError.asStateFlow()
 
+    private val _scanSuccess = MutableStateFlow(false)
+    val scanSuccess: StateFlow<Boolean> = _scanSuccess.asStateFlow()
+
     private val _filterIPv4 = MutableStateFlow(true)
     val filterIPv4: StateFlow<Boolean> = _filterIPv4.asStateFlow()
 
@@ -121,6 +124,7 @@ class NetworkMonitorViewModel @Inject constructor(
 
                         _networkDevices.value = sortedDevices
                         applyFilters()
+                        _scanSuccess.value = true
                         if (sortedDevices.isEmpty()) {
                             _error.value = "No devices found on the network"
                         }
@@ -337,5 +341,12 @@ class NetworkMonitorViewModel @Inject constructor(
             (isIPv4 && _filterIPv4.value) || (isIPv6 && _filterIPv6.value)
         }
         _filteredDevices.value = filtered
+    }
+
+    /**
+     * Reset the scan success flag
+     */
+    fun resetScanSuccess() {
+        _scanSuccess.value = false
     }
 }

@@ -126,6 +126,23 @@ class NetworkMonitorFragment : Fragment() {
                 }
             }
         }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.scanSuccess.collect { success ->
+                    if (success) {
+                        val deviceCount = viewModel.filteredDevices.value.size
+                        android.widget.Toast.makeText(
+                            requireContext(),
+                            "Scan complete: $deviceCount device${if (deviceCount != 1) "s" else ""} found",
+                            android.widget.Toast.LENGTH_SHORT
+                        ).show()
+                        // Reset the success flag
+                        viewModel.resetScanSuccess()
+                    }
+                }
+            }
+        }
     }
 
     private fun updateLoadingState(isLoading: Boolean) {
@@ -146,7 +163,10 @@ class NetworkMonitorFragment : Fragment() {
         val filterSection = binding.findViewById<LinearLayout>(R.id.filterSection)
         val deviceCountText = binding.findViewById<TextView>(R.id.deviceCount)
         
-        if (count > 0) {
+        // Show device count and filter section if we have scanned (even if filtered results are empty)
+        val hasScanned = viewModel.networkDevices.value.isNotEmpty()
+        
+        if (hasScanned) {
             deviceCountSection.visibility = View.VISIBLE
             filterSection.visibility = View.VISIBLE
             deviceCountText.text = count.toString()
@@ -160,7 +180,10 @@ class NetworkMonitorFragment : Fragment() {
         val emptyState = binding.findViewById<LinearLayout>(R.id.emptyState)
         val recyclerView = binding.findViewById<RecyclerView>(R.id.devicesRecyclerView)
         
-        if (isEmpty) {
+        // Only show empty state if we have no scanned devices at all
+        val hasScanned = viewModel.networkDevices.value.isNotEmpty()
+        
+        if (isEmpty && !hasScanned) {
             emptyState.visibility = View.VISIBLE
             recyclerView.visibility = View.GONE
         } else {
