@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace 'com.harpyandroid.harpy'
+    namespace 'com.vishal.harpy'
     compileSdk 36
 
     defaultConfig {
-        applicationId "com.harpyandroid.harpy"
+        applicationId "com.vishal.harpy"
         minSdk 24
         targetSdk 36
         versionCode 1
