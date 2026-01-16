@@ -57,10 +57,10 @@ To build the project, ensure you have the Android SDK properly configured with t
 - [x] ARP scanning implementation
 - [x] Device identification algorithms
 - [x] Network topology mapping
-- [ ] Real-time device monitoring
-  - [ ] Background service for continuous network scanning
+- [x] Real-time device monitoring
+  - [x] Background service for continuous network scanning
   - [ ] WebSocket or similar connection for live updates
-  - [ ] Efficient polling mechanism to minimize battery drain
+  - [x] Efficient polling mechanism to minimize battery drain
   - [ ] Notification system for new device detection
   - [ ] Live status updates for device connectivity
 
