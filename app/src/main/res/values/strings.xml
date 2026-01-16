@@ -10,6 +10,7 @@
     <string name="error_command_execution">Error occurred while executing network command.</string>
     <string name="error_invalid_ip_address">Invalid IP address: %s</string>
     <string name="error_invalid_mac_address">Invalid MAC address: %s</string>
+    <string name="error_native_library">Native library or root helper error occurred.</string>
     <string name="error_unknown">An unknown error occurred.</string>
 
     <!-- Root error messages -->

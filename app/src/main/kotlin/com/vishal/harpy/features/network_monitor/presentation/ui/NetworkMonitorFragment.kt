@@ -143,6 +143,21 @@ class NetworkMonitorFragment : Fragment() {
                 }
             }
         }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.testPingResult.collect { result ->
+                    result?.let { (ip, responded) ->
+                        android.widget.Toast.makeText(
+                            requireContext(),
+                            "Ping test for $ip: ${if (responded) "REACHABLE (Verified)" else "NO RESPONSE (May be offline)"}",
+                            android.widget.Toast.LENGTH_LONG
+                        ).show()
+                        viewModel.resetPingResult()
+                    }
+                }
+            }
+        }
     }
 
     private fun updateLoadingState(isLoading: Boolean) {
@@ -238,6 +253,7 @@ class NetworkMonitorFragment : Fragment() {
             menu.add(0, 1, 0, if (device.isPinned) "Unpin" else "Pin")
             menu.add(0, 2, 1, "Set Name")
             menu.add(0, 3, 2, if (device.isBlocked) "Unblock" else "Block")
+            menu.add(0, 4, 3, "Test Ping (Verify)")
             
             setOnMenuItemClickListener { item ->
                 when (item.itemId) {
@@ -260,6 +276,10 @@ class NetworkMonitorFragment : Fragment() {
                         } else {
                             viewModel.blockDevice(device)
                         }
+                        true
+                    }
+                    4 -> {
+                        viewModel.testPing(device)
                         true
                     }
                     else -> false

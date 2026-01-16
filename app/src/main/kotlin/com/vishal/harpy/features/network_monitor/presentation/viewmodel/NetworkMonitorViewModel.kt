@@ -8,6 +8,7 @@ import com.vishal.harpy.features.network_monitor.domain.usecases.IsDeviceRootedU
 import com.vishal.harpy.features.network_monitor.domain.usecases.BlockDeviceUseCase
 import com.vishal.harpy.features.network_monitor.domain.usecases.UnblockDeviceUseCase
 import com.vishal.harpy.features.network_monitor.domain.usecases.MapNetworkTopologyUseCase
+import com.vishal.harpy.features.network_monitor.domain.usecases.TestPingUseCase
 import com.vishal.harpy.core.utils.NetworkDevice
 import com.vishal.harpy.core.utils.NetworkTopology
 import com.vishal.harpy.core.utils.NetworkResult
@@ -29,6 +30,7 @@ class NetworkMonitorViewModel @Inject constructor(
     private val blockDeviceUseCase: BlockDeviceUseCase,
     private val unblockDeviceUseCase: UnblockDeviceUseCase,
     private val mapNetworkTopologyUseCase: MapNetworkTopologyUseCase,
+    private val testPingUseCase: TestPingUseCase,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -60,6 +62,9 @@ class NetworkMonitorViewModel @Inject constructor(
 
     private val _filterIPv6 = MutableStateFlow(false)
     val filterIPv6: StateFlow<Boolean> = _filterIPv6.asStateFlow()
+
+    private val _testPingResult = MutableStateFlow<Pair<String, Boolean>?>(null)
+    val testPingResult: StateFlow<Pair<String, Boolean>?> = _testPingResult.asStateFlow()
 
     private val _filteredDevices = MutableStateFlow<List<NetworkDevice>>(emptyList())
     val filteredDevices: StateFlow<List<NetworkDevice>> = _filteredDevices.asStateFlow()
@@ -243,6 +248,34 @@ class NetworkMonitorViewModel @Inject constructor(
                 _isLoading.value = false
             }
         }
+    }
+
+    fun testPing(device: NetworkDevice) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            _testPingResult.value = null
+            try {
+                val result = testPingUseCase(device)
+                when (result) {
+                    is NetworkResult.Success -> {
+                        _testPingResult.value = Pair(device.ipAddress, result.data)
+                    }
+                    is NetworkResult.Error -> {
+                        _testPingResult.value = Pair(device.ipAddress, false)
+                        _error.value = "Ping test failed: ${result.error.message}"
+                    }
+                }
+            } catch (e: Exception) {
+                _testPingResult.value = Pair(device.ipAddress, false)
+                _error.value = "Ping test error: ${e.message}"
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    fun resetPingResult() {
+        _testPingResult.value = null
     }
 
     /**

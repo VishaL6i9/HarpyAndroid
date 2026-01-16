@@ -1,5 +1,6 @@
 package com.vishal.harpy.features.network_monitor.presentation.ui
 
+import android.graphics.Color
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -46,6 +47,13 @@ class NetworkDeviceAdapter(
             val unblockButton = view.findViewById<Button>(R.id.unblockButton)
 
             ipAddress.text = item.ipAddress
+            if (item.isCurrentDevice) {
+                ipAddress.setTextColor(Color.parseColor("#2196F3")) // Standard Blue
+            } else {
+                // Return to default (usually black or primary text color)
+                // We should ideally use a resource color, but for simplicity:
+                ipAddress.setTextColor(macAddress.textColors) 
+            }
             macAddress.text = item.macAddress
             
             // Show hostname only if it's not "Unknown"
