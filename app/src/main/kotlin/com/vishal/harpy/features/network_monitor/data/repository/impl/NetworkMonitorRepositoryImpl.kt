@@ -291,7 +291,7 @@ class NetworkMonitorRepositoryImpl : NetworkMonitorRepository {
         return try {
             val scanResult = scanNetwork()
             if (scanResult is NetworkResult.Error) {
-                return scanResult as NetworkResult<NetworkTopology>
+                return NetworkResult.error(scanResult.error)
             }
 
             val devices = (scanResult as NetworkResult.Success).data
