@@ -13,7 +13,9 @@ import com.vishal.harpy.core.utils.NetworkDevice
 
 class NetworkDeviceAdapter(
     private val onBlockClick: (NetworkDevice) -> Unit,
-    private val onUnblockClick: (NetworkDevice) -> Unit
+    private val onUnblockClick: (NetworkDevice) -> Unit,
+    private val onPinClick: (NetworkDevice) -> Unit,
+    private val onEditNameClick: (NetworkDevice) -> Unit
 ) : ListAdapter<NetworkDevice, NetworkDeviceAdapter.DeviceViewHolder>(DeviceDiffCallback) {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): DeviceViewHolder {
@@ -39,12 +41,21 @@ class NetworkDeviceAdapter(
             val blockedStatus = view.findViewById<TextView>(R.id.blockedStatus)
             val blockButton = view.findViewById<Button>(R.id.blockButton)
             val unblockButton = view.findViewById<Button>(R.id.unblockButton)
+            val pinButton = view.findViewById<Button>(R.id.pinButton)
+            val editNameButton = view.findViewById<Button>(R.id.editNameButton)
 
             ipAddress.text = item.ipAddress
             macAddress.text = item.macAddress
             hostname.text = item.hostname ?: "Unknown"
             deviceType.text = item.deviceType ?: "Unknown"
-            vendor.text = item.vendor ?: "Unknown"
+            vendor.text = item.getDisplayName()
+
+            // Pin button
+            pinButton.text = if (item.isPinned) "📌 Pinned" else "📍 Pin"
+            pinButton.setOnClickListener { onPinClick(item) }
+
+            // Edit name button
+            editNameButton.setOnClickListener { onEditNameClick(item) }
 
             if (item.isBlocked) {
                 blockedStatus.visibility = View.VISIBLE

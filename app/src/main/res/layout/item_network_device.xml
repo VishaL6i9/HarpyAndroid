@@ -154,6 +154,28 @@
             android:spacing="8dp">
 
             <Button
+                android:id="@+id/editNameButton"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:text="✏️ Edit"
+                android:textSize="12sp"
+                android:paddingHorizontal="12dp"
+                android:background="@drawable/button_background"
+                android:textColor="@android:color/white"
+                android:layout_marginEnd="4dp" />
+
+            <Button
+                android:id="@+id/pinButton"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:text="📍 Pin"
+                android:textSize="12sp"
+                android:paddingHorizontal="12dp"
+                android:background="@drawable/button_background"
+                android:textColor="@android:color/white"
+                android:layout_marginEnd="4dp" />
+
+            <Button
                 android:id="@+id/blockButton"
                 android:layout_width="wrap_content"
                 android:layout_height="40dp"

@@ -57,7 +57,9 @@ class NetworkMonitorFragment : Fragment() {
         recyclerView.layoutManager = LinearLayoutManager(context)
         adapter = NetworkDeviceAdapter(
             onBlockClick = { device -> viewModel.blockDevice(device) },
-            onUnblockClick = { device -> viewModel.unblockDevice(device) }
+            onUnblockClick = { device -> viewModel.unblockDevice(device) },
+            onPinClick = { device -> viewModel.toggleDevicePin(device) },
+            onEditNameClick = { device -> showEditNameDialog(device) }
         )
         recyclerView.adapter = adapter
     }
@@ -169,6 +171,39 @@ class NetworkMonitorFragment : Fragment() {
         val clip = android.content.ClipData.newPlainText("Error Details", text)
         clipboard.setPrimaryClip(clip)
         android.widget.Toast.makeText(requireContext(), "Error details copied to clipboard", android.widget.Toast.LENGTH_SHORT).show()
+    }
+
+    private fun showEditNameDialog(device: NetworkDevice) {
+        val editText = android.widget.EditText(requireContext()).apply {
+            setText(device.customName ?: "")
+            hint = "Enter custom name"
+            setSingleLine()
+        }
+
+        androidx.appcompat.app.AlertDialog.Builder(requireContext())
+            .setTitle("Rename Device")
+            .setMessage("Current: ${device.getDisplayName()}")
+            .setView(editText)
+            .setPositiveButton("Save") { _, _ ->
+                val newName = editText.text.toString().trim().takeIf { it.isNotEmpty() }
+                viewModel.setDeviceCustomName(device, newName)
+                android.widget.Toast.makeText(
+                    requireContext(),
+                    "Device renamed to: ${newName ?: device.vendor ?: "Unknown"}",
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+            }
+            .setNegativeButton("Cancel") { _, _ -> }
+            .setNeutralButton("Clear") { _, _ ->
+                viewModel.setDeviceCustomName(device, null)
+                android.widget.Toast.makeText(
+                    requireContext(),
+                    "Custom name cleared",
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+            }
+            .create()
+            .show()
     }
 
     override fun onDestroyView() {
