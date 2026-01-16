@@ -172,8 +172,8 @@ std::vector<std::string> network_scan(const char *interface,
         *last_dot = '\0';
     }
 
-    std::cout << "DEBUG: Sweeping subnet prefix: " << subnet_prefix << std::endl;
-    LOGD("Sweeping %s.1-254", subnet_prefix);
+    std::cout << "DEBUG: Starting 2-pass sweep on subnet: " << subnet_prefix << std::endl;
+    LOGD("Starting 2-pass sweep on %s.1-254", subnet_prefix);
     
     // Structure for sending
     struct arp_packet sweep_pkt;
@@ -198,19 +198,38 @@ std::vector<std::string> network_scan(const char *interface,
     dest_addr.sll_halen = ETH_ALEN;
     memset(dest_addr.sll_addr, 0xff, ETH_ALEN);
 
-    for (int i = 1; i < 255; i++) {
-        char target_ip[16];
-        snprintf(target_ip, sizeof(target_ip), "%s.%d", subnet_prefix, i);
-        inet_aton(target_ip, (struct in_addr *)sweep_pkt.arp.arp_tpa);
-        
-        sendto(sock, &sweep_pkt, sizeof(sweep_pkt), 0, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
-        
-        if (i % 30 == 0) usleep(10000); 
-    }
+    auto run_sweep = [&](int pass) {
+        std::cout << "DEBUG: Sweep Pass " << pass << " starting..." << std::endl;
+        for (int i = 1; i < 255; i++) {
+            char target_ip[16];
+            snprintf(target_ip, sizeof(target_ip), "%s.%d", subnet_prefix, i);
+            inet_aton(target_ip, (struct in_addr *)sweep_pkt.arp.arp_tpa);
+            
+            sendto(sock, &sweep_pkt, sizeof(sweep_pkt), 0, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
+            
+            // Pacing: Wait 1ms between packets to avoid buffer overflows
+            // and 20ms every 32 packets to let the network breathe
+            if (i % 32 == 0) usleep(20000);
+            else usleep(1000); 
+        }
+    };
 
-    std::cout << "DEBUG: Sweep sent, waiting " << timeout_seconds << " seconds for responses..." << std::endl;
-    LOGD("Sweep sent, waiting %d seconds for responses...", timeout_seconds);
-    sleep(timeout_seconds);
+    // Pass 1
+    run_sweep(1);
+    
+    // Wait for half the total timeout after pass 1
+    int wait_time = timeout_seconds / 2;
+    if (wait_time < 2) wait_time = 2; // Min wait 2s
+    
+    std::cout << "DEBUG: Pass 1 finished, waiting " << wait_time << "s..." << std::endl;
+    sleep(wait_time);
+
+    // Pass 2
+    run_sweep(2);
+
+    // Wait for the remaining timeout
+    std::cout << "DEBUG: Pass 2 finished, final wait " << wait_time << "s..." << std::endl;
+    sleep(wait_time);
 
     // Stop and cleanup
     g_stop_capture = true;
