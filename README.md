@@ -92,10 +92,15 @@ To build the project, ensure you have the Android SDK properly configured with t
 - [ ] UI/UX enhancements
 - [x] Error handling improvements
   - [x] NetworkError sealed class hierarchy
+  - [x] RootError sealed class hierarchy for root-specific errors
   - [x] NetworkResult wrapper for safe operations
-  - [x] Comprehensive error mapping utilities
+  - [x] RootResult wrapper for root operations
+  - [x] Comprehensive error mapping utilities (NetworkErrorMapper, RootErrorMapper)
   - [x] User-friendly error messages
   - [x] Functional error handling with onSuccess/onError extensions
+  - [x] Stack trace presentation for all errors
+  - [x] Detailed error reporting with full diagnostics
+  - [x] Error logging with complete stack traces
 - [ ] Localization support
 - [ ] Accessibility features
 
