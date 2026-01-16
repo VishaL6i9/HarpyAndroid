@@ -17,7 +17,9 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import android.widget.Button
 import android.widget.ProgressBar
 import androidx.recyclerview.widget.RecyclerView
+import dagger.hilt.android.AndroidEntryPoint
 
+@AndroidEntryPoint
 class NetworkMonitorFragment : Fragment() {
 
     private var _binding: View? = null
