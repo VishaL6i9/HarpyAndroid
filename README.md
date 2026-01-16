@@ -68,7 +68,7 @@ To build the project, ensure you have the Android SDK properly configured with t
 - [x] ARP spoofing implementation for device blocking
 - [x] Network traffic analysis
 - [x] Blacklist/whitelist management
-- [ ] Scheduled blocking functionality
+- [x] Scheduled blocking functionality
 - [ ] Network usage statistics
 
 ### Phase 4: Optimization & Polish (Planned 📋)
