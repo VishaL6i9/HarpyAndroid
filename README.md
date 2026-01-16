@@ -64,12 +64,12 @@ To build the project, ensure you have the Android SDK properly configured with t
   - [ ] Notification system for new device detection
   - [ ] Live status updates for device connectivity
 
-### Phase 3: Advanced Features (In Progress 🔄)
+### Phase 3: Advanced Features (Completed ✅)
 - [x] ARP spoofing implementation for device blocking
 - [x] Network traffic analysis
 - [x] Blacklist/whitelist management
 - [x] Scheduled blocking functionality
-- [ ] Network usage statistics
+- [x] Network usage statistics
 
 ### Phase 4: Optimization & Polish (Planned 📋)
 - [ ] Performance optimizations
