@@ -168,6 +168,7 @@ class NetworkMonitorViewModel @Inject constructor(
                                     it
                                 }
                             }
+                            applyFilters()
                         }
                     }
 
@@ -204,6 +205,7 @@ class NetworkMonitorViewModel @Inject constructor(
                                     it
                                 }
                             }
+                            applyFilters()
                         }
                     }
 
