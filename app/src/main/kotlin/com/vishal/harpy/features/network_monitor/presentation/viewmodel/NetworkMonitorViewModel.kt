@@ -31,40 +31,40 @@ class NetworkMonitorViewModel @Inject constructor(
     private val mapNetworkTopologyUseCase: MapNetworkTopologyUseCase,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
-    
+
     private val devicePreferenceRepository = DevicePreferenceRepository(context)
-    
+
     private val _networkDevices = MutableStateFlow<List<NetworkDevice>>(emptyList())
     val networkDevices: StateFlow<List<NetworkDevice>> = _networkDevices.asStateFlow()
-    
+
     private val _isRooted = MutableStateFlow(false)
     val isRooted: StateFlow<Boolean> = _isRooted.asStateFlow()
-    
+
     private val _networkTopology = MutableStateFlow<NetworkTopology?>(null)
     val networkTopology: StateFlow<NetworkTopology?> = _networkTopology.asStateFlow()
-    
+
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
-    
+
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
     private val _lastError = MutableStateFlow<NetworkError?>(null)
     val lastError: StateFlow<NetworkError?> = _lastError.asStateFlow()
-    
+
     private val _filterIPv4 = MutableStateFlow(true)
     val filterIPv4: StateFlow<Boolean> = _filterIPv4.asStateFlow()
-    
+
     private val _filterIPv6 = MutableStateFlow(false)
     val filterIPv6: StateFlow<Boolean> = _filterIPv6.asStateFlow()
-    
+
     private val _filteredDevices = MutableStateFlow<List<NetworkDevice>>(emptyList())
     val filteredDevices: StateFlow<List<NetworkDevice>> = _filteredDevices.asStateFlow()
-    
+
     init {
         checkRootAccess()
     }
-    
+
     private fun checkRootAccess() {
         viewModelScope.launch {
             _isLoading.value = true
@@ -75,6 +75,7 @@ class NetworkMonitorViewModel @Inject constructor(
                     is NetworkResult.Success -> {
                         _isRooted.value = result.data
                     }
+
                     is NetworkResult.Error -> {
                         _lastError.value = result.error
                         _error.value = result.error.message
@@ -105,24 +106,26 @@ class NetworkMonitorViewModel @Inject constructor(
                     is NetworkResult.Success -> {
                         // Load preferences for each device
                         val devicesWithPreferences = result.data.map { device ->
-                            val preference = devicePreferenceRepository.getDevicePreference(device.macAddress)
+                            val preference =
+                                devicePreferenceRepository.getDevicePreference(device.macAddress)
                             device.copy(
                                 deviceName = preference?.deviceName,
                                 isPinned = preference?.isPinned ?: false
                             )
                         }
-                        
+
                         // Sort: pinned devices first, then by IP
                         val sortedDevices = devicesWithPreferences.sortedWith(
                             compareBy({ !it.isPinned }, { it.ipAddress })
                         )
-                        
+
                         _networkDevices.value = sortedDevices
                         applyFilters()
                         if (sortedDevices.isEmpty()) {
                             _error.value = "No devices found on the network"
                         }
                     }
+
                     is NetworkResult.Error -> {
                         _lastError.value = result.error
                         _error.value = result.error.message
@@ -158,6 +161,7 @@ class NetworkMonitorViewModel @Inject constructor(
                             }
                         }
                     }
+
                     is NetworkResult.Error -> {
                         _lastError.value = result.error
                         _error.value = result.error.message
@@ -193,6 +197,7 @@ class NetworkMonitorViewModel @Inject constructor(
                             }
                         }
                     }
+
                     is NetworkResult.Error -> {
                         _lastError.value = result.error
                         _error.value = result.error.message
@@ -220,6 +225,7 @@ class NetworkMonitorViewModel @Inject constructor(
                     is NetworkResult.Success -> {
                         _networkTopology.value = result.data
                     }
+
                     is NetworkResult.Error -> {
                         _lastError.value = result.error
                         _error.value = result.error.message
@@ -324,10 +330,12 @@ class NetworkMonitorViewModel @Inject constructor(
      */
     private fun applyFilters() {
         val filtered = _networkDevices.value.filter { device ->
-            val isIPv4 = device.ipAddress.matches(Regex("^\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}$"))
+            val isIPv4 =
+                device.ipAddress.matches(Regex("^\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}$"))
             val isIPv6 = !isIPv4
-            
+
             (isIPv4 && _filterIPv4.value) || (isIPv6 && _filterIPv6.value)
         }
         _filteredDevices.value = filtered
     }
+}
