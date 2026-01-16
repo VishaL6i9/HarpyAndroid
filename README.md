@@ -77,14 +77,14 @@ To build the project, ensure you have the Android SDK properly configured with t
 
 ## Project Roadmap
 
-### Phase 1: Foundation & UI (Completed ✅)
+### Phase 1: Foundation & UI (Completed)
 - [x] Project initialization with Android SDK 36 support
 - [x] Root detection functionality
 - [x] Basic UI with device listing
 - [x] Network device discovery implementation
 - [x] Device blocking/unblocking UI elements
 
-### Phase 2: Core Network Functionality (In Progress 🔄)
+### Phase 2: Core Network Functionality (In Progress)
 - [x] Root access validation improvements
 - [x] ARP scanning implementation
 - [x] Device identification algorithms (enhanced with hardware type detection)
@@ -105,14 +105,14 @@ To build the project, ensure you have the Android SDK properly configured with t
   - [x] Aggressive spoofing interval (500ms)
   - [x] Error handling and debug logging
 
-### Phase 3: Advanced Features (Completed ✅)
+### Phase 3: Advanced Features (Completed)
 - [x] ARP spoofing implementation for device blocking
 - [x] Network traffic analysis
 - [x] Blacklist/whitelist management
 - [x] Scheduled blocking functionality
 - [x] Network usage statistics
 
-### Phase 4: Optimization & Polish (Completed ✅)
+### Phase 4: Optimization & Polish (Completed)
 - [x] Performance optimizations
   - [x] Network scan timeout handling (5 second limits)
   - [x] Removed sequential ping loop (was O(n) now O(1))
@@ -160,7 +160,7 @@ To build the project, ensure you have the Android SDK properly configured with t
 - [ ] Localization support
 - [ ] Accessibility features
 
-### Phase 5: Native Integration (In Progress 🔄)
+### Phase 5: Native Integration (In Progress)
 - [x] Native C/C++ libraries for low-level network operations
   - [x] JNI interface for native operations (NativeNetworkOps.kt)
   - [x] Native wrapper with fallback to shell commands (NativeNetworkWrapper.kt)
@@ -209,20 +209,20 @@ To build the project, ensure you have the Android SDK properly configured with t
   - [x] Enhanced error handling in native code
   - [x] Optimized socket operations
 
-### Phase 6: Testing & Deployment (Planned 📋)
+### Phase 6: Testing & Deployment (Planned)
 - [ ] Comprehensive unit testing
 - [ ] Integration testing on various devices
 - [ ] Security audit
 - [ ] Beta testing program
 - [ ] Production release preparation
 
-### Phase 7: Non-Root Implementation (Future Plan 📋)
+### Phase 7: Non-Root Implementation (Future Plan)
 - [ ] VpnService-based network monitoring
 - [ ] Limited functionality for non-rooted devices
 - [ ] Feature parity assessment
 - [ ] Alternative network scanning methods
 
-### Phase 8: Advanced Network Protocols (Future Plan 📋)
+### Phase 8: Advanced Network Protocols (Future Plan)
 - [ ] DNS spoofing and redirection
 - [ ] DHCP spoofing and response interception
 - [ ] SSL/TLS interception and man-in-the-middle capabilities
