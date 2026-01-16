@@ -92,3 +92,13 @@ To build the project, ensure you have the Android SDK properly configured with t
 - [ ] Limited functionality for non-rooted devices
 - [ ] Feature parity assessment
 - [ ] Alternative network scanning methods
+
+## Acknowledgements
+
+- Inspired by the iOS jailbreak tweak "Harpy" for network monitoring and control
+- Based on research into ARP spoofing techniques and network security concepts
+- References to various open-source tools and libraries that informed the approach:
+  - [dsniff](https://github.com/traviscross/dsniff) suite containing arpspoof for understanding ARP manipulation
+  - [Android network security research](https://source.android.com/security/network-security) papers and documentation
+  - [Kotlin and Android development community](https://developer.android.com/) resources
+- Special thanks to the Android development community for best practices and guidance
