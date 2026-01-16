@@ -49,7 +49,7 @@ To build the project, ensure you have the Android SDK properly configured with t
 - [x] Project initialization with Android SDK 36 support
 - [x] Root detection functionality
 - [x] Basic UI with device listing
-- [x] Network device discovery placeholder
+- [x] Network device discovery implementation
 - [x] Device blocking/unblocking UI elements
 
 ### Phase 2: Core Network Functionality (In Progress 🔄)
