@@ -1,5 +1,7 @@
 package com.vishal.harpy
 
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import java.io.BufferedReader
 import java.io.DataOutputStream
@@ -314,6 +316,78 @@ class NetworkMonitorService {
         }
     }
     
+    // Variables for managing continuous scanning
+    private var isScanning = false
+    private var scanInterval: Long = 30000 // 30 seconds default
+    private var scanHandler: Handler? = null
+    private var scanRunnable: Runnable? = null
+
+    /**
+     * Starts continuous network scanning
+     * @param intervalMs Interval between scans in milliseconds
+     * @return true if scanning started successfully, false otherwise
+     */
+    fun startScanning(intervalMs: Long = 30000): Boolean {
+        if (!isDeviceRooted()) {
+            Log.e(TAG, "Cannot start scanning: Device is not rooted")
+            return false
+        }
+
+        if (isScanning) {
+            Log.w(TAG, "Scanning is already running")
+            return false
+        }
+
+        isScanning = true
+        scanInterval = intervalMs
+        scanHandler = Handler(Looper.getMainLooper())
+
+        scanRunnable = object : Runnable {
+            override fun run() {
+                if (isScanning) {
+                    Log.d(TAG, "Performing network scan...")
+                    val devices = scanNetwork()
+                    onDevicesScanned(devices)
+
+                    // Schedule next scan
+                    scanHandler?.postDelayed(this, scanInterval)
+                }
+            }
+        }
+
+        // Start the first scan
+        scanRunnable?.run()
+        Log.i(TAG, "Started continuous network scanning with interval: ${intervalMs}ms")
+        return true
+    }
+
+    /**
+     * Stops continuous network scanning
+     */
+    fun stopScanning() {
+        isScanning = false
+        scanHandler?.removeCallbacks(scanRunnable ?: Runnable {})
+        Log.i(TAG, "Stopped continuous network scanning")
+    }
+
+    /**
+     * Checks if continuous scanning is currently active
+     * @return true if scanning is active, false otherwise
+     */
+    fun isScanning(): Boolean {
+        return isScanning
+    }
+
+    /**
+     * Callback function when devices are scanned
+     * This can be overridden or connected to listeners to handle scan results
+     */
+    private fun onDevicesScanned(devices: List<NetworkDevice>) {
+        Log.d(TAG, "Found ${devices.size} devices in network scan")
+        // This is where we would notify listeners about the scan results
+        // In a real implementation, this would trigger UI updates or notifications
+    }
+
     /**
      * Unblocks a previously blocked device
      * @param device The device to unblock
@@ -324,7 +398,7 @@ class NetworkMonitorService {
             Log.e(TAG, "Cannot unblock device: Device is not rooted")
             return false
         }
-        
+
         // Placeholder implementation for unblocking
         Log.i(TAG, "Successfully unblocked device: ${device.ipAddress}")
         return true
