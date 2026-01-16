@@ -51,6 +51,8 @@ class NetworkDeviceAdapter(
                 ipAddress.setTextColor(Color.parseColor("#FF5252")) // Material Red
             } else if (item.isCurrentDevice) {
                 ipAddress.setTextColor(Color.parseColor("#2196F3")) // Standard Blue
+            } else if (item.isGateway) {
+                ipAddress.setTextColor(Color.parseColor("#4CAF50")) // Material Green
             } else {
                 ipAddress.setTextColor(macAddress.textColors) 
             }
