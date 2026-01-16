@@ -42,4 +42,36 @@ object NetworkErrorMapper {
             }
         }
     }
+
+    /**
+     * Get detailed error information including stack trace
+     */
+    fun getDetailedErrorInfo(error: NetworkError): String {
+        return error.getDetailedReport()
+    }
+
+    /**
+     * Get just the stack trace from an error
+     */
+    fun getStackTrace(error: NetworkError): String {
+        return error.getStackTrace()
+    }
+
+    /**
+     * Format error for logging with full details
+     */
+    fun formatForLogging(error: NetworkError): String {
+        val sb = StringBuilder()
+        sb.append("=== Network Error Report ===\n")
+        sb.append("Type: ${error.javaClass.simpleName}\n")
+        sb.append("Message: ${error.message}\n")
+        if (error.errorCause != null) {
+            sb.append("Cause Type: ${error.errorCause.javaClass.simpleName}\n")
+            sb.append("Cause Message: ${error.errorCause.message}\n")
+            sb.append("\nStack Trace:\n")
+            sb.append(error.getStackTrace())
+        }
+        sb.append("\n=== End Report ===")
+        return sb.toString()
+    }
 }

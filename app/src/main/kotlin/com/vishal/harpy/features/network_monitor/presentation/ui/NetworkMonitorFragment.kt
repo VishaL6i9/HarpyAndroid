@@ -82,11 +82,23 @@ class NetworkMonitorFragment : Fragment() {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.error.collect { error ->
                     error?.let {
-                        // Show error message
+                        showErrorDialog(it)
                     }
                 }
             }
         }
+    }
+
+    private fun showErrorDialog(errorMessage: String) {
+        val dialog = androidx.appcompat.app.AlertDialog.Builder(requireContext())
+            .setTitle("Error")
+            .setMessage(errorMessage)
+            .setPositiveButton("OK") { _, _ -> }
+            .setNegativeButton("View Details") { _, _ ->
+                // This would be handled by the ViewModel to show full stack trace
+            }
+            .create()
+        dialog.show()
     }
 
     override fun onDestroyView() {

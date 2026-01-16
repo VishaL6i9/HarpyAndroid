@@ -10,6 +10,8 @@ import com.vishal.harpy.features.network_monitor.domain.usecases.MapNetworkTopol
 import com.vishal.harpy.core.utils.NetworkDevice
 import com.vishal.harpy.core.utils.NetworkTopology
 import com.vishal.harpy.core.utils.NetworkResult
+import com.vishal.harpy.core.utils.NetworkError
+import com.vishal.harpy.core.utils.NetworkErrorMapper
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -40,6 +42,9 @@ class NetworkMonitorViewModel @Inject constructor(
     
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
+
+    private val _lastError = MutableStateFlow<NetworkError?>(null)
+    val lastError: StateFlow<NetworkError?> = _lastError.asStateFlow()
     
     init {
         checkRootAccess()
@@ -56,10 +61,13 @@ class NetworkMonitorViewModel @Inject constructor(
                         _isRooted.value = result.data
                     }
                     is NetworkResult.Error -> {
+                        _lastError.value = result.error
                         _error.value = result.error.message
                     }
                 }
             } catch (e: Exception) {
+                val error = NetworkError.UnknownError(e)
+                _lastError.value = error
                 _error.value = e.message
             } finally {
                 _isLoading.value = false
@@ -80,10 +88,13 @@ class NetworkMonitorViewModel @Inject constructor(
                         _networkDevices.value = result.data
                     }
                     is NetworkResult.Error -> {
+                        _lastError.value = result.error
                         _error.value = result.error.message
                     }
                 }
             } catch (e: Exception) {
+                val error = NetworkError.UnknownError(e)
+                _lastError.value = error
                 _error.value = e.message
             } finally {
                 _isLoading.value = false
@@ -102,7 +113,6 @@ class NetworkMonitorViewModel @Inject constructor(
                 when (result) {
                     is NetworkResult.Success -> {
                         if (result.data) {
-                            // Update the device's blocked status
                             _networkDevices.value = _networkDevices.value.map {
                                 if (it.ipAddress == device.ipAddress) {
                                     it.copy(isBlocked = true)
@@ -113,10 +123,13 @@ class NetworkMonitorViewModel @Inject constructor(
                         }
                     }
                     is NetworkResult.Error -> {
+                        _lastError.value = result.error
                         _error.value = result.error.message
                     }
                 }
             } catch (e: Exception) {
+                val error = NetworkError.UnknownError(e)
+                _lastError.value = error
                 _error.value = e.message
             } finally {
                 _isLoading.value = false
@@ -135,7 +148,6 @@ class NetworkMonitorViewModel @Inject constructor(
                 when (result) {
                     is NetworkResult.Success -> {
                         if (result.data) {
-                            // Update the device's blocked status
                             _networkDevices.value = _networkDevices.value.map {
                                 if (it.ipAddress == device.ipAddress) {
                                     it.copy(isBlocked = false)
@@ -146,10 +158,13 @@ class NetworkMonitorViewModel @Inject constructor(
                         }
                     }
                     is NetworkResult.Error -> {
+                        _lastError.value = result.error
                         _error.value = result.error.message
                     }
                 }
             } catch (e: Exception) {
+                val error = NetworkError.UnknownError(e)
+                _lastError.value = error
                 _error.value = e.message
             } finally {
                 _isLoading.value = false
@@ -170,14 +185,31 @@ class NetworkMonitorViewModel @Inject constructor(
                         _networkTopology.value = result.data
                     }
                     is NetworkResult.Error -> {
+                        _lastError.value = result.error
                         _error.value = result.error.message
                     }
                 }
             } catch (e: Exception) {
+                val error = NetworkError.UnknownError(e)
+                _lastError.value = error
                 _error.value = e.message
             } finally {
                 _isLoading.value = false
             }
         }
+    }
+
+    /**
+     * Get the detailed error report including stack trace
+     */
+    fun getErrorDetails(): String {
+        return _lastError.value?.getDetailedReport() ?: "No error details available"
+    }
+
+    /**
+     * Get the stack trace of the last error
+     */
+    fun getErrorStackTrace(): String {
+        return _lastError.value?.getStackTrace() ?: "No stack trace available"
     }
 }

@@ -31,6 +31,28 @@ sealed class NetworkError(open val message: String, open val errorCause: Throwab
 
     data class UnknownError(override val errorCause: Throwable? = null) :
         NetworkError("Unknown error occurred", errorCause)
+
+    /**
+     * Get the full stack trace as a formatted string
+     */
+    fun getStackTrace(): String {
+        return errorCause?.stackTraceToString() ?: "No stack trace available"
+    }
+
+    /**
+     * Get a detailed error report including message and stack trace
+     */
+    fun getDetailedReport(): String {
+        val sb = StringBuilder()
+        sb.append("Error: $message\n")
+        if (errorCause != null) {
+            sb.append("Cause: ${errorCause.javaClass.simpleName}\n")
+            sb.append("Message: ${errorCause.message}\n")
+            sb.append("Stack Trace:\n")
+            sb.append(getStackTrace())
+        }
+        return sb.toString()
+    }
 }
 
 /**
