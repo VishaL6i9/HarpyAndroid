@@ -22,7 +22,7 @@
       <sourceFolder url="file://$MODULE_DIR$/app/src/test/kotlin" isTestSource="true" />
       <sourceFolder url="file://$MODULE_DIR$/app/src/androidTest/kotlin" isTestSource="false" />
     </content>
-    <orderEntry type="jdk" jdkName="Android API 34 Platform" jdkType="Android SDK" />
+    <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="library" name="KotlinJavaRuntime" level="project" />
   </component>
