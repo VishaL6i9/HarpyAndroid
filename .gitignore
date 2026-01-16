@@ -16,9 +16,6 @@ local.properties
 !.idea/markdown
 !.idea/runConfigurations
 
-### Temporary files ###
-COMMIT_STYLE.txt
-
 ### Kotlin ###
 .kotlin
 
