@@ -1,8 +1,10 @@
 package com.vishal.harpy
 
 import android.util.Log
+import java.io.BufferedReader
 import java.io.DataOutputStream
 import java.io.IOException
+import java.io.InputStreamReader
 
 /**
  * Service to handle network monitoring and device management
@@ -45,9 +47,30 @@ class NetworkMonitorService {
     fun isDeviceRooted(): Boolean {
         return try {
             val process = Runtime.getRuntime().exec("su")
-            true
+            // Check if we got root access by attempting a simple root command
+            val outputStream = process.outputStream
+            val inputStream = process.inputStream
+
+            outputStream.write("id\n".toByteArray())
+            outputStream.flush()
+            outputStream.close()
+
+            val reader = BufferedReader(InputStreamReader(inputStream))
+            val response = reader.readLine()
+            reader.close()
+            inputStream.close()
+
+            process.waitFor()
+            process.destroy()
+
+            // If the command executed successfully and we got a response,
+            // we likely have root access
+            response != null && response.contains("uid=0")
         } catch (e: IOException) {
             Log.d(TAG, "Device is not rooted: ${e.message}")
+            false
+        } catch (e: InterruptedException) {
+            Log.d(TAG, "Root check interrupted: ${e.message}")
             false
         }
     }
