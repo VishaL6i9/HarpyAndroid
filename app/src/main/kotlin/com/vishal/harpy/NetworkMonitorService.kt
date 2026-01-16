@@ -7,6 +7,7 @@ import java.io.BufferedReader
 import java.io.DataOutputStream
 import java.io.IOException
 import java.io.InputStreamReader
+import java.util.Calendar
 import kotlin.text.Regex
 
 /**
@@ -849,6 +850,310 @@ class NetworkMonitorService {
                 // If no whitelist, check if device is blacklisted
                 device.ipAddress !in blacklist
             }
+        }
+    }
+
+    // Properties for scheduled blocking
+    private val scheduledBlocks = mutableMapOf<String, ScheduledBlock>() // Maps IP to scheduled block
+    private val schedulerHandler = Handler(Looper.getMainLooper())
+    private val scheduledTasks = mutableMapOf<String, Runnable>() // Maps IP to scheduled task
+
+    /**
+     * Data class representing a scheduled block
+     */
+    data class ScheduledBlock(
+        val device: NetworkDevice,
+        val startTime: Long,      // Unix timestamp when to start blocking
+        val endTime: Long,        // Unix timestamp when to end blocking
+        val isActive: Boolean = true,
+        val recurring: Boolean = false, // Whether this schedule repeats daily
+        val daysOfWeek: List<Int>? = null // Days of week for recurring (1=Sunday, 7=Saturday)
+    )
+
+    /**
+     * Schedules a block for a device
+     * @param device The device to schedule blocking for
+     * @param startTime Unix timestamp when to start blocking
+     * @param duration Duration in milliseconds to block the device
+     * @param recurring Whether this schedule repeats daily
+     * @param daysOfWeek Days of week for recurring schedule (null for daily)
+     * @return true if scheduled successfully, false otherwise
+     */
+    fun scheduleBlock(
+        device: NetworkDevice,
+        startTime: Long,
+        duration: Long,
+        recurring: Boolean = false,
+        daysOfWeek: List<Int>? = null
+    ): Boolean {
+        val scheduledBlock = ScheduledBlock(
+            device = device,
+            startTime = startTime,
+            endTime = startTime + duration,
+            isActive = true,
+            recurring = recurring,
+            daysOfWeek = daysOfWeek
+        )
+
+        synchronized(scheduledBlocks) {
+            scheduledBlocks[device.ipAddress] = scheduledBlock
+        }
+
+        // Calculate delay until start time
+        val currentTime = System.currentTimeMillis()
+        val delay = startTime - currentTime
+
+        if (delay > 0) {
+            // Schedule the blocking to start at the specified time
+            val startRunnable = Runnable {
+                if (isScheduledBlockActive(device.ipAddress)) {
+                    blockDevice(device)
+                    Log.i(TAG, "Scheduled block started for ${device.ipAddress}")
+
+                    // Schedule the unblock event
+                    val unblockDelay = duration
+                    val unblockRunnable = Runnable {
+                        unblockDevice(device)
+                        Log.i(TAG, "Scheduled block ended for ${device.ipAddress}")
+
+                        // Handle recurring schedules
+                        if (scheduledBlock.recurring) {
+                            rescheduleBlock(scheduledBlock)
+                        } else {
+                            // Remove the schedule after it completes
+                            removeScheduledBlock(device)
+                        }
+                    }
+
+                    schedulerHandler.postDelayed(unblockRunnable, unblockDelay)
+                    scheduledTasks["unblock_${device.ipAddress}"] = unblockRunnable
+                }
+            }
+
+            schedulerHandler.postDelayed(startRunnable, delay)
+            scheduledTasks["block_${device.ipAddress}"] = startRunnable
+        } else {
+            // Start time has passed, start blocking immediately
+            blockDevice(device)
+            Log.i(TAG, "Scheduled block started immediately for ${device.ipAddress}")
+
+            // Schedule the unblock event
+            val unblockDelay = scheduledBlock.endTime - currentTime
+            if (unblockDelay > 0) {
+                val unblockRunnable = Runnable {
+                    unblockDevice(device)
+                    Log.i(TAG, "Scheduled block ended for ${device.ipAddress}")
+
+                    // Handle recurring schedules
+                    if (scheduledBlock.recurring) {
+                        rescheduleBlock(scheduledBlock)
+                    } else {
+                        // Remove the schedule after it completes
+                        removeScheduledBlock(device)
+                    }
+                }
+
+                schedulerHandler.postDelayed(unblockRunnable, unblockDelay)
+                scheduledTasks["unblock_${device.ipAddress}"] = unblockRunnable
+            }
+        }
+
+        Log.d(TAG, "Scheduled block for ${device.ipAddress} from ${startTime} to ${scheduledBlock.endTime}")
+        return true
+    }
+
+    /**
+     * Reschedules a recurring block
+     * @param scheduledBlock The scheduled block to reschedule
+     */
+    private fun rescheduleBlock(scheduledBlock: ScheduledBlock) {
+        if (!scheduledBlock.recurring) return
+
+        val currentTime = System.currentTimeMillis()
+        var nextStartTime = scheduledBlock.startTime
+
+        // Calculate next occurrence based on recurrence pattern
+        if (scheduledBlock.daysOfWeek != null) {
+            // Recurring on specific days of the week
+            val calendar = Calendar.getInstance()
+            calendar.timeInMillis = currentTime
+
+            // Find the next occurrence among the specified days
+            var foundNext = false
+            for (dayOffset in 1..7) { // Check up to 7 days ahead
+                calendar.add(Calendar.DAY_OF_MONTH, 1)
+                val dayOfWeek = calendar.get(Calendar.DAY_OF_WEEK)
+
+                if (scheduledBlock.daysOfWeek.contains(dayOfWeek)) {
+                    // Set the time to match the original schedule
+                    val originalStartCalendar = Calendar.getInstance()
+                    originalStartCalendar.timeInMillis = scheduledBlock.startTime
+
+                    calendar.set(Calendar.HOUR_OF_DAY, originalStartCalendar.get(Calendar.HOUR_OF_DAY))
+                    calendar.set(Calendar.MINUTE, originalStartCalendar.get(Calendar.MINUTE))
+                    calendar.set(Calendar.SECOND, originalStartCalendar.get(Calendar.SECOND))
+
+                    nextStartTime = calendar.timeInMillis
+                    foundNext = true
+                    break
+                }
+            }
+
+            if (!foundNext) {
+                // If no day found in the next 7 days, wrap around
+                calendar.timeInMillis = currentTime
+                for (dayOffset in 1..14) { // Check up to 14 days ahead
+                    calendar.add(Calendar.DAY_OF_MONTH, 1)
+                    val dayOfWeek = calendar.get(Calendar.DAY_OF_WEEK)
+
+                    if (scheduledBlock.daysOfWeek.contains(dayOfWeek)) {
+                        // Set the time to match the original schedule
+                        val originalStartCalendar = Calendar.getInstance()
+                        originalStartCalendar.timeInMillis = scheduledBlock.startTime
+
+                        calendar.set(Calendar.HOUR_OF_DAY, originalStartCalendar.get(Calendar.HOUR_OF_DAY))
+                        calendar.set(Calendar.MINUTE, originalStartCalendar.get(Calendar.MINUTE))
+                        calendar.set(Calendar.SECOND, originalStartCalendar.get(Calendar.SECOND))
+
+                        nextStartTime = calendar.timeInMillis
+                        foundNext = true
+                        break
+                    }
+                }
+            }
+        } else {
+            // Daily recurring
+            val period = scheduledBlock.endTime - scheduledBlock.startTime
+            nextStartTime = ((currentTime / period) + 1) * period + (scheduledBlock.startTime % period)
+        }
+
+        // Update the scheduled block with new times
+        val newScheduledBlock = scheduledBlock.copy(
+            startTime = nextStartTime,
+            endTime = nextStartTime + (scheduledBlock.endTime - scheduledBlock.startTime)
+        )
+
+        synchronized(scheduledBlocks) {
+            scheduledBlocks[scheduledBlock.device.ipAddress] = newScheduledBlock
+        }
+
+        // Schedule the next occurrence
+        val delay = nextStartTime - currentTime
+        if (delay > 0) {
+            val startRunnable = Runnable {
+                if (isScheduledBlockActive(scheduledBlock.device.ipAddress)) {
+                    blockDevice(scheduledBlock.device)
+                    Log.i(TAG, "Recurring block started for ${scheduledBlock.device.ipAddress}")
+
+                    // Schedule the unblock event
+                    val duration = scheduledBlock.endTime - scheduledBlock.startTime
+                    val unblockRunnable = Runnable {
+                        unblockDevice(scheduledBlock.device)
+                        Log.i(TAG, "Recurring block ended for ${scheduledBlock.device.ipAddress}")
+
+                        // Reschedule again
+                        rescheduleBlock(newScheduledBlock)
+                    }
+
+                    schedulerHandler.postDelayed(unblockRunnable, duration)
+                    scheduledTasks["unblock_${scheduledBlock.device.ipAddress}"] = unblockRunnable
+                }
+            }
+
+            schedulerHandler.postDelayed(startRunnable, delay)
+            scheduledTasks["block_${scheduledBlock.device.ipAddress}"] = startRunnable
+        }
+    }
+
+    /**
+     * Cancels a scheduled block for a device
+     * @param device The device to cancel scheduled blocking for
+     * @return true if cancelled successfully, false otherwise
+     */
+    fun cancelScheduledBlock(device: NetworkDevice): Boolean {
+        synchronized(scheduledBlocks) {
+            val wasPresent = scheduledBlocks.containsKey(device.ipAddress)
+            if (wasPresent) {
+                scheduledBlocks.remove(device.ipAddress)
+            }
+
+            // Cancel any pending scheduled tasks for this device
+            val blockRunnable = scheduledTasks.remove("block_${device.ipAddress}")
+            val unblockRunnable = scheduledTasks.remove("unblock_${device.ipAddress}")
+
+            if (blockRunnable != null) {
+                schedulerHandler.removeCallbacks(blockRunnable)
+            }
+            if (unblockRunnable != null) {
+                schedulerHandler.removeCallbacks(unblockRunnable)
+            }
+
+            Log.d(TAG, "Cancelled scheduled block for ${device.ipAddress}")
+            return wasPresent
+        }
+    }
+
+    /**
+     * Removes a scheduled block for a device (internal use)
+     * @param device The device to remove scheduled blocking for
+     * @return true if removed successfully, false otherwise
+     */
+    private fun removeScheduledBlock(device: NetworkDevice): Boolean {
+        synchronized(scheduledBlocks) {
+            val wasPresent = scheduledBlocks.containsKey(device.ipAddress)
+            if (wasPresent) {
+                scheduledBlocks.remove(device.ipAddress)
+            }
+            return wasPresent
+        }
+    }
+
+    /**
+     * Checks if a scheduled block is active for a device
+     * @param ipAddress The IP address to check
+     * @return true if scheduled block is active, false otherwise
+     */
+    private fun isScheduledBlockActive(ipAddress: String): Boolean {
+        synchronized(scheduledBlocks) {
+            val scheduledBlock = scheduledBlocks[ipAddress]
+            return scheduledBlock?.isActive == true
+        }
+    }
+
+    /**
+     * Gets all scheduled blocks
+     * @return List of all scheduled blocks
+     */
+    fun getScheduledBlocks(): List<ScheduledBlock> {
+        synchronized(scheduledBlocks) {
+            return scheduledBlocks.values.toList()
+        }
+    }
+
+    /**
+     * Gets scheduled block for a specific device
+     * @param device The device to get scheduled block for
+     * @return ScheduledBlock if exists, null otherwise
+     */
+    fun getScheduledBlockForDevice(device: NetworkDevice): ScheduledBlock? {
+        synchronized(scheduledBlocks) {
+            return scheduledBlocks[device.ipAddress]
+        }
+    }
+
+    /**
+     * Clears all scheduled blocks
+     */
+    fun clearAllScheduledBlocks() {
+        synchronized(scheduledBlocks) {
+            // Cancel all pending tasks
+            scheduledTasks.values.forEach { runnable ->
+                schedulerHandler.removeCallbacks(runnable)
+            }
+            scheduledTasks.clear()
+
+            scheduledBlocks.clear()
+            Log.d(TAG, "Cleared all scheduled blocks")
         }
     }
 }
