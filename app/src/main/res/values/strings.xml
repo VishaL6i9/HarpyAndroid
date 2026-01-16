@@ -12,6 +12,14 @@
     <string name="error_invalid_mac_address">Invalid MAC address: %s</string>
     <string name="error_unknown">An unknown error occurred.</string>
 
+    <!-- Root error messages -->
+    <string name="error_root_access_denied">Root access denied. Device may not be rooted or root permission was denied.</string>
+    <string name="error_root_check_failed">Failed to check root status. An unexpected error occurred.</string>
+    <string name="error_root_command_execution">Error executing root command.</string>
+    <string name="error_root_permission">Insufficient root permissions to perform this operation.</string>
+    <string name="error_root_timeout">Root command execution timed out.</string>
+    <string name="error_root_unknown">An unknown root-related error occurred.</string>
+
     <!-- UI strings -->
     <string name="title_network_monitor">Network Monitor</string>
     <string name="btn_scan_network">Scan Network</string>

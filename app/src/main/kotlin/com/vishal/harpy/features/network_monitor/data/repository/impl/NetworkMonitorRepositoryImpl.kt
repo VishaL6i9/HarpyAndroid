@@ -5,6 +5,8 @@ import com.vishal.harpy.core.utils.NetworkDevice
 import com.vishal.harpy.core.utils.NetworkTopology
 import com.vishal.harpy.core.utils.NetworkResult
 import com.vishal.harpy.core.utils.NetworkError
+import com.vishal.harpy.core.utils.RootError
+import com.vishal.harpy.core.utils.RootErrorMapper
 import android.util.Log
 import java.io.BufferedReader
 import java.io.DataOutputStream
@@ -58,12 +60,18 @@ class NetworkMonitorRepositoryImpl : NetworkMonitorRepository {
             NetworkResult.success(isRooted)
         } catch (e: IOException) {
             Log.d(TAG, "Device is not rooted: ${e.message}")
-            NetworkResult.success(false)
+            val rootError = RootError.RootAccessDeniedError(e)
+            RootErrorMapper.logErrorWithStackTrace("Root check failed with IOException", rootError)
+            NetworkResult.error(NetworkError.DeviceNotRootedError(e))
         } catch (e: InterruptedException) {
-            Log.d(TAG, "Root check interrupted: ${e.message}")
+            Log.e(TAG, "Root check interrupted: ${e.message}", e)
+            val rootError = RootError.RootTimeoutError(e)
+            RootErrorMapper.logErrorWithStackTrace("Root check interrupted", rootError)
             NetworkResult.error(NetworkError.CommandExecutionError(e))
         } catch (e: Exception) {
             Log.e(TAG, "Unexpected error during root check: ${e.message}", e)
+            val rootError = RootError.RootCheckFailedError(e)
+            RootErrorMapper.logErrorWithStackTrace("Unexpected error during root check", rootError)
             NetworkResult.error(NetworkError.DeviceNotRootedError(e))
         }
     }
