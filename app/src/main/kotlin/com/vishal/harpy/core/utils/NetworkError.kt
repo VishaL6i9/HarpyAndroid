@@ -29,6 +29,9 @@ sealed class NetworkError(open val message: String, open val errorCause: Throwab
     data class InvalidMacAddressError(val macAddress: String) :
         NetworkError("Invalid MAC address: $macAddress")
 
+    data class NativeLibraryError(override val errorCause: Throwable? = null) :
+        NetworkError("Native library/helper error", errorCause)
+
     data class UnknownError(override val errorCause: Throwable? = null) :
         NetworkError("Unknown error occurred", errorCause)
 

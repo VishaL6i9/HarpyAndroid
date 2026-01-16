@@ -37,6 +37,9 @@ object NetworkErrorMapper {
             is NetworkError.InvalidMacAddressError -> {
                 context.getString(R.string.error_invalid_mac_address, error.macAddress)
             }
+            is NetworkError.NativeLibraryError -> {
+                context.getString(R.string.error_native_library)
+            }
             is NetworkError.UnknownError -> {
                 context.getString(R.string.error_unknown)
             }

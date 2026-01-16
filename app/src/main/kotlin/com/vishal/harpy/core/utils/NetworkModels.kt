@@ -14,7 +14,8 @@ data class NetworkDevice(
     val deviceInterface: String? = null, // Network interface (wlan0, eth0, etc.)
     var isBlocked: Boolean = false,
     var deviceName: String? = null, // User-defined device name (e.g., "My Laptop", "Guest Phone")
-    var isPinned: Boolean = false   // Whether device is pinned
+    var isPinned: Boolean = false,  // Whether device is pinned
+    val isCurrentDevice: Boolean = false // Whether it's the current device
 ) {
     /**
      * Get display name - prioritizes device name over vendor
