@@ -67,7 +67,7 @@ To build the project, ensure you have the Android SDK properly configured with t
 ### Phase 3: Advanced Features (In Progress 🔄)
 - [x] ARP spoofing implementation for device blocking
 - [x] Network traffic analysis
-- [ ] Blacklist/whitelist management
+- [x] Blacklist/whitelist management
 - [ ] Scheduled blocking functionality
 - [ ] Network usage statistics
 
