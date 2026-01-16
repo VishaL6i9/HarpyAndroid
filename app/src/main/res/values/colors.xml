@@ -8,21 +8,41 @@
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
 
-    <!-- Primary Colors -->
-    <color name="primary_color">#2196F3</color>
-    <color name="primary_dark_color">#1976D2</color>
-    <color name="accent_color">#FF5722</color>
+    <!-- OLED Dark Theme Colors -->
+    <!-- True blacks for OLED displays (power efficient) -->
+    <color name="oled_black">#000000</color>
+    <color name="oled_black_surface">#0A0A0A</color>
+    <color name="oled_black_card">#121212</color>
+    <color name="oled_black_elevated">#1E1E1E</color>
+
+    <!-- Primary Colors - Vibrant for dark theme -->
+    <color name="primary_color">#00BCD4</color>
+    <color name="primary_dark_color">#0097A7</color>
+    <color name="primary_light_color">#4DD0E1</color>
+    <color name="accent_color">#FF6E40</color>
 
     <!-- Background Colors -->
-    <color name="background_color">#F5F5F5</color>
-    <color name="card_background">#FFFFFF</color>
+    <color name="background_color">#000000</color>
+    <color name="card_background">#0A0A0A</color>
+    <color name="surface_color">#121212</color>
+
+    <!-- Text Colors -->
+    <color name="text_primary">#FFFFFF</color>
+    <color name="text_secondary">#B3B3B3</color>
+    <color name="text_tertiary">#808080</color>
 
     <!-- Status Colors -->
-    <color name="status_blocked">#F44336</color>
+    <color name="status_blocked">#FF5252</color>
     <color name="status_active">#4CAF50</color>
-    <color name="status_warning">#FF9800</color>
+    <color name="status_warning">#FFB74D</color>
+    <color name="status_info">#29B6F6</color>
 
     <!-- Button Colors -->
-    <color name="button_block">#F44336</color>
-    <color name="button_unblock">#4CAF50</color>
+    <color name="button_block">#FF5252</color>
+    <color name="button_unblock">#66BB6A</color>
+    <color name="button_primary">#00BCD4</color>
+
+    <!-- Divider and Border -->
+    <color name="divider_color">#1F1F1F</color>
+    <color name="border_color">#2A2A2A</color>
 </resources>
