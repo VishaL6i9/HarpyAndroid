@@ -9,6 +9,7 @@ import com.vishal.harpy.features.network_monitor.domain.usecases.UnblockDeviceUs
 import com.vishal.harpy.features.network_monitor.domain.usecases.MapNetworkTopologyUseCase
 import com.vishal.harpy.core.utils.NetworkDevice
 import com.vishal.harpy.core.utils.NetworkTopology
+import com.vishal.harpy.core.utils.NetworkResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -47,8 +48,11 @@ class NetworkMonitorViewModel @Inject constructor(
     private fun checkRootAccess() {
         viewModelScope.launch {
             _isLoading.value = true
+            _error.value = null
             try {
-                _isRooted.value = isDeviceRootedUseCase()
+                isDeviceRootedUseCase()
+                    .onSuccess { isRooted -> _isRooted.value = isRooted }
+                    .onError { error -> _error.value = error.message }
             } catch (e: Exception) {
                 _error.value = e.message
             } finally {
@@ -56,16 +60,17 @@ class NetworkMonitorViewModel @Inject constructor(
             }
         }
     }
-    
+
     fun scanNetwork() {
         if (!_isRooted.value) return
-        
+
         viewModelScope.launch {
             _isLoading.value = true
             _error.value = null
             try {
-                val devices = scanNetworkUseCase()
-                _networkDevices.value = devices
+                scanNetworkUseCase()
+                    .onSuccess { devices -> _networkDevices.value = devices }
+                    .onError { error -> _error.value = error.message }
             } catch (e: Exception) {
                 _error.value = e.message
             } finally {
@@ -73,24 +78,28 @@ class NetworkMonitorViewModel @Inject constructor(
             }
         }
     }
-    
+
     fun blockDevice(device: NetworkDevice) {
         if (!_isRooted.value) return
-        
+
         viewModelScope.launch {
             _isLoading.value = true
+            _error.value = null
             try {
-                val success = blockDeviceUseCase(device)
-                if (success) {
-                    // Update the device's blocked status
-                    _networkDevices.value = _networkDevices.value.map { 
-                        if (it.ipAddress == device.ipAddress) {
-                            it.copy(isBlocked = true)
-                        } else {
-                            it
+                blockDeviceUseCase(device)
+                    .onSuccess { success ->
+                        if (success) {
+                            // Update the device's blocked status
+                            _networkDevices.value = _networkDevices.value.map {
+                                if (it.ipAddress == device.ipAddress) {
+                                    it.copy(isBlocked = true)
+                                } else {
+                                    it
+                                }
+                            }
                         }
                     }
-                }
+                    .onError { error -> _error.value = error.message }
             } catch (e: Exception) {
                 _error.value = e.message
             } finally {
@@ -98,24 +107,28 @@ class NetworkMonitorViewModel @Inject constructor(
             }
         }
     }
-    
+
     fun unblockDevice(device: NetworkDevice) {
         if (!_isRooted.value) return
-        
+
         viewModelScope.launch {
             _isLoading.value = true
+            _error.value = null
             try {
-                val success = unblockDeviceUseCase(device)
-                if (success) {
-                    // Update the device's blocked status
-                    _networkDevices.value = _networkDevices.value.map { 
-                        if (it.ipAddress == device.ipAddress) {
-                            it.copy(isBlocked = false)
-                        } else {
-                            it
+                unblockDeviceUseCase(device)
+                    .onSuccess { success ->
+                        if (success) {
+                            // Update the device's blocked status
+                            _networkDevices.value = _networkDevices.value.map {
+                                if (it.ipAddress == device.ipAddress) {
+                                    it.copy(isBlocked = false)
+                                } else {
+                                    it
+                                }
+                            }
                         }
                     }
-                }
+                    .onError { error -> _error.value = error.message }
             } catch (e: Exception) {
                 _error.value = e.message
             } finally {
@@ -123,15 +136,17 @@ class NetworkMonitorViewModel @Inject constructor(
             }
         }
     }
-    
+
     fun mapNetworkTopology() {
         if (!_isRooted.value) return
-        
+
         viewModelScope.launch {
             _isLoading.value = true
+            _error.value = null
             try {
-                val topology = mapNetworkTopologyUseCase()
-                _networkTopology.value = topology
+                mapNetworkTopologyUseCase()
+                    .onSuccess { topology -> _networkTopology.value = topology }
+                    .onError { error -> _error.value = error.message }
             } catch (e: Exception) {
                 _error.value = e.message
             } finally {

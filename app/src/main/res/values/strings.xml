@@ -1,3 +1,24 @@
 <resources>
     <string name="app_name">Harpy Network Monitor</string>
+
+    <!-- Error messages -->
+    <string name="error_device_not_rooted">Device is not rooted. Root access is required for this functionality.</string>
+    <string name="error_network_scan">Error occurred while scanning the network.</string>
+    <string name="error_block_device">Error occurred while blocking the device.</string>
+    <string name="error_unblock_device">Error occurred while unblocking the device.</string>
+    <string name="error_network_access">Network access error occurred.</string>
+    <string name="error_command_execution">Error occurred while executing network command.</string>
+    <string name="error_invalid_ip_address">Invalid IP address: %s</string>
+    <string name="error_invalid_mac_address">Invalid MAC address: %s</string>
+    <string name="error_unknown">An unknown error occurred.</string>
+
+    <!-- UI strings -->
+    <string name="title_network_monitor">Network Monitor</string>
+    <string name="btn_scan_network">Scan Network</string>
+    <string name="btn_block">Block</string>
+    <string name="btn_unblock">Unblock</string>
+    <string name="label_ip_address">IP Address:</string>
+    <string name="label_mac_address">MAC Address:</string>
+    <string name="label_hostname">Hostname:</string>
+    <string name="label_device_type">Device Type:</string>
 </resources>
