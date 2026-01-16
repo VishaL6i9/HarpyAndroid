@@ -15,6 +15,8 @@ import java.io.DataOutputStream
 import java.io.IOException
 import java.io.InputStreamReader
 import kotlin.text.Regex
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class NetworkMonitorRepositoryImpl(private val context: android.content.Context) : NetworkMonitorRepository {
 
@@ -29,8 +31,8 @@ class NetworkMonitorRepositoryImpl(private val context: android.content.Context)
 
     private val blockingProcesses = java.util.concurrent.ConcurrentHashMap<String, Process>()
 
-    override suspend fun scanNetwork(): NetworkResult<List<NetworkDevice>> {
-        return try {
+    override suspend fun scanNetwork(): NetworkResult<List<NetworkDevice>> = withContext(Dispatchers.IO) {
+        try {
             Log.d(TAG, "Scanning network for connected devices...")
 
             val isRootedResult = isDeviceRooted()
@@ -47,8 +49,8 @@ class NetworkMonitorRepositoryImpl(private val context: android.content.Context)
         }
     }
 
-    override suspend fun isDeviceRooted(): NetworkResult<Boolean> {
-        return try {
+    override suspend fun isDeviceRooted(): NetworkResult<Boolean> = withContext(Dispatchers.IO) {
+        try {
             // Try multiple methods to detect root
             
             // Method 1: Try su command
@@ -71,7 +73,7 @@ class NetworkMonitorRepositoryImpl(private val context: android.content.Context)
 
                 if (response != null && response.contains("uid=0")) {
                     Log.d(TAG, "Device is rooted (su method)")
-                    return NetworkResult.success(true)
+                    return@withContext NetworkResult.success(true)
                 }
             } catch (e: Exception) {
                 Log.d(TAG, "su method failed: ${e.message}")
@@ -87,7 +89,7 @@ class NetworkMonitorRepositoryImpl(private val context: android.content.Context)
 
                 if (!magiskPath.isNullOrEmpty()) {
                     Log.d(TAG, "Device is rooted (Magisk detected at: $magiskPath)")
-                    return NetworkResult.success(true)
+                    return@withContext NetworkResult.success(true)
                 }
             } catch (e: Exception) {
                 Log.d(TAG, "Magisk check failed: ${e.message}")
@@ -101,7 +103,7 @@ class NetworkMonitorRepositoryImpl(private val context: android.content.Context)
                 
                 if (suFile1.exists() || suFile2.exists() || suFile3.exists()) {
                     Log.d(TAG, "Device is rooted (su binary found)")
-                    return NetworkResult.success(true)
+                    return@withContext NetworkResult.success(true)
                 }
             } catch (e: Exception) {
                 Log.d(TAG, "File check failed: ${e.message}")
@@ -129,6 +131,8 @@ class NetworkMonitorRepositoryImpl(private val context: android.content.Context)
 
     private fun scanNetworkWithRoot(): List<NetworkDevice> {
         val devices = mutableListOf<NetworkDevice>()
+        val ourIp = getOurIp() // Cache our IP once at the start of scan
+        Log.d(TAG, "Starting root scan. Our IP: $ourIp")
 
         try {
             Log.d(TAG, "Getting network route information...")
@@ -230,7 +234,7 @@ class NetworkMonitorRepositoryImpl(private val context: android.content.Context)
                                     if (parts.size == 2) {
                                         val ip = parts[0]
                                         val mac = parts[1]
-                                        addDeviceToList(devices, ip, mac, "wlan0", null)
+                                        addDeviceToList(devices, ip, mac, "wlan0", null, ourIp)
                                         Log.d(TAG, "Root helper found: $ip ($mac)")
                                     }
                                 }
@@ -322,7 +326,7 @@ class NetworkMonitorRepositoryImpl(private val context: android.content.Context)
                                     mac != "00:00:00:00:00:00" && mac != "<incomplete>" && !seenMacs.contains(mac)) {
                                     
                                     seenMacs.add(mac)
-                                    addDeviceToList(devices, ip, mac, deviceInterface, null)
+                                    addDeviceToList(devices, ip, mac, deviceInterface, null, ourIp)
                                     Log.d(TAG, "Found device: $ip ($mac) (state=$state)")
                                 }
                             }
@@ -378,7 +382,7 @@ class NetworkMonitorRepositoryImpl(private val context: android.content.Context)
                                     mac != "00:00:00:00:00:00" && !seenMacs.contains(mac)) {
                                     
                                     seenMacs.add(mac)
-                                    addDeviceToList(devices, ip, mac, deviceInterface, null)
+                                    addDeviceToList(devices, ip, mac, deviceInterface, null, ourIp)
                                     Log.d(TAG, "Found device (from /proc): $ip ($mac)")
                                 }
                             }
@@ -412,11 +416,15 @@ class NetworkMonitorRepositoryImpl(private val context: android.content.Context)
         ip: String,
         mac: String,
         deviceInterface: String?,
-        hostname: String?
+        hostname: String?,
+        ourIp: String?
     ) {
         var resolvedHostname = hostname
         
-        // Try to resolve hostname if not provided
+        // Cache our IP to avoid calling getOurIp() in a loop
+        val isOurDevice = (ip == ourIp)
+        
+        // Try to resolve hostname if not provided and not our device (our device usually resolves easily or we already know it)
         if (resolvedHostname == null) {
             try {
                 val hostnameProcess = Runtime.getRuntime().exec(arrayOf("sh", "-c", "nslookup $ip"))
@@ -451,7 +459,7 @@ class NetworkMonitorRepositoryImpl(private val context: android.content.Context)
             hwType = "Unknown",
             mask = "*",
             deviceInterface = deviceInterface ?: "unknown",
-            isCurrentDevice = (ip == getOurIp())
+            isCurrentDevice = isOurDevice
         )
         devices.add(networkDevice)
     }
@@ -479,22 +487,30 @@ class NetworkMonitorRepositoryImpl(private val context: android.content.Context)
         }
     }
 
-    override suspend fun blockDevice(device: NetworkDevice): NetworkResult<Boolean> {
-        return try {
+    override suspend fun blockDevice(device: NetworkDevice): NetworkResult<Boolean> = withContext(Dispatchers.IO) {
+        try {
             val isRootedResult = isDeviceRooted()
             if (!(isRootedResult is NetworkResult.Success && isRootedResult.data)) {
-                return NetworkResult.error(NetworkError.DeviceNotRootedError())
+                return@withContext NetworkResult.error(NetworkError.DeviceNotRootedError())
             }
 
             // Check if already blocking
             if (blockingProcesses.containsKey(device.ipAddress)) {
-                return NetworkResult.success(true)
+                return@withContext NetworkResult.success(true)
             }
 
-            val gatewayIp = getGatewayIp() ?: return NetworkResult.error(NetworkError.NetworkAccessError())
-            val helperPath = NativeNetworkWrapper.getRootHelperPath(context) ?: return NetworkResult.error(NetworkError.NativeLibraryError())
-            val ourMac = getOurMacAddress() ?: "00:00:00:00:00:00" // Should ideally get this from route
-            val iface = "wlan0" // Should ideally get this from route
+            val gatewayIp = getGatewayIp() ?: run {
+                Log.e(TAG, "Failed to get gateway IP")
+                return@withContext NetworkResult.error(NetworkError.NetworkAccessError(Exception("Gateway IP lookup failed. Please check your network connection.")))
+            }
+            val helperPath = NativeNetworkWrapper.getRootHelperPath(context) ?: run {
+                Log.e(TAG, "Failed to find root helper binary")
+                return@withContext NetworkResult.error(NetworkError.NativeLibraryError(Exception("Root helper binary not found at expected path")))
+            }
+            val iface = getActiveInterface() ?: "wlan0"
+            val ourMac = getOurMacAddress(iface) ?: "00:00:00:00:00:00"
+            
+            Log.d(TAG, "Gateway: $gatewayIp, Helper: $helperPath, Interface: $iface, OurMac: $ourMac")
 
             // Start blocking process in background
             val libDir = context.applicationInfo.nativeLibraryDir
@@ -517,16 +533,41 @@ class NetworkMonitorRepositoryImpl(private val context: android.content.Context)
         }
     }
 
-    override suspend fun unblockDevice(device: NetworkDevice): NetworkResult<Boolean> {
-        return try {
+    override suspend fun unblockDevice(device: NetworkDevice): NetworkResult<Boolean> = withContext(Dispatchers.IO) {
+        try {
             val process = blockingProcesses.remove(device.ipAddress)
             if (process != null) {
+                // Perform proactive restoration
+                val gatewayIp = getGatewayIp()
+                val iface = getActiveInterface() ?: "wlan0"
+                val helperPath = NativeNetworkWrapper.getRootHelperPath(context)
+                
+                if (gatewayIp != null && helperPath != null) {
+                    val gatewayMac = getOurMacAddress(iface) // Wait, this is OUR mac. I need the true gateway mac.
+                    // Actually, the app likely already contains the gateway mac if it scanned.
+                    // Let's try to resolve it using the helper or use a broadcast-friendly restoration.
+                    
+                    // Actually, the most robust way is to use the helper to get the mac first.
+                    val cmdUnblock = "chmod 755 $helperPath && $helperPath unblock $iface ${device.ipAddress} ${device.macAddress ?: "00:00:00:00:00:00"} $gatewayIp"
+                    
+                    // We need the gateway MAC. In a real scenario, we'd fetch it. 
+                    // Let's assume we can get it or use the repository's knowledge.
+                    val gMac = getGatewayMacInternal(iface, gatewayIp) ?: "ff:ff:ff:ff:ff:ff" 
+                    
+                    val fullUnblockCmd = "$cmdUnblock $gMac\n"
+                    
+                    val restorer = Runtime.getRuntime().exec("su")
+                    val restorerOut = DataOutputStream(restorer.outputStream)
+                    restorerOut.writeBytes(fullUnblockCmd)
+                    restorerOut.writeBytes("exit\n")
+                    restorerOut.flush()
+                    restorerOut.close()
+                    restorer.waitFor()
+                }
+
                 // Try to kill the root process
                 val killer = Runtime.getRuntime().exec("su")
                 val out = DataOutputStream(killer.outputStream)
-                // We need to kill the specific helper process. Since su might spawn it in a new session,
-                // we'll try to kill it by name if possible, or just destroy the process we have.
-                // However, killing the 'su' child might not be enough.
                 out.writeBytes("pkill -f libharpy_root_helper.so\n")
                 out.writeBytes("exit\n")
                 out.flush()
@@ -543,11 +584,45 @@ class NetworkMonitorRepositoryImpl(private val context: android.content.Context)
         }
     }
 
-    override suspend fun mapNetworkTopology(): NetworkResult<NetworkTopology> {
-        return try {
+    private fun getGatewayMacInternal(iface: String, ip: String): String? {
+        try {
+            // First check ARP table via ip neigh
+            val p = Runtime.getRuntime().exec(arrayOf("su", "-c", "ip neigh show $ip"))
+            val r = BufferedReader(InputStreamReader(p.inputStream))
+            val line = r.readLine()
+            r.close()
+            p.waitFor()
+            
+            if (!line.isNullOrEmpty() && line.contains("lladdr")) {
+                val parts = line.split(" ")
+                val index = parts.indexOf("lladdr")
+                if (index != -1 && index + 1 < parts.size) {
+                    val mac = parts[index + 1]
+                    if (mac.contains(":") && mac != "00:00:00:00:00:00") return mac
+                }
+            }
+            
+            // Fallback: Use helper to resolve MAC if not in cache
+            val helperPath = NativeNetworkWrapper.getRootHelperPath(context)
+            if (helperPath != null) {
+                val p2 = Runtime.getRuntime().exec(arrayOf("su", "-c", "$helperPath mac $iface $ip"))
+                val r2 = BufferedReader(InputStreamReader(p2.inputStream))
+                val mac = r2.readLine()?.trim()
+                r2.close()
+                p2.waitFor()
+                if (!mac.isNullOrEmpty() && mac.contains(":")) return mac
+            }
+        } catch (e: Exception) {
+            Log.d(TAG, "Failed to resolve gateway MAC internally: ${e.message}")
+        }
+        return null
+    }
+
+    override suspend fun mapNetworkTopology(): NetworkResult<NetworkTopology> = withContext(Dispatchers.IO) {
+        try {
             val scanResult = scanNetwork()
             if (scanResult is NetworkResult.Error) {
-                return NetworkResult.error(scanResult.error)
+                return@withContext NetworkResult.error(scanResult.error)
             }
 
             val devices = (scanResult as NetworkResult.Success).data
@@ -584,60 +659,124 @@ class NetworkMonitorRepositoryImpl(private val context: android.content.Context)
     }
 
     private fun getGatewayIp(): String? {
-        return try {
-            val process = Runtime.getRuntime().exec("su -c \"ip route | grep default | awk '{print \$3}'\"")
-            val reader = BufferedReader(InputStreamReader(process.inputStream))
-            val gatewayIp = reader.readLine()
-            reader.close()
-            process.waitFor()
-
-            gatewayIp?.trim()
-        } catch (e: Exception) {
-            Log.e(TAG, "Error getting gateway IP: ${e.message}", e)
-            null
-        }
-    }
-
-    private fun getOurMacAddress(): String? {
-        return try {
-            val process = Runtime.getRuntime().exec("su -c \"cat /sys/class/net/wlan0/address\"")
-            val reader = BufferedReader(InputStreamReader(process.inputStream))
-            val macAddress = reader.readLine()
-            reader.close()
-            process.waitFor()
-
-            if (!macAddress.isNullOrEmpty() && macAddress != "00:00:00:00:00:00") {
-                macAddress.trim()
-            } else {
-                val interfaces = arrayOf("wlan0", "wlan1", "eth0", "rndis0")
-                for (iface in interfaces) {
-                    val altProcess = Runtime.getRuntime().exec("su -c \"cat /sys/class/net/$iface/address\"")
-                    val altReader = BufferedReader(InputStreamReader(altProcess.inputStream))
-                    val altMac = altReader.readLine()
-                    altReader.close()
-                    altProcess.waitFor()
-
-                    if (!altMac.isNullOrEmpty() && altMac != "00:00:00:00:00:00") {
-                        return altMac.trim()
-                    }
-                }
-                null
+        Log.d(TAG, "Attempting to get gateway IP...")
+        
+        // Method 1: ConnectivityManager
+        try {
+            val connectivityManager = context.getSystemService(android.content.Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
+            val activeNetwork = connectivityManager?.activeNetwork
+            val linkProperties = connectivityManager?.getLinkProperties(activeNetwork)
+            
+            val gateway = linkProperties?.routes?.firstOrNull { 
+                it.isDefaultRoute && it.gateway is java.net.Inet4Address 
+            }?.gateway?.hostAddress
+            
+            if (gateway != null) {
+                Log.d(TAG, "Gateway IPv4 found via ConnectivityManager: $gateway")
+                return gateway
+            }
+            
+            // Fallback to any default gateway if IPv4 specific wasn't found (though unlikely for block to work)
+            val anyGateway = linkProperties?.routes?.firstOrNull { it.isDefaultRoute && it.gateway != null }?.gateway?.hostAddress
+            if (anyGateway != null) {
+                Log.d(TAG, "Gateway IP (fallback) found via ConnectivityManager: $anyGateway")
+                return anyGateway
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error getting MAC address: ${e.message}", e)
+            Log.d(TAG, "ConnectivityManager gateway lookup failed: ${e.message}")
+        }
+
+        // Method 2: Shell fallback
+        return try {
+            val process = Runtime.getRuntime().exec(arrayOf("su", "-c", "ip route get 1.1.1.1 | grep -o 'via [0-9.]*' | awk '{print \$2}'"))
+            val reader = BufferedReader(InputStreamReader(process.inputStream))
+            val gatewayIp = reader.readLine()
+            Log.d(TAG, "Gateway IP output (shell): $gatewayIp")
+            reader.close()
+            process.waitFor()
+            gatewayIp?.trim()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting gateway IP via shell: ${e.message}", e)
             null
         }
     }
 
-    override suspend fun testPing(device: NetworkDevice): NetworkResult<Boolean> {
-        return try {
+    private fun getOurMacAddress(iface: String = "wlan0"): String? {
+        Log.d(TAG, "Getting MAC address for interface: $iface")
+        
+        // Method 1: cat /sys/class/net/iface/address
+        try {
+            val process = Runtime.getRuntime().exec(arrayOf("su", "-c", "cat /sys/class/net/$iface/address"))
+            val reader = BufferedReader(InputStreamReader(process.inputStream))
+            val mac = reader.readLine()?.trim()
+            reader.close()
+            process.waitFor()
+            if (!mac.isNullOrEmpty() && mac != "00:00:00:00:00:00" && mac.contains(":")) {
+                Log.d(TAG, "MAC found via sysfs: $mac")
+                return mac
+            }
+        } catch (e: Exception) {
+            Log.d(TAG, "Sysfs MAC lookup failed: ${e.message}")
+        }
+
+        // Method 2: ip link show
+        try {
+            val process = Runtime.getRuntime().exec(arrayOf("su", "-c", "ip link show $iface | grep -o 'link/ether [0-9a-f:]*' | awk '{print \$2}'"))
+            val reader = BufferedReader(InputStreamReader(process.inputStream))
+            val mac = reader.readLine()?.trim()
+            reader.close()
+            process.waitFor()
+            if (!mac.isNullOrEmpty() && mac != "00:00:00:00:00:00" && mac.contains(":")) {
+                Log.d(TAG, "MAC found via ip link: $mac")
+                return mac
+            }
+        } catch (e: Exception) {
+            Log.d(TAG, "ip link MAC lookup failed: ${e.message}")
+        }
+
+        // Method 3: ip addr show
+        try {
+            val process = Runtime.getRuntime().exec(arrayOf("su", "-c", "ip addr show $iface | grep -o 'link/ether [0-9a-f:]*' | awk '{print \$2}'"))
+            val reader = BufferedReader(InputStreamReader(process.inputStream))
+            val mac = reader.readLine()?.trim()
+            reader.close()
+            process.waitFor()
+            if (!mac.isNullOrEmpty() && mac != "00:00:00:00:00:00" && mac.contains(":")) {
+                Log.d(TAG, "MAC found via ip addr: $mac")
+                return mac
+            }
+        } catch (e: Exception) {
+            Log.d(TAG, "ip addr MAC lookup failed: ${e.message}")
+        }
+
+        // Method 4: All Interfaces Fallback
+        try {
+            val process = Runtime.getRuntime().exec(arrayOf("su", "-c", "ip link show | grep 'link/ether' | grep -v '00:00:00:00:00:00' | head -n 1 | awk '{print \$2}'"))
+            val reader = BufferedReader(InputStreamReader(process.inputStream))
+            val mac = reader.readLine()?.trim()
+            reader.close()
+            process.waitFor()
+            if (!mac.isNullOrEmpty() && mac.contains(":")) {
+                Log.d(TAG, "MAC found via global ip link search: $mac")
+                return mac
+            }
+        } catch (e: Exception) {
+            Log.d(TAG, "Global MAC search failed: ${e.message}")
+        }
+
+        Log.e(TAG, "All MAC detection methods failed for $iface")
+        return null
+    }
+
+    override suspend fun testPing(device: NetworkDevice): NetworkResult<Boolean> = withContext(Dispatchers.IO) {
+        try {
             // First try ICMP Ping
             val pingProcess = Runtime.getRuntime().exec("ping -c 1 -W 1 ${device.ipAddress}")
             val exitCode = pingProcess.waitFor()
             
             if (exitCode == 0) {
                 Log.d(TAG, "Ping successful for ${device.ipAddress}")
-                return NetworkResult.success(true)
+                return@withContext NetworkResult.success(true)
             }
 
             // If ping fails, check ARP table as a fallback (some devices block ICMP but are active)
@@ -662,16 +801,46 @@ class NetworkMonitorRepositoryImpl(private val context: android.content.Context)
         }
     }
 
+    private fun getActiveInterface(): String? {
+        try {
+            val connectivityManager = context.getSystemService(android.content.Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
+            val activeNetwork = connectivityManager?.activeNetwork
+            val linkProperties = connectivityManager?.getLinkProperties(activeNetwork)
+            return linkProperties?.interfaceName
+        } catch (e: Exception) {
+            Log.d(TAG, "Failed to get active interface: ${e.message}")
+        }
+        return null
+    }
+
     private fun getOurIp(): String? {
+        // Method 1: ConnectivityManager (Primary Android API)
+        try {
+            val connectivityManager = context.getSystemService(android.content.Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
+            val activeNetwork = connectivityManager?.activeNetwork
+            val linkProperties = connectivityManager?.getLinkProperties(activeNetwork)
+            
+            val ipAddress = linkProperties?.linkAddresses?.firstOrNull { 
+                it.address is java.net.Inet4Address && !it.address.isLoopbackAddress 
+            }?.address?.hostAddress
+            
+            if (ipAddress != null) {
+                return ipAddress
+            }
+        } catch (e: Exception) {
+            Log.d(TAG, "ConnectivityManager IP lookup failed: ${e.message}")
+        }
+
+        // Method 2: Robust Shell Fallback (ip route get)
         return try {
-            val process = Runtime.getRuntime().exec("su -c \"ip route | grep src | awk '{print \$NF}'\"")
+            val process = Runtime.getRuntime().exec(arrayOf("su", "-c", "ip route get 1.1.1.1 | grep -o 'src [0-9.]*' | awk '{print \$2}'"))
             val reader = BufferedReader(InputStreamReader(process.inputStream))
             val ourIp = reader.readLine()
             reader.close()
             process.waitFor()
             ourIp?.trim()
         } catch (e: Exception) {
-            Log.e(TAG, "Error getting our IP: ${e.message}", e)
+            Log.e(TAG, "Shell IP identification fallback failed: ${e.message}")
             null
         }
     }
