@@ -8,6 +8,8 @@ A network monitoring and control application for Android, inspired by the iOS ja
 - Network device discovery using ARP scanning with instant results
 - Detailed device information (IP address, MAC address, hostname, vendor)
 - Ability to block/disconnect specific devices from the network using ARP spoofing
+- Gateway detection and identification with visual indicators
+- Nuclear option: Block all devices on the network by spoofing the gateway
 - Device management interface for controlling network access
 - Real-time network monitoring
 - Custom device naming for easy identification
@@ -17,6 +19,7 @@ A network monitoring and control application for Android, inspired by the iOS ja
 - OLED-optimized dark theme with true blacks
 - Device ping testing to verify connectivity
 - Root helper binary for privileged network operations
+- Bottom sheet UI for device actions with confirmation dialogs
 
 ### Non-Root Approach (Future Plan)
 - Network monitoring using Android's VpnService
@@ -32,9 +35,10 @@ The root-based implementation is built using native Kotlin for the Android appli
 A standalone executable (`libharpy_root_helper.so`) is packaged with the app and can be invoked via `su` to perform privileged network operations without requiring the entire app to run as root. This provides better security isolation and allows for more granular permission control.
 
 Supported commands:
-- `scan <interface> <subnet>` - Network device discovery
+- `scan <interface> <subnet> [timeout]` - Network device discovery (default 10s timeout)
 - `mac <interface> <ip>` - MAC address resolution
-- `block <interface> <target_ip> <target_mac> <gateway_ip> <our_mac>` - Bidirectional ARP spoofing for device blocking
+- `block <interface> <target_ip> <gateway_ip> <our_mac>` - Bidirectional ARP spoofing for device blocking
+- `block_all <interface> <gateway_ip> <our_mac>` - Nuclear option: Block all devices via gateway spoofing
 - `unblock <interface> <target_ip> <target_mac> <gateway_ip> <gateway_mac>` - ARP cache restoration to unblock device
 
 ## Requirements
@@ -104,6 +108,9 @@ To build the project, ensure you have the Android SDK properly configured with t
   - [x] Unblock command with ARP cache restoration
   - [x] Aggressive spoofing interval (500ms)
   - [x] Error handling and debug logging
+  - [x] Nuclear option for blocking all devices via gateway spoofing
+  - [x] Broadcast ARP spoofing packets (300ms interval)
+  - [x] Gateway detection and identification
 
 ### Phase 3: Advanced Features (Completed)
 - [x] ARP spoofing implementation for device blocking
@@ -122,6 +129,9 @@ To build the project, ensure you have the Android SDK properly configured with t
   - [x] Better error handling and recovery
   - [x] Reduced memory allocations in loops
   - [x] Efficient string parsing with regex caching
+  - [x] 2-pass ARP sweep with improved pacing (1ms between packets, 20ms between batches)
+  - [x] Configurable timeout for root helper scan (default 10 seconds)
+  - [x] Timeout handling with proper process termination
 - [x] UI/UX enhancements
   - [x] Header section with app title and status
   - [x] Device count display
@@ -139,7 +149,10 @@ To build the project, ensure you have the Android SDK properly configured with t
   - [x] Debug menu for clearing custom names
   - [x] Red highlighting for blocked devices
   - [x] Blue highlighting for current device
+  - [x] Green highlighting for gateway device
   - [x] Immediate UI updates after block/unblock operations
+  - [x] Bottom sheet UI for device actions
+  - [x] Two-stage confirmation dialogs for nuclear option
 - [x] Error handling improvements
   - [x] NetworkError sealed class hierarchy
   - [x] RootError sealed class hierarchy for root-specific errors
