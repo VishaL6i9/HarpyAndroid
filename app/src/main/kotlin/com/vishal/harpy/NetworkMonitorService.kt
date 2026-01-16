@@ -120,7 +120,7 @@ class NetworkMonitorService {
                             val flags = fields[2]  // Flags
                             val mac = fields[3]  // MAC address
                             val mask = fields[4]  // Mask
-                            val device = fields[5]  // Device name
+                            val deviceInterface = fields[5]  // Device name
 
                             // Only add entries that are marked as reachable (flags contain 0x2)
                             if (flags.contains("0x2") || flags.contains("0x6")) {
@@ -146,9 +146,29 @@ class NetworkMonitorService {
                                         Log.d(TAG, "Could not resolve hostname for $ip: ${e.message}")
                                     }
 
+                                    // Determine device type based on hardware type
+                                    val hwTypeDescription = when(hwType.lowercase()) {
+                                        "0x1" -> "Ethernet"
+                                        "0x19" -> "WiFi"
+                                        "0x420" -> "Bridge"
+                                        else -> "Unknown"
+                                    }
+
                                     val vendor = identifyVendor(mac)
-                                    val deviceType = identifyDeviceType(NetworkDevice(ip, mac, hostname, vendor))
-                                    devices.add(NetworkDevice(ip, mac, hostname, vendor, deviceType))
+                                    val deviceType = identifyDeviceType(NetworkDevice(ip, mac, hostname, vendor, hwTypeDescription))
+
+                                    // Create the device with all available information
+                                    val networkDevice = NetworkDevice(
+                                        ipAddress = ip,
+                                        macAddress = mac,
+                                        hostname = hostname,
+                                        vendor = vendor,
+                                        deviceType = deviceType,
+                                        hwType = hwTypeDescription,
+                                        mask = mask,
+                                        deviceInterface = deviceInterface
+                                    )
+                                    devices.add(networkDevice)
                                 }
                             }
                         }
@@ -229,6 +249,8 @@ class NetworkMonitorService {
             vendor?.contains("TP-Link", ignoreCase = true) == true ||
             vendor?.contains("Ubiquiti", ignoreCase = true) == true ||
             vendor?.contains("Realtek", ignoreCase = true) == true -> "Router/Network equipment"
+            device.hwType?.contains("WiFi", ignoreCase = true) == true -> "Wireless Device"
+            device.hwType?.contains("Ethernet", ignoreCase = true) == true -> "Wired Device"
             else -> null
         }
     }
@@ -414,6 +436,9 @@ data class NetworkDevice(
     val hostname: String? = null,
     val vendor: String? = null,
     val deviceType: String? = null, // e.g., phone, laptop, IoT device
+    val hwType: String? = null,    // Hardware type (ethernet, wifi, etc.)
+    val mask: String? = null,      // Network mask
+    val deviceInterface: String? = null, // Network interface (wlan0, eth0, etc.)
     var isBlocked: Boolean = false
 )
 
