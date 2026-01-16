@@ -35,18 +35,26 @@ class NetworkDeviceAdapter(
             val macAddress = view.findViewById<TextView>(R.id.macAddress)
             val hostname = view.findViewById<TextView>(R.id.hostname)
             val deviceType = view.findViewById<TextView>(R.id.deviceType)
+            val vendor = view.findViewById<TextView>(R.id.vendor)
+            val blockedStatus = view.findViewById<TextView>(R.id.blockedStatus)
             val blockButton = view.findViewById<Button>(R.id.blockButton)
+            val unblockButton = view.findViewById<Button>(R.id.unblockButton)
 
             ipAddress.text = item.ipAddress
             macAddress.text = item.macAddress
             hostname.text = item.hostname ?: "Unknown"
             deviceType.text = item.deviceType ?: "Unknown"
+            vendor.text = item.vendor ?: "Unknown"
 
             if (item.isBlocked) {
-                blockButton.text = "Unblock"
-                blockButton.setOnClickListener { onUnblockClick(item) }
+                blockedStatus.visibility = View.VISIBLE
+                blockButton.visibility = View.GONE
+                unblockButton.visibility = View.VISIBLE
+                unblockButton.setOnClickListener { onUnblockClick(item) }
             } else {
-                blockButton.text = "Block"
+                blockedStatus.visibility = View.GONE
+                blockButton.visibility = View.VISIBLE
+                unblockButton.visibility = View.GONE
                 blockButton.setOnClickListener { onBlockClick(item) }
             }
         }

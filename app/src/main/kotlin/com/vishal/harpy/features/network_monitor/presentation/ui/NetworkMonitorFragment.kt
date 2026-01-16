@@ -65,6 +65,8 @@ class NetworkMonitorFragment : Fragment() {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.networkDevices.collect { devices ->
                     adapter.submitList(devices)
+                    updateDeviceCount(devices.size)
+                    updateEmptyState(devices.isEmpty())
                 }
             }
         }
@@ -72,8 +74,7 @@ class NetworkMonitorFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.isLoading.collect { isLoading ->
-                    val progressBar = binding.findViewById<ProgressBar>(R.id.progressBar)
-                    progressBar.visibility = if (isLoading) View.VISIBLE else View.GONE
+                    updateLoadingState(isLoading)
                 }
             }
         }
@@ -86,6 +87,44 @@ class NetworkMonitorFragment : Fragment() {
                     }
                 }
             }
+        }
+    }
+
+    private fun updateLoadingState(isLoading: Boolean) {
+        val progressSection = binding.findViewById<LinearLayout>(R.id.progressSection)
+        val scanButton = binding.findViewById<Button>(R.id.scanButton)
+        
+        if (isLoading) {
+            progressSection.visibility = View.VISIBLE
+            scanButton.isEnabled = false
+        } else {
+            progressSection.visibility = View.GONE
+            scanButton.isEnabled = true
+        }
+    }
+
+    private fun updateDeviceCount(count: Int) {
+        val deviceCountSection = binding.findViewById<LinearLayout>(R.id.deviceCountSection)
+        val deviceCountText = binding.findViewById<TextView>(R.id.deviceCount)
+        
+        if (count > 0) {
+            deviceCountSection.visibility = View.VISIBLE
+            deviceCountText.text = count.toString()
+        } else {
+            deviceCountSection.visibility = View.GONE
+        }
+    }
+
+    private fun updateEmptyState(isEmpty: Boolean) {
+        val emptyState = binding.findViewById<LinearLayout>(R.id.emptyState)
+        val recyclerView = binding.findViewById<RecyclerView>(R.id.devicesRecyclerView)
+        
+        if (isEmpty) {
+            emptyState.visibility = View.VISIBLE
+            recyclerView.visibility = View.GONE
+        } else {
+            emptyState.visibility = View.GONE
+            recyclerView.visibility = View.VISIBLE
         }
     }
 
