@@ -45,9 +45,10 @@ sealed class NetworkError(open val message: String, open val errorCause: Throwab
     fun getDetailedReport(): String {
         val sb = StringBuilder()
         sb.append("Error: $message\n")
-        if (errorCause != null) {
-            sb.append("Cause: ${errorCause.javaClass.simpleName}\n")
-            sb.append("Message: ${errorCause.message}\n")
+        val cause = errorCause
+        if (cause != null) {
+            sb.append("Cause: ${cause.javaClass.simpleName}\n")
+            sb.append("Message: ${cause.message}\n")
             sb.append("Stack Trace:\n")
             sb.append(getStackTrace())
         }

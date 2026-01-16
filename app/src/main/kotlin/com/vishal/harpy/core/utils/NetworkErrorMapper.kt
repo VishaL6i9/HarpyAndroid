@@ -65,9 +65,10 @@ object NetworkErrorMapper {
         sb.append("=== Network Error Report ===\n")
         sb.append("Type: ${error.javaClass.simpleName}\n")
         sb.append("Message: ${error.message}\n")
-        if (error.errorCause != null) {
-            sb.append("Cause Type: ${error.errorCause.javaClass.simpleName}\n")
-            sb.append("Cause Message: ${error.errorCause.message}\n")
+        val cause = error.errorCause
+        if (cause != null) {
+            sb.append("Cause Type: ${cause.javaClass.simpleName}\n")
+            sb.append("Cause Message: ${cause.message}\n")
             sb.append("\nStack Trace:\n")
             sb.append(error.getStackTrace())
         }
