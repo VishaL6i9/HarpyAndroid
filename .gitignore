@@ -31,6 +31,16 @@ bin/
 !**/src/main/**/bin/
 !**/src/test/**/bin/
 
+### Android ###
+/build/
+.gradle/
+captures/
+.externalNativeBuild/
+.cxx/
+.idea/sonarlint/
+.idea/assetWizardSettings.xml
+.idea/deploymentTargetSelector.xml
+
 ### NetBeans ###
 /nbproject/private/
 /nbbuild/
