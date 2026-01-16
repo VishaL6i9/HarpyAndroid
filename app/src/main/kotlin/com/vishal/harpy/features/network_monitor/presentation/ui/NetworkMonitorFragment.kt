@@ -95,10 +95,39 @@ class NetworkMonitorFragment : Fragment() {
             .setMessage(errorMessage)
             .setPositiveButton("OK") { _, _ -> }
             .setNegativeButton("View Details") { _, _ ->
-                // This would be handled by the ViewModel to show full stack trace
+                showErrorDetailsDialog()
             }
             .create()
         dialog.show()
+    }
+
+    private fun showErrorDetailsDialog() {
+        val errorDetails = viewModel.getErrorDetails()
+        val scrollView = android.widget.ScrollView(requireContext()).apply {
+            addView(android.widget.TextView(requireContext()).apply {
+                text = errorDetails
+                setPadding(16, 16, 16, 16)
+                textSize = 12f
+                setTextIsSelectable(true)
+            })
+        }
+
+        androidx.appcompat.app.AlertDialog.Builder(requireContext())
+            .setTitle("Error Details")
+            .setView(scrollView)
+            .setPositiveButton("Copy") { _, _ ->
+                copyToClipboard(errorDetails)
+            }
+            .setNegativeButton("Close") { _, _ -> }
+            .create()
+            .show()
+    }
+
+    private fun copyToClipboard(text: String) {
+        val clipboard = requireContext().getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+        val clip = android.content.ClipData.newPlainText("Error Details", text)
+        clipboard.setPrimaryClip(clip)
+        android.widget.Toast.makeText(requireContext(), "Error details copied to clipboard", android.widget.Toast.LENGTH_SHORT).show()
     }
 
     override fun onDestroyView() {
