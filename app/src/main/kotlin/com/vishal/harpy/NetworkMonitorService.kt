@@ -692,6 +692,165 @@ class NetworkMonitorService {
             else -> "UNKNOWN"
         }
     }
+
+    // Properties to hold the blacklist and whitelist
+    private val blacklist = mutableSetOf<String>() // IP addresses
+    private val whitelist = mutableSetOf<String>() // IP addresses
+
+    /**
+     * Adds a device to the blacklist
+     * @param device The device to add to blacklist
+     * @return true if successfully added, false otherwise
+     */
+    fun addToBlacklist(device: NetworkDevice): Boolean {
+        synchronized(blacklist) {
+            val result = blacklist.add(device.ipAddress)
+            // Remove from whitelist if it was there
+            removeFromWhitelist(device)
+            Log.d(TAG, "Added ${device.ipAddress} to blacklist")
+            return result
+        }
+    }
+
+    /**
+     * Adds a device to the whitelist
+     * @param device The device to add to whitelist
+     * @return true if successfully added, false otherwise
+     */
+    fun addToWhitelist(device: NetworkDevice): Boolean {
+        synchronized(whitelist) {
+            val result = whitelist.add(device.ipAddress)
+            // Remove from blacklist if it was there
+            removeFromBlacklist(device)
+            Log.d(TAG, "Added ${device.ipAddress} to whitelist")
+            return result
+        }
+    }
+
+    /**
+     * Removes a device from the blacklist
+     * @param device The device to remove from blacklist
+     * @return true if successfully removed, false otherwise
+     */
+    fun removeFromBlacklist(device: NetworkDevice): Boolean {
+        synchronized(blacklist) {
+            val result = blacklist.remove(device.ipAddress)
+            Log.d(TAG, "Removed ${device.ipAddress} from blacklist")
+            return result
+        }
+    }
+
+    /**
+     * Removes a device from the whitelist
+     * @param device The device to remove from whitelist
+     * @return true if successfully removed, false otherwise
+     */
+    fun removeFromWhitelist(device: NetworkDevice): Boolean {
+        synchronized(whitelist) {
+            val result = whitelist.remove(device.ipAddress)
+            Log.d(TAG, "Removed ${device.ipAddress} from whitelist")
+            return result
+        }
+    }
+
+    /**
+     * Checks if a device is blacklisted
+     * @param device The device to check
+     * @return true if device is blacklisted, false otherwise
+     */
+    fun isBlacklisted(device: NetworkDevice): Boolean {
+        synchronized(blacklist) {
+            return device.ipAddress in blacklist
+        }
+    }
+
+    /**
+     * Checks if a device is whitelisted
+     * @param device The device to check
+     * @return true if device is whitelisted, false otherwise
+     */
+    fun isWhitelisted(device: NetworkDevice): Boolean {
+        synchronized(whitelist) {
+            return device.ipAddress in whitelist
+        }
+    }
+
+    /**
+     * Gets all blacklisted devices
+     * @return List of blacklisted NetworkDevice objects
+     */
+    fun getBlacklistedDevices(allDevices: List<NetworkDevice>): List<NetworkDevice> {
+        synchronized(blacklist) {
+            return allDevices.filter { it.ipAddress in blacklist }
+        }
+    }
+
+    /**
+     * Gets all whitelisted devices
+     * @return List of whitelisted NetworkDevice objects
+     */
+    fun getWhitelistedDevices(allDevices: List<NetworkDevice>): List<NetworkDevice> {
+        synchronized(whitelist) {
+            return allDevices.filter { it.ipAddress in whitelist }
+        }
+    }
+
+    /**
+     * Clears the blacklist
+     */
+    fun clearBlacklist() {
+        synchronized(blacklist) {
+            blacklist.clear()
+            Log.d(TAG, "Blacklist cleared")
+        }
+    }
+
+    /**
+     * Clears the whitelist
+     */
+    fun clearWhitelist() {
+        synchronized(whitelist) {
+            whitelist.clear()
+            Log.d(TAG, "Whitelist cleared")
+        }
+    }
+
+    /**
+     * Gets the count of blacklisted devices
+     * @return Number of blacklisted devices
+     */
+    fun getBlacklistCount(): Int {
+        synchronized(blacklist) {
+            return blacklist.size
+        }
+    }
+
+    /**
+     * Gets the count of whitelisted devices
+     * @return Number of whitelisted devices
+     */
+    fun getWhitelistCount(): Int {
+        synchronized(whitelist) {
+            return whitelist.size
+        }
+    }
+
+    /**
+     * Applies blacklist/whitelist rules to a list of devices
+     * @param devices The list of devices to filter
+     * @return Filtered list based on blacklist/whitelist rules
+     */
+    fun applyFilterRules(devices: List<NetworkDevice>): List<NetworkDevice> {
+        return devices.filter { device ->
+            // If whitelist is not empty, only allow whitelisted devices
+            if (whitelist.isNotEmpty()) {
+                device.ipAddress in whitelist
+            } else {
+                // If no whitelist, check if device is blacklisted
+                device.ipAddress !in blacklist
+            }
+        }
+    }
 }
 
 /**
