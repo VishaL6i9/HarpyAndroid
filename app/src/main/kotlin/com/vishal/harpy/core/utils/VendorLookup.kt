@@ -101,26 +101,23 @@ object VendorLookup {
             
             val inputStream = context!!.assets.open("oui.txt")
             val reader = BufferedReader(InputStreamReader(inputStream))
-            var line: String?
             var foundVendor: String? = null
             
-            while (reader.readLine().also { line = it } != null) {
-                line?.let {
+            reader.useLines { lines ->
+                for (line in lines) {
                     // OUI database format: XX-XX-XX (hex) vendor name
-                    if (it.startsWith(formattedOui)) {
+                    if (line.startsWith(formattedOui)) {
                         // Extract vendor name after the hex and whitespace
-                        val parts = it.split(Regex("\\s+"), limit = 2)
+                        val parts = line.split(Regex("\\s+"), limit = 2)
                         if (parts.size >= 2) {
                             foundVendor = parts[1].trim()
                             Log.d(TAG, "Found vendor for $formattedOui: $foundVendor")
-                            break
+                            return@useLines
                         }
                     }
                 }
             }
             
-            reader.close()
-            inputStream.close()
             foundVendor
         } catch (e: Exception) {
             Log.d(TAG, "Failed to query local OUI database: ${e.message}")

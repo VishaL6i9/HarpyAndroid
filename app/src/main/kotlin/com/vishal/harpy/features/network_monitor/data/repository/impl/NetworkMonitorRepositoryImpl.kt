@@ -7,6 +7,7 @@ import com.vishal.harpy.core.utils.NetworkResult
 import com.vishal.harpy.core.utils.NetworkError
 import com.vishal.harpy.core.utils.RootError
 import com.vishal.harpy.core.utils.RootErrorMapper
+import com.vishal.harpy.core.utils.VendorLookup
 import android.util.Log
 import java.io.BufferedReader
 import java.io.DataOutputStream
@@ -295,39 +296,7 @@ class NetworkMonitorRepositoryImpl : NetworkMonitorRepository {
     }
 
     private fun identifyVendor(macAddress: String): String? {
-        val oui = macAddress.substring(0, 8).uppercase()
-
-        return when (oui) {
-            "00:50:43" -> "Siemens"
-            "00:50:C2" -> "IEEE Registration Authority"
-            "00:60:2F" -> "Hewlett Packard"
-            "00:A0:C9" -> "Intel Corporation"
-            "00:E0:4C" -> "Realtek Semiconductor Corp."
-            "08:00:27" -> "Oracle VirtualBox"
-            "1C:69:7A" -> "AcSiP Technology Corp."
-            "24:4B:03" -> "Samsung Electronics Co., Ltd"
-            "28:C6:3F" -> "Apple, Inc."
-            "38:4F:F0" -> "Samsung Electronics Co., Ltd"
-            "40:B0:FA" -> "LG Electronics (Mobile Communications)"
-            "44:D9:E7" -> "Ubiquiti Networks Inc."
-            "5C:F9:DD" -> "Dell Inc."
-            "6C:EC:5A" -> "Hon Hai Precision Ind. Co.,Ltd."
-            "78:4F:43" -> "Apple, Inc."
-            "80:A5:89" -> "AzureWave Technology Inc."
-            "8C:1F:64" -> "Intel Corporate"
-            "9C:93:4E" -> "ASUSTek Computer, Inc."
-            "AC:DE:48" -> "Intel Corporate"
-            "B8:27:EB" -> "Raspberry Pi Foundation"
-            "BC:5F:F4" -> "Dell Inc."
-            "C8:60:00" -> "Apple, Inc."
-            "D8:3B:BF" -> "Samsung Electronics Co., Ltd"
-            "DC:A6:32" -> "Raspberry Pi Trading Ltd"
-            "E4:5D:52" -> "Intel Corporate"
-            "EC:26:CA" -> "TP-Link Technologies Co., Ltd."
-            "F0:18:98" -> "Apple, Inc."
-            "F4:8C:50" -> "Intel Corporate"
-            else -> null
-        }
+        return VendorLookup.getVendor(macAddress)
     }
 
     private fun identifyDeviceType(device: NetworkDevice): String? {
