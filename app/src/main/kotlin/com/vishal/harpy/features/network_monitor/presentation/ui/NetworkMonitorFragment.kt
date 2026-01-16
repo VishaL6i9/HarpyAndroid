@@ -71,13 +71,56 @@ class NetworkMonitorFragment : Fragment() {
         val recyclerView = binding.findViewById<RecyclerView>(R.id.devicesRecyclerView)
         recyclerView.layoutManager = LinearLayoutManager(context)
         adapter = NetworkDeviceAdapter(
-            onBlockClick = { device -> viewModel.blockDevice(device) },
+            onBlockClick = { device -> showDeviceActions(device) },
             onUnblockClick = { device -> viewModel.unblockDevice(device) },
             onPinClick = { device -> viewModel.toggleDevicePin(device) },
             onEditNameClick = { device -> showEditNameDialog(device) },
-            onLongPress = { device, view -> showContextMenu(device, view) }
+            onLongPress = { device, _ -> showDeviceActions(device) }
         )
         recyclerView.adapter = adapter
+    }
+
+    private fun showDeviceActions(device: NetworkDevice) {
+        DeviceActionsBottomSheet(
+            device = device,
+            onPinClick = { viewModel.toggleDevicePin(it) },
+            onEditNameClick = { showEditNameDialog(it) },
+            onBlockClick = { 
+                if (it.isBlocked) {
+                    viewModel.unblockDevice(it)
+                } else if (it.isGateway) {
+                    showNuclearConfirmation(it)
+                } else {
+                    viewModel.blockDevice(it)
+                }
+            },
+            onPingClick = { viewModel.testPing(it) }
+        ).show(childFragmentManager, DeviceActionsBottomSheet.TAG)
+    }
+
+    private fun showNuclearConfirmation(device: NetworkDevice) {
+        androidx.appcompat.app.AlertDialog.Builder(requireContext())
+            .setTitle("⚠️ NUCLEAR OPTION ⚠️")
+            .setMessage("Are you sure? Blocking the Gateway will disconnect EVERY device on this WiFi network from the internet.")
+            .setPositiveButton("I AM SURE") { _, _ ->
+                showFinalNuclearWarning(device)
+            }
+            .setNegativeButton("Cancel", null)
+            .create()
+            .show()
+    }
+
+    private fun showFinalNuclearWarning(device: NetworkDevice) {
+        androidx.appcompat.app.AlertDialog.Builder(requireContext())
+            .setTitle("🛑 EXTREME CAUTION 🛑")
+            .setMessage("This action will cause network-wide disruption. You will have to manually unblock the gateway to restore service. Proceed?")
+            .setPositiveButton("ACTIVATE NUCLEAR") { _, _ ->
+                viewModel.blockDevice(device)
+                android.widget.Toast.makeText(requireContext(), "NUCLEAR OPTION ACTIVATED", android.widget.Toast.LENGTH_LONG).show()
+            }
+            .setNegativeButton("Abort", null)
+            .create()
+            .show()
     }
 
     private fun observeViewModel() {
@@ -246,47 +289,6 @@ class NetworkMonitorFragment : Fragment() {
         val clip = android.content.ClipData.newPlainText("Error Details", text)
         clipboard.setPrimaryClip(clip)
         android.widget.Toast.makeText(requireContext(), "Error details copied to clipboard", android.widget.Toast.LENGTH_SHORT).show()
-    }
-
-    private fun showContextMenu(device: NetworkDevice, view: View) {
-        androidx.appcompat.widget.PopupMenu(requireContext(), view).apply {
-            menu.add(0, 1, 0, if (device.isPinned) "Unpin" else "Pin")
-            menu.add(0, 2, 1, "Set Name")
-            menu.add(0, 3, 2, if (device.isBlocked) "Unblock" else "Block")
-            menu.add(0, 4, 3, "Test Ping (Verify)")
-            
-            setOnMenuItemClickListener { item ->
-                when (item.itemId) {
-                    1 -> {
-                        viewModel.toggleDevicePin(device)
-                        android.widget.Toast.makeText(
-                            requireContext(),
-                            if (device.isPinned) "Device unpinned" else "Device pinned",
-                            android.widget.Toast.LENGTH_SHORT
-                        ).show()
-                        true
-                    }
-                    2 -> {
-                        showEditNameDialog(device)
-                        true
-                    }
-                    3 -> {
-                        if (device.isBlocked) {
-                            viewModel.unblockDevice(device)
-                        } else {
-                            viewModel.blockDevice(device)
-                        }
-                        true
-                    }
-                    4 -> {
-                        viewModel.testPing(device)
-                        true
-                    }
-                    else -> false
-                }
-            }
-            show()
-        }
     }
 
     private fun showDebugMenu(view: View) {
