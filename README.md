@@ -34,7 +34,8 @@ A standalone executable (`libharpy_root_helper.so`) is packaged with the app and
 Supported commands:
 - `scan <interface> <subnet>` - Network device discovery
 - `mac <interface> <ip>` - MAC address resolution
-- `block <interface> <target_ip> <gateway_ip> <our_mac>` - ARP spoofing for device blocking
+- `block <interface> <target_ip> <target_mac> <gateway_ip> <our_mac>` - Bidirectional ARP spoofing for device blocking
+- `unblock <interface> <target_ip> <target_mac> <gateway_ip> <gateway_mac>` - ARP cache restoration to unblock device
 
 ## Requirements
 
@@ -98,6 +99,11 @@ To build the project, ensure you have the Android SDK properly configured with t
   - [x] TestPingUseCase for domain layer operations
   - [x] UI integration for ping test results
   - [x] State management for ping operations
+- [x] Bidirectional ARP spoofing for device blocking
+  - [x] Gateway MAC resolution for effective spoofing
+  - [x] Unblock command with ARP cache restoration
+  - [x] Aggressive spoofing interval (500ms)
+  - [x] Error handling and debug logging
 
 ### Phase 3: Advanced Features (Completed ✅)
 - [x] ARP spoofing implementation for device blocking
@@ -131,6 +137,9 @@ To build the project, ensure you have the Android SDK properly configured with t
   - [x] Device pinning to keep important devices at the top
   - [x] Long-press context menu for device actions
   - [x] Debug menu for clearing custom names
+  - [x] Red highlighting for blocked devices
+  - [x] Blue highlighting for current device
+  - [x] Immediate UI updates after block/unblock operations
 - [x] Error handling improvements
   - [x] NetworkError sealed class hierarchy
   - [x] RootError sealed class hierarchy for root-specific errors
@@ -185,6 +194,11 @@ To build the project, ensure you have the Android SDK properly configured with t
   - [x] Automatic fallback mechanism
   - [x] Logging for debugging native operations
   - [x] Root helper binary invocation via su
+  - [x] Proper coroutine context with IO dispatcher
+  - [x] Multi-method MAC address resolution (sysfs, ip link, ip addr, global fallback)
+  - [x] Robust gateway IP detection with ConnectivityManager API
+  - [x] Dynamic network interface detection
+  - [x] Enhanced error messages with detailed context
 - [x] Performance benchmarking structure
   - [x] Native operations logging
   - [x] Fallback tracking
