@@ -5,11 +5,16 @@ A network monitoring and control application for Android, inspired by the iOS ja
 ## Features
 
 ### Root-Based Functionality (Current Implementation)
-- Network device discovery using ARP scanning
-- Detailed device information (IP address, MAC address, hostname)
+- Network device discovery using ARP scanning with instant results
+- Detailed device information (IP address, MAC address, hostname, vendor)
 - Ability to block/disconnect specific devices from the network using ARP spoofing
 - Device management interface for controlling network access
 - Real-time network monitoring
+- Custom device naming for easy identification
+- Device pinning to keep important devices at the top
+- Vendor lookup using OUI database for accurate manufacturer identification
+- Immersive fullscreen mode with auto-hiding status bar
+- OLED-optimized dark theme with true blacks
 
 ### Non-Root Approach (Future Plan)
 - Network monitoring using Android's VpnService
@@ -87,7 +92,7 @@ To build the project, ensure you have the Android SDK properly configured with t
 - [x] Scheduled blocking functionality
 - [x] Network usage statistics
 
-### Phase 4: Optimization & Polish (In Progress 🔄)
+### Phase 4: Optimization & Polish (Completed ✅)
 - [x] Performance optimizations
   - [x] Network scan timeout handling (5 second limits)
   - [x] Removed sequential ping loop (was O(n) now O(1))
@@ -107,6 +112,11 @@ To build the project, ensure you have the Android SDK properly configured with t
   - [x] Better button states and visibility
   - [x] Enhanced loading indicators
   - [x] OLED dark theme with true blacks
+  - [x] Immersive fullscreen mode with auto-hiding status bar
+  - [x] Custom device naming for easy identification
+  - [x] Device pinning to keep important devices at the top
+  - [x] Long-press context menu for device actions
+  - [x] Debug menu for clearing custom names
 - [x] Error handling improvements
   - [x] NetworkError sealed class hierarchy
   - [x] RootError sealed class hierarchy for root-specific errors
@@ -118,6 +128,12 @@ To build the project, ensure you have the Android SDK properly configured with t
   - [x] Stack trace presentation for all errors
   - [x] Detailed error reporting with full diagnostics
   - [x] Error logging with complete stack traces
+- [x] Vendor identification
+  - [x] OUI database integration for accurate manufacturer lookup
+  - [x] Multi-octet matching (5, 4, 3 octets) for flexible vendor detection
+  - [x] Local database lookup (no network calls)
+  - [x] Result caching for performance
+  - [x] Fallback to hardcoded common vendors
 - [ ] Localization support
 - [ ] Accessibility features
 
