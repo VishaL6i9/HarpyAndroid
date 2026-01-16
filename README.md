@@ -35,11 +35,27 @@ This tool should only be used on networks you own or have explicit permission to
 
 ## Development
 
-The project follows a modular structure:
-- `app/` - Main Android application module
-- `app/src/main/kotlin/com/vishal/harpy/` - Kotlin source code
-- `app/src/main/res/` - Resource files
-- `app/src/main/AndroidManifest.xml` - Application manifest
+The project follows a modern Android architecture with feature modules:
+
+### Core Layer
+- `core/network/` - Network utilities and protocols
+- `core/ui/` - Common UI components and composables
+- `core/utils/` - Shared utility classes and data models
+
+### Feature Modules
+- `features/network_monitor/` - Network monitoring feature with:
+  - `data/` - Repository implementations and data sources
+  - `domain/` - Business logic (UseCases)
+  - `presentation/` - UI logic (ViewModels, Fragments/Activities)
+  - `di/` - Dependency injection setup
+- `features/device_manager/` - Device management feature with the same layered architecture
+
+### Architecture Principles
+- **MVVM Pattern**: Clean separation of View, ViewModel, and Model
+- **Clean Architecture**: Each layer has a specific responsibility
+- **Feature-First Organization**: Related functionality is grouped together
+- **Dependency Injection**: Proper decoupling of components
+- **State Management**: Using Kotlin Flows for reactive programming
 
 To build the project, ensure you have the Android SDK properly configured with the required API level and build tools.
 
