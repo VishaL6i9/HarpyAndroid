@@ -496,10 +496,206 @@ class NetworkMonitorService {
             false
         }
     }
+
+    /**
+     * Analyzes network traffic for a specific device
+     * @param device The device to analyze traffic for
+     * @return NetworkTrafficStats object containing traffic analysis
+     */
+    fun analyzeTrafficForDevice(device: NetworkDevice): NetworkTrafficStats {
+        return try {
+            // Get network statistics from /proc/net/dev
+            val process = Runtime.getRuntime().exec("su -c \"cat /proc/net/dev\"")
+            val reader = BufferedReader(InputStreamReader(process.inputStream))
+
+            var line: String?
+            var receivedBytes = 0L
+            var transmittedBytes = 0L
+            var receivedPackets = 0L
+            var transmittedPackets = 0L
+
+            while (reader.readLine().also { line = it } != null) {
+                val trimmedLine = line!!.trim()
+
+                // Skip header lines
+                if (trimmedLine.startsWith("Inter-") || trimmedLine.startsWith("face")) {
+                    continue
+                }
+
+                // Parse interface statistics
+                val parts = trimmedLine.split("\\s+".toRegex())
+                if (parts.size >= 10) {
+                    val interfaceName = parts[0].removeSuffix(":")
+
+                    // Only analyze traffic on active network interfaces
+                    if (interfaceName.startsWith("wlan") || interfaceName.startsWith("eth") || interfaceName.startsWith("rmnet")) {
+                        val rxBytes = parts[1].toLongOrNull() ?: 0L
+                        val rxPackets = parts[2].toLongOrNull() ?: 0L
+                        val txBytes = parts[9].toLongOrNull() ?: 0L
+                        val txPackets = parts[10].toLongOrNull() ?: 0L
+
+                        receivedBytes += rxBytes
+                        receivedPackets += rxPackets
+                        transmittedBytes += txBytes
+                        transmittedPackets += txPackets
+                    }
+                }
+            }
+
+            reader.close()
+            process.waitFor()
+
+            // Get connection information for the specific device
+            val connections = getConnectionInfoForDevice(device.ipAddress)
+
+            NetworkTrafficStats(
+                device = device,
+                totalReceivedBytes = receivedBytes,
+                totalTransmittedBytes = transmittedBytes,
+                totalReceivedPackets = receivedPackets,
+                totalTransmittedPackets = transmittedPackets,
+                activeConnections = connections,
+                timestamp = System.currentTimeMillis()
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Error analyzing traffic for device ${device.ipAddress}: ${e.message}", e)
+            NetworkTrafficStats(
+                device = device,
+                totalReceivedBytes = 0,
+                totalTransmittedBytes = 0,
+                totalReceivedPackets = 0,
+                totalTransmittedPackets = 0,
+                activeConnections = emptyList(),
+                timestamp = System.currentTimeMillis()
+            )
+        }
+    }
+
+    /**
+     * Gets connection information for a specific device
+     * @param ipAddress The IP address to get connections for
+     * @return List of ConnectionInfo objects
+     */
+    private fun getConnectionInfoForDevice(ipAddress: String): List<ConnectionInfo> {
+        val connections = mutableListOf<ConnectionInfo>()
+
+        try {
+            // Check TCP connections
+            val tcpProcess = Runtime.getRuntime().exec("su -c \"cat /proc/net/tcp\"")
+            val tcpReader = BufferedReader(InputStreamReader(tcpProcess.inputStream))
+
+            var line: String?
+            while (tcpReader.readLine().also { line = it } != null) {
+                if (line!!.contains(ipAddress.replace(".", " ").replace(" ", ""))) {
+                    // Parse TCP connection info
+                    val parts = line!!.split("\\s+".toRegex())
+                    if (parts.size >= 8) {
+                        val localAddr = parseHexAddress(parts[1])
+                        val remoteAddr = parseHexAddress(parts[2])
+                        val state = parseTcpState(parts[3])
+
+                        connections.add(ConnectionInfo(
+                            localAddress = localAddr.first,
+                            localPort = localAddr.second,
+                            remoteAddress = remoteAddr.first,
+                            remotePort = remoteAddr.second,
+                            protocol = "TCP",
+                            state = state,
+                            timestamp = System.currentTimeMillis()
+                        ))
+                    }
+                }
+            }
+
+            tcpReader.close()
+            tcpProcess.waitFor()
+
+            // Check UDP connections
+            val udpProcess = Runtime.getRuntime().exec("su -c \"cat /proc/net/udp\"")
+            val udpReader = BufferedReader(InputStreamReader(udpProcess.inputStream))
+
+            while (udpReader.readLine().also { line = it } != null) {
+                if (line!!.contains(ipAddress.replace(".", " ").replace(" ", ""))) {
+                    // Parse UDP connection info
+                    val parts = line!!.split("\\s+".toRegex())
+                    if (parts.size >= 7) {
+                        val localAddr = parseHexAddress(parts[1])
+                        val remoteAddr = parseHexAddress(parts[2]) // For UDP, this might be empty
+
+                        connections.add(ConnectionInfo(
+                            localAddress = localAddr.first,
+                            localPort = localAddr.second,
+                            remoteAddress = remoteAddr.first,
+                            remotePort = remoteAddr.second,
+                            protocol = "UDP",
+                            state = "ESTABLISHED", // UDP is connectionless
+                            timestamp = System.currentTimeMillis()
+                        ))
+                    }
+                }
+            }
+
+            udpReader.close()
+            udpProcess.waitFor()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting connection info for device $ipAddress: ${e.message}", e)
+        }
+
+        return connections
+    }
+
+    /**
+     * Parses hexadecimal address and port from /proc/net/tcp format
+     * @param hexAddrPort Hexadecimal string in format "address:port"
+     * @return Pair of IP address and port
+     */
+    private fun parseHexAddress(hexAddrPort: String): Pair<String, Int> {
+        val parts = hexAddrPort.split(":")
+        if (parts.size < 2) return Pair("", 0)
+
+        // Parse IP address (reverse byte order)
+        val hexIp = parts[0]
+        if (hexIp.length != 8) return Pair("", 0)
+
+        val ipParts = mutableListOf<String>()
+        for (i in 0 until 8 step 2) {
+            val hexByte = hexIp.substring(i, i + 2)
+            val decimalByte = Integer.parseInt(hexByte, 16)
+            ipParts.add(decimalByte.toString())
+        }
+
+        // Parse port
+        val hexPort = parts[1]
+        val port = Integer.parseInt(hexPort, 16)
+
+        return Pair(ipParts.reversed().joinToString("."), port)
+    }
+
+    /**
+     * Parses TCP state from hexadecimal value
+     * @param hexState Hexadecimal state value
+     * @return Human-readable state string
+     */
+    private fun parseTcpState(hexState: String): String {
+        return when (hexState.lowercase()) {
+            "01" -> "ESTABLISHED"
+            "02" -> "SYN_SENT"
+            "03" -> "SYN_RECV"
+            "04" -> "FIN_WAIT1"
+            "05" -> "FIN_WAIT2"
+            "06" -> "TIME_WAIT"
+            "07" -> "CLOSE"
+            "08" -> "CLOSE_WAIT"
+            "09" -> "LAST_ACK"
+            "0a" -> "LISTEN"
+            "0b" -> "CLOSING"
+            else -> "UNKNOWN"
+        }
+    }
 }
 
 /**
- * Data class representing a network device
+ * Data class representing network device
  */
 data class NetworkDevice(
     val ipAddress: String,
@@ -511,6 +707,32 @@ data class NetworkDevice(
     val mask: String? = null,      // Network mask
     val deviceInterface: String? = null, // Network interface (wlan0, eth0, etc.)
     var isBlocked: Boolean = false
+)
+
+/**
+ * Data class representing network traffic statistics
+ */
+data class NetworkTrafficStats(
+    val device: NetworkDevice,
+    val totalReceivedBytes: Long,
+    val totalTransmittedBytes: Long,
+    val totalReceivedPackets: Long,
+    val totalTransmittedPackets: Long,
+    val activeConnections: List<ConnectionInfo>,
+    val timestamp: Long
+)
+
+/**
+ * Data class representing a network connection
+ */
+data class ConnectionInfo(
+    val localAddress: String,
+    val localPort: Int,
+    val remoteAddress: String,
+    val remotePort: Int,
+    val protocol: String, // TCP, UDP, etc.
+    val state: String,   // ESTABLISHED, LISTEN, etc.
+    val timestamp: Long
 )
 
 /**
