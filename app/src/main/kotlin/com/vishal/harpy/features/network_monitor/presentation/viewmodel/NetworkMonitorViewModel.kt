@@ -9,12 +9,15 @@ import com.vishal.harpy.features.network_monitor.domain.usecases.UnblockDeviceUs
 import com.vishal.harpy.features.network_monitor.domain.usecases.MapNetworkTopologyUseCase
 import com.vishal.harpy.core.utils.NetworkDevice
 import com.vishal.harpy.core.utils.NetworkTopology
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
-class NetworkMonitorViewModel(
+@HiltViewModel
+class NetworkMonitorViewModel @Inject constructor(
     private val scanNetworkUseCase: ScanNetworkUseCase,
     private val isDeviceRootedUseCase: IsDeviceRootedUseCase,
     private val blockDeviceUseCase: BlockDeviceUseCase,

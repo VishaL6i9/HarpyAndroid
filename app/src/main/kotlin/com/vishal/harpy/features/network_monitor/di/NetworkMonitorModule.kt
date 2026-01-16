@@ -3,40 +3,49 @@ package com.vishal.harpy.features.network_monitor.di
 import com.vishal.harpy.features.network_monitor.data.repository.NetworkMonitorRepository
 import com.vishal.harpy.features.network_monitor.data.repository.impl.NetworkMonitorRepositoryImpl
 import com.vishal.harpy.features.network_monitor.domain.usecases.*
+import dagger.Module
+import dagger.Provides
+import dagger.hilt.InstallIn
+import dagger.hilt.components.SingletonComponent
+import javax.inject.Singleton
 
+@Module
+@InstallIn(SingletonComponent::class)
 object NetworkMonitorModule {
-    
+
+    @Provides
+    @Singleton
     fun provideRepository(): NetworkMonitorRepository {
         return NetworkMonitorRepositoryImpl()
     }
-    
-    fun provideScanNetworkUseCase(): ScanNetworkUseCase {
-        return ScanNetworkUseCase(provideRepository())
+
+    @Provides
+    @Singleton
+    fun provideScanNetworkUseCase(repository: NetworkMonitorRepository): ScanNetworkUseCase {
+        return ScanNetworkUseCase(repository)
     }
-    
-    fun provideIsDeviceRootedUseCase(): IsDeviceRootedUseCase {
-        return IsDeviceRootedUseCase(provideRepository())
+
+    @Provides
+    @Singleton
+    fun provideIsDeviceRootedUseCase(repository: NetworkMonitorRepository): IsDeviceRootedUseCase {
+        return IsDeviceRootedUseCase(repository)
     }
-    
-    fun provideBlockDeviceUseCase(): BlockDeviceUseCase {
-        return BlockDeviceUseCase(provideRepository())
+
+    @Provides
+    @Singleton
+    fun provideBlockDeviceUseCase(repository: NetworkMonitorRepository): BlockDeviceUseCase {
+        return BlockDeviceUseCase(repository)
     }
-    
-    fun provideUnblockDeviceUseCase(): UnblockDeviceUseCase {
-        return UnblockDeviceUseCase(provideRepository())
+
+    @Provides
+    @Singleton
+    fun provideUnblockDeviceUseCase(repository: NetworkMonitorRepository): UnblockDeviceUseCase {
+        return UnblockDeviceUseCase(repository)
     }
-    
-    fun provideMapNetworkTopologyUseCase(): MapNetworkTopologyUseCase {
-        return MapNetworkTopologyUseCase(provideRepository())
-    }
-    
-    fun provideViewModelFactory(): NetworkMonitorViewModelFactory {
-        return NetworkMonitorViewModelFactory(
-            provideScanNetworkUseCase(),
-            provideIsDeviceRootedUseCase(),
-            provideBlockDeviceUseCase(),
-            provideUnblockDeviceUseCase(),
-            provideMapNetworkTopologyUseCase()
-        )
+
+    @Provides
+    @Singleton
+    fun provideMapNetworkTopologyUseCase(repository: NetworkMonitorRepository): MapNetworkTopologyUseCase {
+        return MapNetworkTopologyUseCase(repository)
     }
 }
