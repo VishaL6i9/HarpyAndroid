@@ -1156,6 +1156,264 @@ class NetworkMonitorService {
             Log.d(TAG, "Cleared all scheduled blocks")
         }
     }
+
+    // Properties for network usage statistics
+    private val networkUsageStats = mutableMapOf<String, DeviceUsageStats>() // Maps IP to usage stats
+    private val historicalStats = mutableListOf<HistoricalUsageStats>()
+
+    /**
+     * Data class representing device usage statistics
+     */
+    data class DeviceUsageStats(
+        val ipAddress: String,
+        var totalBytesReceived: Long = 0,
+        var totalBytesTransmitted: Long = 0,
+        var peakBandwidthRx: Double = 0.0, // in Mbps
+        var peakBandwidthTx: Double = 0.0, // in Mbps
+        var averageBandwidthRx: Double = 0.0, // in Mbps
+        var averageBandwidthTx: Double = 0.0, // in Mbps
+        var activeTime: Long = 0, // in milliseconds
+        var lastActive: Long = 0,
+        var firstSeen: Long = System.currentTimeMillis()
+    )
+
+    /**
+     * Data class representing historical usage statistics
+     */
+    data class HistoricalUsageStats(
+        val ipAddress: String,
+        val bytesReceived: Long,
+        val bytesTransmitted: Long,
+        val timestamp: Long,
+        val period: Long // in milliseconds
+    )
+
+    /**
+     * Gets network usage statistics for a specific device
+     * @param device The device to get statistics for
+     * @return DeviceUsageStats object with usage information
+     */
+    fun getNetworkUsageStats(device: NetworkDevice): DeviceUsageStats {
+        synchronized(networkUsageStats) {
+            val stats = networkUsageStats.getOrPut(device.ipAddress) {
+                DeviceUsageStats(device.ipAddress)
+            }
+
+            // Update with current network data
+            updateDeviceStats(stats)
+            return stats
+        }
+    }
+
+    /**
+     * Updates device statistics with current network data
+     * @param stats The statistics object to update
+     */
+    private fun updateDeviceStats(stats: DeviceUsageStats) {
+        try {
+            // Get current network statistics from /proc/net/dev
+            val process = Runtime.getRuntime().exec("su -c \"cat /proc/net/dev\"")
+            val reader = BufferedReader(InputStreamReader(process.inputStream))
+
+            var line: String?
+            var newRxBytes = 0L
+            var newTxBytes = 0L
+
+            while (reader.readLine().also { line = it } != null) {
+                val trimmedLine = line!!.trim()
+
+                // Skip header lines
+                if (trimmedLine.startsWith("Inter-") || trimmedLine.startsWith("face")) {
+                    continue
+                }
+
+                // Parse interface statistics
+                val parts = trimmedLine.split("\\s+".toRegex())
+                if (parts.size >= 10) {
+                    val interfaceName = parts[0].removeSuffix(":")
+
+                    // Only analyze traffic on active network interfaces
+                    if (interfaceName.startsWith("wlan") || interfaceName.startsWith("eth") || interfaceName.startsWith("rmnet")) {
+                        val rxBytes = parts[1].toLongOrNull() ?: 0L
+                        val txBytes = parts[9].toLongOrNull() ?: 0L
+
+                        newRxBytes += rxBytes
+                        newTxBytes += txBytes
+                    }
+                }
+            }
+
+            reader.close()
+            process.waitFor()
+
+            // Calculate differences
+            val deltaRx = newRxBytes - stats.totalBytesReceived
+            val deltaTx = newTxBytes - stats.totalBytesTransmitted
+
+            // Update stats
+            stats.totalBytesReceived = newRxBytes
+            stats.totalBytesTransmitted = newTxBytes
+            stats.lastActive = System.currentTimeMillis()
+
+            // Calculate bandwidth if we have a time difference
+            val currentTime = System.currentTimeMillis()
+            if (stats.lastActive > stats.firstSeen) {
+                val timeDiffSec = (currentTime - stats.lastActive) / 1000.0
+                if (timeDiffSec > 0) {
+                    val bandwidthRxMbps = (deltaRx * 8.0) / (timeDiffSec * 1_000_000.0) // Convert to Mbps
+                    val bandwidthTxMbps = (deltaTx * 8.0) / (timeDiffSec * 1_000_000.0) // Convert to Mbps
+
+                    // Update peak bandwidths
+                    if (bandwidthRxMbps > stats.peakBandwidthRx) {
+                        stats.peakBandwidthRx = bandwidthRxMbps
+                    }
+                    if (bandwidthTxMbps > stats.peakBandwidthTx) {
+                        stats.peakBandwidthTx = bandwidthTxMbps
+                    }
+
+                    // Update average bandwidths
+                    val totalTimeActiveSec = (stats.activeTime + timeDiffSec) / 1000.0
+                    stats.averageBandwidthRx = ((stats.averageBandwidthRx * (stats.activeTime / 1000.0)) + bandwidthRxMbps) / totalTimeActiveSec
+                    stats.averageBandwidthTx = ((stats.averageBandwidthTx * (stats.activeTime / 1000.0)) + bandwidthTxMbps) / totalTimeActiveSec
+                }
+            }
+
+            // Update active time
+            stats.activeTime += currentTime - stats.lastActive
+        } catch (e: Exception) {
+            Log.e(TAG, "Error updating network stats for ${stats.ipAddress}: ${e.message}", e)
+        }
+    }
+
+    /**
+     * Gets network usage statistics for all devices
+     * @param devices List of devices to get statistics for
+     * @return List of DeviceUsageStats objects
+     */
+    fun getAllNetworkUsageStats(devices: List<NetworkDevice>): List<DeviceUsageStats> {
+        return devices.map { getNetworkUsageStats(it) }
+    }
+
+    /**
+     * Gets historical network usage statistics for a device
+     * @param ipAddress The IP address to get historical stats for
+     * @param startTime Start time for the historical data
+     * @param endTime End time for the historical data
+     * @return List of HistoricalUsageStats objects
+     */
+    fun getHistoricalNetworkUsage(
+        ipAddress: String,
+        startTime: Long,
+        endTime: Long
+    ): List<HistoricalUsageStats> {
+        synchronized(historicalStats) {
+            return historicalStats.filter {
+                it.ipAddress == ipAddress &&
+                it.timestamp >= startTime &&
+                it.timestamp <= endTime
+            }.sortedBy { it.timestamp }
+        }
+    }
+
+    /**
+     * Gets aggregated network usage statistics for a time period
+     * @param startTime Start time for aggregation
+     * @param endTime End time for aggregation
+     * @return Aggregated usage statistics
+     */
+    fun getAggregatedNetworkUsage(startTime: Long, endTime: Long): Map<String, DeviceUsageStats> {
+        val result = mutableMapOf<String, DeviceUsageStats>()
+
+        synchronized(networkUsageStats) {
+            networkUsageStats.forEach { (ip, stats) ->
+                if (stats.firstSeen <= endTime && stats.lastActive >= startTime) {
+                    result[ip] = stats.copy()
+                }
+            }
+        }
+
+        return result
+    }
+
+    /**
+     * Resets network usage statistics for a device
+     * @param device The device to reset statistics for
+     */
+    fun resetNetworkUsageStats(device: NetworkDevice) {
+        synchronized(networkUsageStats) {
+            networkUsageStats[device.ipAddress] = DeviceUsageStats(device.ipAddress)
+        }
+    }
+
+    /**
+     * Resets all network usage statistics
+     */
+    fun resetAllNetworkUsageStats() {
+        synchronized(networkUsageStats) {
+            networkUsageStats.clear()
+        }
+    }
+
+    /**
+     * Gets the top bandwidth consuming devices
+     * @param devices List of devices to evaluate
+     * @param limit Number of top devices to return
+     * @return List of devices sorted by bandwidth consumption
+     */
+    fun getTopBandwidthConsumers(devices: List<NetworkDevice>, limit: Int = 10): List<Pair<NetworkDevice, Double>> {
+        val statsList = devices.mapNotNull { device ->
+            val stats = getNetworkUsageStats(device)
+            val totalBandwidth = stats.averageBandwidthRx + stats.averageBandwidthTx
+            if (totalBandwidth > 0) {
+                Pair(device, totalBandwidth)
+            } else {
+                null
+            }
+        }
+
+        return statsList.sortedByDescending { it.second }.take(limit)
+    }
+
+    /**
+     * Gets the top data consuming devices
+     * @param devices List of devices to evaluate
+     * @param limit Number of top devices to return
+     * @return List of devices sorted by data consumption
+     */
+    fun getTopDataConsumers(devices: List<NetworkDevice>, limit: Int = 10): List<Pair<NetworkDevice, Long>> {
+        val statsList = devices.map { device ->
+            val stats = getNetworkUsageStats(device)
+            val totalData = stats.totalBytesReceived + stats.totalBytesTransmitted
+            Pair(device, totalData)
+        }
+
+        return statsList.filter { it.second > 0 }.sortedByDescending { it.second }.take(limit)
+    }
+
+    /**
+     * Calculates network usage percentage for each device
+     * @param devices List of devices to calculate percentages for
+     * @return Map of device IP to usage percentage
+     */
+    fun getNetworkUsagePercentages(devices: List<NetworkDevice>): Map<String, Double> {
+        val totalData = devices.sumOf { device ->
+            val stats = getNetworkUsageStats(device)
+            stats.totalBytesReceived + stats.totalBytesTransmitted
+        }
+
+        if (totalData == 0L) {
+            return emptyMap()
+        }
+
+        val percentages = mutableMapOf<String, Double>()
+        devices.forEach { device ->
+            val stats = getNetworkUsageStats(device)
+            val deviceData = stats.totalBytesReceived + stats.totalBytesTransmitted
+            percentages[device.ipAddress] = (deviceData.toDouble() / totalData.toDouble()) * 100.0
+        }
+
+        return percentages
+    }
 }
 
 /**
