@@ -21,6 +21,27 @@ class NativeNetworkWrapper {
                 isNativeAvailable = false
             }
         }
+
+        fun getRootHelperPath(context: android.content.Context): String? {
+            val libDir = context.applicationInfo.nativeLibraryDir
+            val binaryName = "libharpy_root_helper.so"
+            
+            // Try direct path first
+            var helperPath = "$libDir/$binaryName"
+            var file = java.io.File(helperPath)
+            if (file.exists()) return helperPath
+            
+            // Try common ABI subdirectories just in case
+            val abis = listOf("arm64-v8a", "arm64", "base.apk!/lib/arm64-v8a", "base.apk!/lib/arm64")
+            for (abi in abis) {
+                helperPath = "$libDir/$abi/$binaryName"
+                file = java.io.File(helperPath)
+                if (file.exists()) return helperPath
+            }
+
+            Log.e(TAG, "Root helper not found in $libDir or its subdirectories. Checked: $abis")
+            return null
+        }
     }
 
     /**

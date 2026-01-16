@@ -10,4 +10,5 @@ interface NetworkMonitorRepository {
     suspend fun blockDevice(device: NetworkDevice): NetworkResult<Boolean>
     suspend fun unblockDevice(device: NetworkDevice): NetworkResult<Boolean>
     suspend fun mapNetworkTopology(): NetworkResult<NetworkTopology>
+    suspend fun testPing(device: NetworkDevice): NetworkResult<Boolean>
 }

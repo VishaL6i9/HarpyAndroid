@@ -25,7 +25,7 @@ object NativeNetworkOps {
      * @param interfaceName Network interface name (e.g., "wlan0")
      * @param subnet Subnet to scan (e.g., "192.168.29.0/24")
      * @param timeoutSeconds Timeout in seconds
-     * @return Array of discovered device IPs
+     * @return Array of discovered device strings in "IP|MAC" format
      */
     external fun scanNetworkNative(
         interfaceName: String,

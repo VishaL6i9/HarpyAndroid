@@ -16,7 +16,7 @@ import java.io.IOException
 import java.io.InputStreamReader
 import kotlin.text.Regex
 
-class NetworkMonitorRepositoryImpl : NetworkMonitorRepository {
+class NetworkMonitorRepositoryImpl(private val context: android.content.Context) : NetworkMonitorRepository {
 
     companion object {
         private const val TAG = "NetworkMonitorRepoImpl"
@@ -26,6 +26,8 @@ class NetworkMonitorRepositoryImpl : NetworkMonitorRepository {
         private val HOSTNAME_PATTERN = Regex("name = (.+)")
         private val FIELDS_SPLIT_PATTERN = Regex("\\s+")
     }
+
+    private val blockingProcesses = java.util.concurrent.ConcurrentHashMap<String, Process>()
 
     override suspend fun scanNetwork(): NetworkResult<List<NetworkDevice>> {
         return try {
@@ -189,56 +191,57 @@ class NetworkMonitorRepositoryImpl : NetworkMonitorRepository {
                     val subnet = matchResult.groupValues[1]
                     Log.d(TAG, "Scanning subnet: $subnet.0/24")
 
-                    // Try native implementation first
-                    Log.d(TAG, "Attempting native network scan...")
-                    val nativeWrapper = NativeNetworkWrapper()
+                    // Try robust root helper binary first
+                    Log.d(TAG, "Attempting robust root helper scan...")
+                    val helperPath = NativeNetworkWrapper.getRootHelperPath(context)
                     
-                    if (nativeWrapper.isNativeAvailable()) {
-                        val nativeDevices = nativeWrapper.scanNetworkNative(
-                            "wlan0",
-                            subnet,
-                            10  // Increased timeout to 10 seconds
-                        )
-                        
-                        if (nativeDevices.isNotEmpty()) {
-                            Log.d(TAG, "Native scan found ${nativeDevices.size} devices")
-                            for (ip in nativeDevices) {
-                                Log.d(TAG, "Native found: $ip")
-                                
-                                // Get MAC from ARP table
-                                try {
-                                    val arpProcess = Runtime.getRuntime().exec("su")
-                                    val arpOutput = DataOutputStream(arpProcess.outputStream)
-                                    arpOutput.writeBytes("ip neigh show $ip\n")
-                                    arpOutput.writeBytes("exit\n")
-                                    arpOutput.flush()
-                                    arpOutput.close()
-                                    
-                                    val arpReader = BufferedReader(InputStreamReader(arpProcess.inputStream))
-                                    var line: String?
-                                    while (arpReader.readLine().also { line = it } != null) {
-                                        val parts = line?.trim()?.split(Regex("\\s+"))
-                                        if (parts != null && parts.size >= 5) {
-                                            val mac = parts[4]
-                                            if (mac.matches(Regex("^([0-9A-Fa-f]{2}:){5}([0-9A-Fa-f]{2})$"))) {
-                                                addDeviceToList(devices, ip, mac, "wlan0", null)
-                                                Log.d(TAG, "Found device (native): $ip ($mac)")
-                                                break
-                                            }
-                                        }
-                                    }
-                                    arpReader.close()
-                                    arpProcess.waitFor(3, java.util.concurrent.TimeUnit.SECONDS)
-                                    arpProcess.destroyForcibly()
-                                } catch (e: Exception) {
-                                    Log.d(TAG, "Could not get MAC for $ip: ${e.message}")
+                    if (helperPath != null) {
+                        try {
+                            val helperProcess = Runtime.getRuntime().exec("su")
+                            val helperOutput = DataOutputStream(helperProcess.outputStream)
+                            
+                            // Ensure executable permission and run with proper library path
+                            val libDir = context.applicationInfo.nativeLibraryDir
+                            val cmd = "chmod 755 $helperPath && LD_LIBRARY_PATH=$libDir $helperPath scan wlan0 $subnet 2>&1\n"
+                            Log.d(TAG, "Executing root helper: $cmd")
+                            helperOutput.writeBytes(cmd)
+                            helperOutput.writeBytes("exit\n")
+                            helperOutput.flush()
+                            helperOutput.close()
+
+                            val helperReader = BufferedReader(InputStreamReader(helperProcess.inputStream))
+                            var helperLine: String?
+                            val helperFoundDevices = mutableListOf<String>()
+                            while (helperReader.readLine().also { helperLine = it } != null) {
+                                Log.d(TAG, "Root helper output: $helperLine")
+                                if (helperLine != null && helperLine!!.contains("|") && 
+                                    !helperLine!!.startsWith("DEBUG:") && !helperLine!!.startsWith("INFO:")) {
+                                    helperFoundDevices.add(helperLine!!)
                                 }
                             }
+                            helperReader.close()
                             
-                            if (devices.isNotEmpty()) {
-                                Log.d(TAG, "Scan complete. Found ${devices.size} devices (native)")
-                                return devices
+                            helperProcess.waitFor()
+                            
+                            if (helperFoundDevices.isNotEmpty()) {
+                                Log.d(TAG, "Root helper found ${helperFoundDevices.size} devices")
+                                for (deviceStr in helperFoundDevices) {
+                                    val parts = deviceStr.split("|")
+                                    if (parts.size == 2) {
+                                        val ip = parts[0]
+                                        val mac = parts[1]
+                                        addDeviceToList(devices, ip, mac, "wlan0", null)
+                                        Log.d(TAG, "Root helper found: $ip ($mac)")
+                                    }
+                                }
+                                
+                                if (devices.isNotEmpty()) {
+                                    Log.d(TAG, "Scan complete. Found ${devices.size} devices (root helper)")
+                                    return devices
+                                }
                             }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Root helper scan failed: ${e.message}")
                         }
                     }
                     
@@ -447,7 +450,8 @@ class NetworkMonitorRepositoryImpl : NetworkMonitorRepository {
             deviceType = deviceType,
             hwType = "Unknown",
             mask = "*",
-            deviceInterface = deviceInterface ?: "unknown"
+            deviceInterface = deviceInterface ?: "unknown",
+            isCurrentDevice = (ip == getOurIp())
         )
         devices.add(networkDevice)
     }
@@ -478,37 +482,34 @@ class NetworkMonitorRepositoryImpl : NetworkMonitorRepository {
     override suspend fun blockDevice(device: NetworkDevice): NetworkResult<Boolean> {
         return try {
             val isRootedResult = isDeviceRooted()
-            if (isRootedResult is NetworkResult.Error) {
-                return isRootedResult as NetworkResult<Boolean>
-            }
-
-            if (!(isRootedResult as NetworkResult.Success).data) {
-                Log.e(TAG, "Cannot block device: Device is not rooted")
+            if (!(isRootedResult is NetworkResult.Success && isRootedResult.data)) {
                 return NetworkResult.error(NetworkError.DeviceNotRootedError())
             }
 
-            val gatewayIp = getGatewayIp()
-            if (gatewayIp.isNullOrEmpty()) {
-                Log.e(TAG, "Could not determine gateway IP for ARP spoofing")
-                return NetworkResult.error(NetworkError.NetworkAccessError())
+            // Check if already blocking
+            if (blockingProcesses.containsKey(device.ipAddress)) {
+                return NetworkResult.success(true)
             }
 
+            val gatewayIp = getGatewayIp() ?: return NetworkResult.error(NetworkError.NetworkAccessError())
+            val helperPath = NativeNetworkWrapper.getRootHelperPath(context) ?: return NetworkResult.error(NetworkError.NativeLibraryError())
+            val ourMac = getOurMacAddress() ?: "00:00:00:00:00:00" // Should ideally get this from route
+            val iface = "wlan0" // Should ideally get this from route
+
+            // Start blocking process in background
+            val libDir = context.applicationInfo.nativeLibraryDir
+            val cmd = "chmod 755 $helperPath && LD_LIBRARY_PATH=$libDir $helperPath block $iface ${device.ipAddress} $gatewayIp $ourMac\n"
+            
+            Log.d(TAG, "Starting blocking process: $cmd")
             val process = Runtime.getRuntime().exec("su")
-            val outputStream = DataOutputStream(process.outputStream)
-
-            outputStream.writeBytes("arping -U -c 1 -s $gatewayIp ${device.ipAddress}\n")
-            outputStream.writeBytes("arping -U -c 1 -s ${device.ipAddress} $gatewayIp\n")
-
-            val ourMac = getOurMacAddress()
-            if (!ourMac.isNullOrEmpty()) {
-                outputStream.writeBytes("arp -s ${device.ipAddress} $ourMac\n")
-            }
-
-            outputStream.writeBytes("exit\n")
-            outputStream.flush()
-
-            process.waitFor()
-            Log.i(TAG, "Successfully initiated ARP spoofing to block device: ${device.ipAddress}")
+            val out = DataOutputStream(process.outputStream)
+            out.writeBytes(cmd)
+            out.flush()
+            // Keep output stream open or the process might exit depending on su implementation
+            
+            blockingProcesses[device.ipAddress] = process
+            
+            Log.i(TAG, "Persistent blocking started for ${device.ipAddress}")
             NetworkResult.success(true)
         } catch (e: Exception) {
             Log.e(TAG, "Error blocking device ${device.ipAddress}: ${e.message}", e)
@@ -518,30 +519,27 @@ class NetworkMonitorRepositoryImpl : NetworkMonitorRepository {
 
     override suspend fun unblockDevice(device: NetworkDevice): NetworkResult<Boolean> {
         return try {
-            val isRootedResult = isDeviceRooted()
-            if (isRootedResult is NetworkResult.Error) {
-                return isRootedResult as NetworkResult<Boolean>
+            val process = blockingProcesses.remove(device.ipAddress)
+            if (process != null) {
+                // Try to kill the root process
+                val killer = Runtime.getRuntime().exec("su")
+                val out = DataOutputStream(killer.outputStream)
+                // We need to kill the specific helper process. Since su might spawn it in a new session,
+                // we'll try to kill it by name if possible, or just destroy the process we have.
+                // However, killing the 'su' child might not be enough.
+                out.writeBytes("pkill -f libharpy_root_helper.so\n")
+                out.writeBytes("exit\n")
+                out.flush()
+                out.close()
+                killer.waitFor()
+                
+                process.destroy()
+                Log.i(TAG, "Blocking stopped for ${device.ipAddress}")
             }
-
-            if (!(isRootedResult as NetworkResult.Success).data) {
-                Log.e(TAG, "Cannot unblock device: Device is not rooted")
-                return NetworkResult.error(NetworkError.DeviceNotRootedError())
-            }
-
-            val process = Runtime.getRuntime().exec("su")
-            val outputStream = DataOutputStream(process.outputStream)
-
-            outputStream.writeBytes("arp -d ${device.ipAddress}\n")
-            outputStream.writeBytes("ping -c 1 -W 1 ${device.ipAddress}\n")
-            outputStream.writeBytes("exit\n")
-            outputStream.flush()
-
-            process.waitFor()
-            Log.i(TAG, "Successfully unblocked device: ${device.ipAddress}")
             NetworkResult.success(true)
         } catch (e: Exception) {
             Log.e(TAG, "Error unblocking device ${device.ipAddress}: ${e.message}", e)
-            NetworkResult.error(NetworkError.UnblockDeviceError(e))
+            NetworkResult.error(NetworkError.BlockDeviceError(e))
         }
     }
 
@@ -627,6 +625,53 @@ class NetworkMonitorRepositoryImpl : NetworkMonitorRepository {
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error getting MAC address: ${e.message}", e)
+            null
+        }
+    }
+
+    override suspend fun testPing(device: NetworkDevice): NetworkResult<Boolean> {
+        return try {
+            // First try ICMP Ping
+            val pingProcess = Runtime.getRuntime().exec("ping -c 1 -W 1 ${device.ipAddress}")
+            val exitCode = pingProcess.waitFor()
+            
+            if (exitCode == 0) {
+                Log.d(TAG, "Ping successful for ${device.ipAddress}")
+                return NetworkResult.success(true)
+            }
+
+            // If ping fails, check ARP table as a fallback (some devices block ICMP but are active)
+            Log.d(TAG, "Ping failed for ${device.ipAddress} (exit $exitCode), checking ARP table...")
+            
+            val arpProcess = Runtime.getRuntime().exec("su -c \"ip neigh show ${device.ipAddress}\"")
+            val reader = BufferedReader(InputStreamReader(arpProcess.inputStream))
+            val line = reader.readLine()
+            reader.close()
+            arpProcess.waitFor()
+
+            if (line != null && (line.contains("REACHABLE") || line.contains("DELAY") || line.contains("PROBE"))) {
+                Log.d(TAG, "Device ${device.ipAddress} is found in ARP table state: $line")
+                NetworkResult.success(true)
+            } else {
+                Log.d(TAG, "Device ${device.ipAddress} appears to be offline.")
+                NetworkResult.success(false)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error testing ping for ${device.ipAddress}: ${e.message}", e)
+            NetworkResult.error(NetworkError.CommandExecutionError(e))
+        }
+    }
+
+    private fun getOurIp(): String? {
+        return try {
+            val process = Runtime.getRuntime().exec("su -c \"ip route | grep src | awk '{print \$NF}'\"")
+            val reader = BufferedReader(InputStreamReader(process.inputStream))
+            val ourIp = reader.readLine()
+            reader.close()
+            process.waitFor()
+            ourIp?.trim()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting our IP: ${e.message}", e)
             null
         }
     }
