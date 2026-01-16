@@ -153,14 +153,28 @@ class NetworkMonitorRepositoryImpl : NetworkMonitorRepository {
                     val arpProcess = Runtime.getRuntime().exec(arrayOf("sh", "-c", "cat /proc/net/arp"))
                     val arpReader = BufferedReader(InputStreamReader(arpProcess.inputStream))
 
+                    var lineNumber = 0
                     var line: String?
                     while (arpReader.readLine().also { line = it } != null) {
-                        val fields = line?.split(FIELDS_SPLIT_PATTERN)
+                        lineNumber++
+                        // Skip header line
+                        if (lineNumber == 1) {
+                            Log.d(TAG, "ARP table header: $line")
+                            continue
+                        }
+
+                        val fields = line?.trim()?.split(FIELDS_SPLIT_PATTERN)
+                        Log.d(TAG, "ARP line $lineNumber: fields=${fields?.size}, content=$line")
+                        
                         if (fields != null && fields.size >= 6) {
                             val ip = fields[0]  // IP address
+                            val hwType = fields[1]  // Hardware type
                             val flags = fields[2]  // Flags
                             val mac = fields[3]  // MAC address
+                            val mask = fields[4]  // Mask
                             val deviceInterface = fields[5]  // Device name
+
+                            Log.d(TAG, "Parsed: IP=$ip, HW=$hwType, Flags=$flags, MAC=$mac, Mask=$mask, Device=$deviceInterface")
 
                             if (flags.contains("0x2") || flags.contains("0x6")) {
                                 if (mac != "00:00:00:00:00:00" && mac != "<incomplete>") {
@@ -185,7 +199,7 @@ class NetworkMonitorRepositoryImpl : NetworkMonitorRepository {
                                         Log.d(TAG, "Could not resolve hostname for $ip: ${e.message}")
                                     }
 
-                                    val hwTypeDescription = when(fields[1].lowercase()) {
+                                    val hwTypeDescription = when(hwType.lowercase()) {
                                         "0x1" -> "Ethernet"
                                         "0x19" -> "WiFi"
                                         "0x420" -> "Bridge"
@@ -202,19 +216,28 @@ class NetworkMonitorRepositoryImpl : NetworkMonitorRepository {
                                         vendor = vendor,
                                         deviceType = deviceType,
                                         hwType = hwTypeDescription,
-                                        mask = fields[4],
+                                        mask = mask,
                                         deviceInterface = deviceInterface
                                     )
                                     devices.add(networkDevice)
-                                    Log.d(TAG, "Found device: $ip ($mac)")
+                                    Log.d(TAG, "Found device: $ip ($mac) - $vendor")
+                                } else {
+                                    Log.d(TAG, "Skipping device with invalid MAC: $mac")
                                 }
+                            } else {
+                                Log.d(TAG, "Skipping device with flags: $flags (not 0x2 or 0x6)")
                             }
+                        } else {
+                            Log.d(TAG, "Skipping line with insufficient fields: ${fields?.size}")
                         }
                     }
 
                     arpReader.close()
-                    arpProcess.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)
-                    arpProcess.destroyForcibly()
+                    val completed = arpProcess.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)
+                    if (!completed) {
+                        arpProcess.destroyForcibly()
+                        Log.w(TAG, "ARP read command timed out")
+                    }
                     
                     Log.d(TAG, "Scan complete. Found ${devices.size} devices")
                 }
