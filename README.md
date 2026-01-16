@@ -15,6 +15,8 @@ A network monitoring and control application for Android, inspired by the iOS ja
 - Vendor lookup using OUI database for accurate manufacturer identification
 - Immersive fullscreen mode with auto-hiding status bar
 - OLED-optimized dark theme with true blacks
+- Device ping testing to verify connectivity
+- Root helper binary for privileged network operations
 
 ### Non-Root Approach (Future Plan)
 - Network monitoring using Android's VpnService
@@ -24,7 +26,15 @@ A network monitoring and control application for Android, inspired by the iOS ja
 
 ## Technical Implementation
 
-The root-based implementation is built using native Kotlin for the Android application layer, with plans for native C/C++ code using libpcap/libnet libraries accessed through JNI for low-level network operations when root access is available. The app leverages root access to execute ARP spoofing techniques similar to the original iOS Harpy tweak.
+The root-based implementation is built using native Kotlin for the Android application layer, with native C/C++ code using libpcap/libnet libraries accessed through JNI for low-level network operations when root access is available. The app leverages root access to execute ARP spoofing techniques similar to the original iOS Harpy tweak.
+
+### Root Helper Binary
+A standalone executable (`libharpy_root_helper.so`) is packaged with the app and can be invoked via `su` to perform privileged network operations without requiring the entire app to run as root. This provides better security isolation and allows for more granular permission control.
+
+Supported commands:
+- `scan <interface> <subnet>` - Network device discovery
+- `mac <interface> <ip>` - MAC address resolution
+- `block <interface> <target_ip> <gateway_ip> <our_mac>` - ARP spoofing for device blocking
 
 ## Requirements
 
@@ -84,6 +94,10 @@ To build the project, ensure you have the Android SDK properly configured with t
   - [x] Efficient polling mechanism to minimize battery drain
   - [ ] Notification system for new device detection
   - [ ] Live status updates for device connectivity
+- [x] Device ping testing functionality
+  - [x] TestPingUseCase for domain layer operations
+  - [x] UI integration for ping test results
+  - [x] State management for ping operations
 
 ### Phase 3: Advanced Features (Completed ✅)
 - [x] ARP spoofing implementation for device blocking
@@ -145,6 +159,11 @@ To build the project, ensure you have the Android SDK properly configured with t
   - [x] JNI bindings for ARP operations
   - [x] JNI bindings for network scanning
   - [x] Shell command fallback implementations
+  - [x] Root helper binary for privileged operations
+    - [x] Standalone executable packaged as libharpy_root_helper.so
+    - [x] Support for network scanning via su
+    - [x] Support for MAC address resolution via su
+    - [x] Support for ARP spoofing via su
   - [ ] Full libpcap integration for network scanning
   - [ ] Full libnet integration for ARP operations
 - [x] JNI integration for ARP manipulation
@@ -157,6 +176,7 @@ To build the project, ensure you have the Android SDK properly configured with t
   - [x] ARP operations using shell commands (fallback)
   - [x] Graceful fallback to shell commands when native unavailable
   - [x] Integration guide (LIBPCAP_LIBNET_INTEGRATION.md)
+  - [x] Root helper binary for privileged operations
   - [ ] Pre-built binary linking
   - [ ] Full libpcap packet capture
   - [ ] Full libnet packet crafting
@@ -164,10 +184,16 @@ To build the project, ensure you have the Android SDK properly configured with t
   - [x] Native library loading with error handling
   - [x] Automatic fallback mechanism
   - [x] Logging for debugging native operations
+  - [x] Root helper binary invocation via su
 - [x] Performance benchmarking structure
   - [x] Native operations logging
   - [x] Fallback tracking
   - [ ] Performance metrics collection
+- [x] Improved network scanning and ARP operations
+  - [x] Refactored C++ code for better performance
+  - [x] Thread-safe device discovery with mutex protection
+  - [x] Enhanced error handling in native code
+  - [x] Optimized socket operations
 
 ### Phase 6: Testing & Deployment (Planned 📋)
 - [ ] Comprehensive unit testing
