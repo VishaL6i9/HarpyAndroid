@@ -144,7 +144,9 @@ class NetworkMonitorService {
                                         Log.d(TAG, "Could not resolve hostname for $ip: ${e.message}")
                                     }
 
-                                    devices.add(NetworkDevice(ip, mac, hostname))
+                                    val vendor = identifyVendor(mac)
+                                    val deviceType = identifyDeviceType(NetworkDevice(ip, mac, hostname, vendor))
+                                    devices.add(NetworkDevice(ip, mac, hostname, vendor, deviceType))
                                 }
                             }
                         }
@@ -160,7 +162,75 @@ class NetworkMonitorService {
 
         return devices
     }
-    
+
+    /**
+     * Identify device vendor based on MAC address OUI (Organizationally Unique Identifier)
+     * @param macAddress The MAC address to identify
+     * @return Vendor name if found, null otherwise
+     */
+    private fun identifyVendor(macAddress: String): String? {
+        // This is a simplified vendor identification based on common prefixes
+        // In a real implementation, this would use a comprehensive OUI database
+        val oui = macAddress.substring(0, 8).uppercase()
+
+        return when (oui) {
+            "00:50:43" -> "Siemens"
+            "00:50:C2" -> "IEEE Registration Authority"
+            "00:60:2F" -> "Hewlett Packard"
+            "00:A0:C9" -> "Intel Corporation"
+            "00:E0:4C" -> "Realtek Semiconductor Corp."
+            "08:00:27" -> "Oracle VirtualBox"
+            "1C:69:7A" -> "AcSiP Technology Corp."
+            "24:4B:03" -> "Samsung Electronics Co., Ltd"
+            "28:C6:3F" -> "Apple, Inc."
+            "38:4F:F0" -> "Samsung Electronics Co., Ltd"
+            "40:B0:FA" -> "LG Electronics (Mobile Communications)"
+            "44:D9:E7" -> "Ubiquiti Networks Inc."
+            "5C:F9:DD" -> "Dell Inc."
+            "6C:EC:5A" -> "Hon Hai Precision Ind. Co.,Ltd."
+            "78:4F:43" -> "Apple, Inc."
+            "80:A5:89" -> "AzureWave Technology Inc."
+            "8C:1F:64" -> "Intel Corporate"
+            "9C:93:4E" -> "ASUSTek Computer, Inc."
+            "AC:DE:48" -> "Intel Corporate"
+            "B8:27:EB" -> "Raspberry Pi Foundation"
+            "BC:5F:F4" -> "Dell Inc."
+            "C8:60:00" -> "Apple, Inc."
+            "D8:3B:BF" -> "Samsung Electronics Co., Ltd"
+            "DC:A6:32" -> "Raspberry Pi Trading Ltd"
+            "E4:5D:52" -> "Intel Corporate"
+            "EC:26:CA" -> "TP-Link Technologies Co., Ltd."
+            "F0:18:98" -> "Apple, Inc."
+            "F4:8C:50" -> "Intel Corporate"
+            else -> null
+        }
+    }
+
+    /**
+     * Identify device type based on various heuristics
+     * @param device The network device to identify
+     * @return Device type if identified, null otherwise
+     */
+    private fun identifyDeviceType(device: NetworkDevice): String? {
+        // Identify device type based on vendor, IP range, or other heuristics
+        val vendor = device.vendor ?: identifyVendor(device.macAddress)
+
+        // Common heuristics for device type identification
+        return when {
+            vendor?.contains("Apple", ignoreCase = true) == true -> "Phone/Tablet"
+            vendor?.contains("Samsung", ignoreCase = true) == true -> "Phone/Tablet"
+            vendor?.contains("Intel", ignoreCase = true) == true -> "Computer"
+            vendor?.contains("Dell", ignoreCase = true) == true -> "Computer"
+            vendor?.contains("HP", ignoreCase = true) == true ||
+            vendor?.contains("Hewlett", ignoreCase = true) == true -> "Computer/Printer"
+            vendor?.contains("Raspberry", ignoreCase = true) == true -> "IoT/Single-board computer"
+            vendor?.contains("TP-Link", ignoreCase = true) == true ||
+            vendor?.contains("Ubiquiti", ignoreCase = true) == true ||
+            vendor?.contains("Realtek", ignoreCase = true) == true -> "Router/Network equipment"
+            else -> null
+        }
+    }
+
     /**
      * Block a specific device from the network using ARP spoofing
      * @param device The device to block
@@ -171,23 +241,76 @@ class NetworkMonitorService {
             Log.e(TAG, "Cannot block device: Device is not rooted")
             return false
         }
-        
+
         return try {
             val process = Runtime.getRuntime().exec("su")
             val outputStream = DataOutputStream(process.outputStream)
-            
+
             // Perform ARP spoofing to block the device
             // This is a simplified example - actual implementation would be more complex
             outputStream.writeBytes("echo 'Performing ARP spoofing to block ${device.ipAddress}'\n")
             outputStream.writeBytes("exit\n")
             outputStream.flush()
-            
+
             process.waitFor()
             Log.i(TAG, "Successfully blocked device: ${device.ipAddress}")
             true
         } catch (e: Exception) {
             Log.e(TAG, "Error blocking device ${device.ipAddress}: ${e.message}", e)
             false
+        }
+    }
+
+    /**
+     * Map the network topology to understand device relationships
+     * @return NetworkTopology object containing network structure information
+     */
+    fun mapNetworkTopology(): NetworkTopology {
+        val devices = scanNetwork()
+        val gatewayIp = getGatewayIp()
+
+        // Identify the gateway device
+        val gatewayDevice = devices.find { it.ipAddress == gatewayIp }
+
+        // Group devices by type
+        val devicesByType = mutableMapOf<String, MutableList<NetworkDevice>>()
+        val unknownDevices = mutableListOf<NetworkDevice>()
+
+        devices.forEach { device ->
+            if (device.deviceType != null) {
+                if (!devicesByType.containsKey(device.deviceType)) {
+                    devicesByType[device.deviceType] = mutableListOf()
+                }
+                devicesByType[device.deviceType]?.add(device)
+            } else {
+                unknownDevices.add(device)
+            }
+        }
+
+        return NetworkTopology(
+            gatewayDevice,
+            devices,
+            devicesByType,
+            unknownDevices
+        )
+    }
+
+    /**
+     * Get the gateway IP address of the current network
+     * @return Gateway IP address as a string
+     */
+    private fun getGatewayIp(): String? {
+        return try {
+            val process = Runtime.getRuntime().exec("su -c \"ip route | grep default | awk '{print \$3}'\"")
+            val reader = BufferedReader(InputStreamReader(process.inputStream))
+            val gatewayIp = reader.readLine()
+            reader.close()
+            process.waitFor()
+
+            gatewayIp?.trim()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting gateway IP: ${e.message}", e)
+            null
         }
     }
     
@@ -216,5 +339,16 @@ data class NetworkDevice(
     val macAddress: String,
     val hostname: String? = null,
     val vendor: String? = null,
+    val deviceType: String? = null, // e.g., phone, laptop, IoT device
     var isBlocked: Boolean = false
+)
+
+/**
+ * Data class representing network topology
+ */
+data class NetworkTopology(
+    val gatewayDevice: NetworkDevice?,
+    val allDevices: List<NetworkDevice>,
+    val devicesByType: Map<String, List<NetworkDevice>>,
+    val unknownDevices: List<NetworkDevice>
 )
