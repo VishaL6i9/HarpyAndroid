@@ -7,7 +7,7 @@ import com.vishal.harpy.R
  * Utility class for handling and displaying network errors
  */
 object NetworkErrorMapper {
-    
+
     /**
      * Maps a NetworkError to a user-friendly error message
      */
@@ -42,21 +42,3 @@ object NetworkErrorMapper {
             }
         }
     }
-}
-
-/**
- * Extension function to handle NetworkResult in UI
- */
-suspend fun <T> NetworkResult<T>.onSuccess(block: suspend (T) -> Unit): NetworkResult<T> {
-    if (this is NetworkResult.Success) {
-        block(data)
-    }
-    return this
-}
-
-suspend fun <T> NetworkResult<T>.onError(block: suspend (NetworkError) -> Unit): NetworkResult<T> {
-    if (this is NetworkResult.Error) {
-        block(error)
-    }
-    return this
-}

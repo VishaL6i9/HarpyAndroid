@@ -50,9 +50,15 @@ class NetworkMonitorViewModel @Inject constructor(
             _isLoading.value = true
             _error.value = null
             try {
-                isDeviceRootedUseCase()
-                    .onSuccess { isRooted -> _isRooted.value = isRooted }
-                    .onError { error -> _error.value = error.message }
+                val result = isDeviceRootedUseCase()
+                when (result) {
+                    is NetworkResult.Success -> {
+                        _isRooted.value = result.data
+                    }
+                    is NetworkResult.Error -> {
+                        _error.value = result.error.message
+                    }
+                }
             } catch (e: Exception) {
                 _error.value = e.message
             } finally {
@@ -68,9 +74,15 @@ class NetworkMonitorViewModel @Inject constructor(
             _isLoading.value = true
             _error.value = null
             try {
-                scanNetworkUseCase()
-                    .onSuccess { devices -> _networkDevices.value = devices }
-                    .onError { error -> _error.value = error.message }
+                val result = scanNetworkUseCase()
+                when (result) {
+                    is NetworkResult.Success -> {
+                        _networkDevices.value = result.data
+                    }
+                    is NetworkResult.Error -> {
+                        _error.value = result.error.message
+                    }
+                }
             } catch (e: Exception) {
                 _error.value = e.message
             } finally {
@@ -86,9 +98,10 @@ class NetworkMonitorViewModel @Inject constructor(
             _isLoading.value = true
             _error.value = null
             try {
-                blockDeviceUseCase(device)
-                    .onSuccess { success ->
-                        if (success) {
+                val result = blockDeviceUseCase(device)
+                when (result) {
+                    is NetworkResult.Success -> {
+                        if (result.data) {
                             // Update the device's blocked status
                             _networkDevices.value = _networkDevices.value.map {
                                 if (it.ipAddress == device.ipAddress) {
@@ -99,7 +112,10 @@ class NetworkMonitorViewModel @Inject constructor(
                             }
                         }
                     }
-                    .onError { error -> _error.value = error.message }
+                    is NetworkResult.Error -> {
+                        _error.value = result.error.message
+                    }
+                }
             } catch (e: Exception) {
                 _error.value = e.message
             } finally {
@@ -115,9 +131,10 @@ class NetworkMonitorViewModel @Inject constructor(
             _isLoading.value = true
             _error.value = null
             try {
-                unblockDeviceUseCase(device)
-                    .onSuccess { success ->
-                        if (success) {
+                val result = unblockDeviceUseCase(device)
+                when (result) {
+                    is NetworkResult.Success -> {
+                        if (result.data) {
                             // Update the device's blocked status
                             _networkDevices.value = _networkDevices.value.map {
                                 if (it.ipAddress == device.ipAddress) {
@@ -128,7 +145,10 @@ class NetworkMonitorViewModel @Inject constructor(
                             }
                         }
                     }
-                    .onError { error -> _error.value = error.message }
+                    is NetworkResult.Error -> {
+                        _error.value = result.error.message
+                    }
+                }
             } catch (e: Exception) {
                 _error.value = e.message
             } finally {
@@ -144,9 +164,15 @@ class NetworkMonitorViewModel @Inject constructor(
             _isLoading.value = true
             _error.value = null
             try {
-                mapNetworkTopologyUseCase()
-                    .onSuccess { topology -> _networkTopology.value = topology }
-                    .onError { error -> _error.value = error.message }
+                val result = mapNetworkTopologyUseCase()
+                when (result) {
+                    is NetworkResult.Success -> {
+                        _networkTopology.value = result.data
+                    }
+                    is NetworkResult.Error -> {
+                        _error.value = result.error.message
+                    }
+                }
             } catch (e: Exception) {
                 _error.value = e.message
             } finally {
