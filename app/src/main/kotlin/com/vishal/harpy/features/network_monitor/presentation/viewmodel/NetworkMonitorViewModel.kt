@@ -76,7 +76,10 @@ class NetworkMonitorViewModel @Inject constructor(
     }
 
     fun scanNetwork() {
-        if (!_isRooted.value) return
+        if (!_isRooted.value) {
+            _error.value = "Device is not rooted. Root access is required to scan the network."
+            return
+        }
 
         viewModelScope.launch {
             _isLoading.value = true
@@ -86,6 +89,9 @@ class NetworkMonitorViewModel @Inject constructor(
                 when (result) {
                     is NetworkResult.Success -> {
                         _networkDevices.value = result.data
+                        if (result.data.isEmpty()) {
+                            _error.value = "No devices found on the network"
+                        }
                     }
                     is NetworkResult.Error -> {
                         _lastError.value = result.error
