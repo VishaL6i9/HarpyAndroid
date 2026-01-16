@@ -42,7 +42,7 @@ class NetworkMonitorService {
      * Check if the device has root access
      * @return true if device is rooted, false otherwise
      */
-    private fun isDeviceRooted(): Boolean {
+    fun isDeviceRooted(): Boolean {
         return try {
             val process = Runtime.getRuntime().exec("su")
             true

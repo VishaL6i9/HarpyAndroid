@@ -7,6 +7,7 @@ import android.view.ViewGroup
 import android.widget.BaseAdapter
 import android.widget.Button
 import android.widget.TextView
+import com.vishal.harpy.R
 
 class DeviceAdapter(
     private val context: Context,
