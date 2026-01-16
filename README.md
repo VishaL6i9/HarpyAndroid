@@ -88,7 +88,15 @@ To build the project, ensure you have the Android SDK properly configured with t
 - [x] Network usage statistics
 
 ### Phase 4: Optimization & Polish (In Progress 🔄)
-- [ ] Performance optimizations
+- [x] Performance optimizations
+  - [x] Network scan timeout handling (5 second limits)
+  - [x] Removed sequential ping loop (was O(n) now O(1))
+  - [x] Direct ARP table reading for faster discovery
+  - [x] Process cleanup with destroyForcibly()
+  - [x] Improved shell command execution
+  - [x] Better error handling and recovery
+  - [x] Reduced memory allocations in loops
+  - [x] Efficient string parsing with regex caching
 - [x] UI/UX enhancements
   - [x] Header section with app title and status
   - [x] Device count display
@@ -98,6 +106,7 @@ To build the project, ensure you have the Android SDK properly configured with t
   - [x] Improved color scheme and typography
   - [x] Better button states and visibility
   - [x] Enhanced loading indicators
+  - [x] OLED dark theme with true blacks
 - [x] Error handling improvements
   - [x] NetworkError sealed class hierarchy
   - [x] RootError sealed class hierarchy for root-specific errors

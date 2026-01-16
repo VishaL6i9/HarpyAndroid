@@ -18,6 +18,11 @@ class NetworkMonitorRepositoryImpl : NetworkMonitorRepository {
 
     companion object {
         private const val TAG = "NetworkMonitorRepoImpl"
+        
+        // Cache regex patterns for better performance
+        private val SUBNET_PATTERN = Regex("""([0-9]+\.[0-9]+\.[0-9]+)\.0""")
+        private val HOSTNAME_PATTERN = Regex("name = (.+)")
+        private val FIELDS_SPLIT_PATTERN = Regex("\\s+")
     }
 
     override suspend fun scanNetwork(): NetworkResult<List<NetworkDevice>> {
@@ -122,30 +127,35 @@ class NetworkMonitorRepositoryImpl : NetworkMonitorRepository {
         val devices = mutableListOf<NetworkDevice>()
 
         try {
-            val ipProcess = Runtime.getRuntime().exec("su -c \"ip route | grep -E '^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+' | head -n 1\"")
+            Log.d(TAG, "Getting network route information...")
+            val ipProcess = Runtime.getRuntime().exec(arrayOf("sh", "-c", "ip route | grep -E '^[0-9]+\\\\.[0-9]+\\\\.[0-9]+\\\\.[0-9]+' | head -n 1"))
             val ipReader = BufferedReader(InputStreamReader(ipProcess.inputStream))
             val routeLine = ipReader.readLine()
             ipReader.close()
-            ipProcess.waitFor()
+            
+            val completed = ipProcess.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)
+            if (!completed) {
+                ipProcess.destroyForcibly()
+                Log.w(TAG, "IP route command timed out")
+                return devices
+            }
 
             if (routeLine != null) {
-                val subnetPattern = Regex("""([0-9]+\.[0-9]+\.[0-9]+)\.0""")
-                val matchResult = subnetPattern.find(routeLine)
+                Log.d(TAG, "Found route: $routeLine")
+                val matchResult = SUBNET_PATTERN.find(routeLine)
 
                 if (matchResult != null) {
                     val subnet = matchResult.groupValues[1]
+                    Log.d(TAG, "Scanning subnet: $subnet.0/24")
 
-                    for (i in 1..254) {
-                        val pingProcess = Runtime.getRuntime().exec("su -c \"ping -c 1 -W 1 ${subnet}.${i}\"")
-                        pingProcess.waitFor()
-                    }
-
-                    val arpProcess = Runtime.getRuntime().exec("su -c \"cat /proc/net/arp\"")
+                    // Read ARP table directly without pinging
+                    Log.d(TAG, "Reading ARP table...")
+                    val arpProcess = Runtime.getRuntime().exec(arrayOf("sh", "-c", "cat /proc/net/arp"))
                     val arpReader = BufferedReader(InputStreamReader(arpProcess.inputStream))
 
                     var line: String?
                     while (arpReader.readLine().also { line = it } != null) {
-                        val fields = line?.split("\\s+".toRegex())
+                        val fields = line?.split(FIELDS_SPLIT_PATTERN)
                         if (fields != null && fields.size >= 6) {
                             val ip = fields[0]  // IP address
                             val flags = fields[2]  // Flags
@@ -156,12 +166,12 @@ class NetworkMonitorRepositoryImpl : NetworkMonitorRepository {
                                 if (mac != "00:00:00:00:00:00" && mac != "<incomplete>") {
                                     var hostname: String? = null
                                     try {
-                                        val hostnameProcess = Runtime.getRuntime().exec("su -c \"nslookup $ip\"")
+                                        val hostnameProcess = Runtime.getRuntime().exec(arrayOf("sh", "-c", "nslookup $ip"))
                                         val hostnameReader = BufferedReader(InputStreamReader(hostnameProcess.inputStream))
                                         var hostnameLine: String?
                                         while (hostnameReader.readLine().also { hostnameLine = it } != null) {
                                             if (hostnameLine!!.contains("name = ")) {
-                                                val nameMatch = Regex("name = (.+)").find(hostnameLine!!)
+                                                val nameMatch = HOSTNAME_PATTERN.find(hostnameLine!!)
                                                 if (nameMatch != null) {
                                                     hostname = nameMatch.groupValues[1].trimEnd('.')
                                                     break
@@ -169,7 +179,8 @@ class NetworkMonitorRepositoryImpl : NetworkMonitorRepository {
                                             }
                                         }
                                         hostnameReader.close()
-                                        hostnameProcess.waitFor()
+                                        hostnameProcess.waitFor(3, java.util.concurrent.TimeUnit.SECONDS)
+                                        hostnameProcess.destroyForcibly()
                                     } catch (e: Exception) {
                                         Log.d(TAG, "Could not resolve hostname for $ip: ${e.message}")
                                     }
@@ -195,13 +206,17 @@ class NetworkMonitorRepositoryImpl : NetworkMonitorRepository {
                                         deviceInterface = deviceInterface
                                     )
                                     devices.add(networkDevice)
+                                    Log.d(TAG, "Found device: $ip ($mac)")
                                 }
                             }
                         }
                     }
 
                     arpReader.close()
-                    arpProcess.waitFor()
+                    arpProcess.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)
+                    arpProcess.destroyForcibly()
+                    
+                    Log.d(TAG, "Scan complete. Found ${devices.size} devices")
                 }
             }
         } catch (e: Exception) {
