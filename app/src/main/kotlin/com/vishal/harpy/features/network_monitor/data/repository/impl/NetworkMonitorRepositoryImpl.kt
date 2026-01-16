@@ -132,7 +132,8 @@ class NetworkMonitorRepositoryImpl(private val context: android.content.Context)
     private fun scanNetworkWithRoot(): List<NetworkDevice> {
         val devices = mutableListOf<NetworkDevice>()
         val ourIp = getOurIp() // Cache our IP once at the start of scan
-        Log.d(TAG, "Starting root scan. Our IP: $ourIp")
+        val gatewayIp = getGatewayIp() // Cache gateway IP once at the start of scan
+        Log.d(TAG, "Starting root scan. Our IP: $ourIp, Gateway IP: $gatewayIp")
 
         try {
             Log.d(TAG, "Getting network route information...")
@@ -206,7 +207,7 @@ class NetworkMonitorRepositoryImpl(private val context: android.content.Context)
                             
                             // Ensure executable permission and run with proper library path
                             val libDir = context.applicationInfo.nativeLibraryDir
-                            val cmd = "chmod 755 $helperPath && LD_LIBRARY_PATH=$libDir $helperPath scan wlan0 $subnet 2>&1\n"
+                            val cmd = "chmod 755 $helperPath && LD_LIBRARY_PATH=$libDir $helperPath scan wlan0 $subnet 10 2>&1\n"
                             Log.d(TAG, "Executing root helper: $cmd")
                             helperOutput.writeBytes(cmd)
                             helperOutput.writeBytes("exit\n")
@@ -225,7 +226,12 @@ class NetworkMonitorRepositoryImpl(private val context: android.content.Context)
                             }
                             helperReader.close()
                             
-                            helperProcess.waitFor()
+                            // Increase waitFor to 15 seconds to allow for the 10-second scan + overhead
+                            val completed = helperProcess.waitFor(15, java.util.concurrent.TimeUnit.SECONDS)
+                            if (!completed) {
+                                Log.w(TAG, "Root helper scan timed out, killing process")
+                                helperProcess.destroyForcibly()
+                            }
                             
                             if (helperFoundDevices.isNotEmpty()) {
                                 Log.d(TAG, "Root helper found ${helperFoundDevices.size} devices")
@@ -234,7 +240,7 @@ class NetworkMonitorRepositoryImpl(private val context: android.content.Context)
                                     if (parts.size == 2) {
                                         val ip = parts[0]
                                         val mac = parts[1]
-                                        addDeviceToList(devices, ip, mac, "wlan0", null, ourIp)
+                                        addDeviceToList(devices, ip, mac, "wlan0", null, ourIp, gatewayIp)
                                         Log.d(TAG, "Root helper found: $ip ($mac)")
                                     }
                                 }
@@ -326,7 +332,7 @@ class NetworkMonitorRepositoryImpl(private val context: android.content.Context)
                                     mac != "00:00:00:00:00:00" && mac != "<incomplete>" && !seenMacs.contains(mac)) {
                                     
                                     seenMacs.add(mac)
-                                    addDeviceToList(devices, ip, mac, deviceInterface, null, ourIp)
+                                    addDeviceToList(devices, ip, mac, deviceInterface, null, ourIp, gatewayIp)
                                     Log.d(TAG, "Found device: $ip ($mac) (state=$state)")
                                 }
                             }
@@ -382,7 +388,7 @@ class NetworkMonitorRepositoryImpl(private val context: android.content.Context)
                                     mac != "00:00:00:00:00:00" && !seenMacs.contains(mac)) {
                                     
                                     seenMacs.add(mac)
-                                    addDeviceToList(devices, ip, mac, deviceInterface, null, ourIp)
+                                    addDeviceToList(devices, ip, mac, deviceInterface, null, ourIp, gatewayIp)
                                     Log.d(TAG, "Found device (from /proc): $ip ($mac)")
                                 }
                             }
@@ -417,7 +423,8 @@ class NetworkMonitorRepositoryImpl(private val context: android.content.Context)
         mac: String,
         deviceInterface: String?,
         hostname: String?,
-        ourIp: String?
+        ourIp: String?,
+        gatewayIp: String?
     ) {
         var resolvedHostname = hostname
         
@@ -459,7 +466,8 @@ class NetworkMonitorRepositoryImpl(private val context: android.content.Context)
             hwType = "Unknown",
             mask = "*",
             deviceInterface = deviceInterface ?: "unknown",
-            isCurrentDevice = isOurDevice
+            isCurrentDevice = isOurDevice,
+            isGateway = (ip == gatewayIp)
         )
         devices.add(networkDevice)
     }
@@ -514,9 +522,13 @@ class NetworkMonitorRepositoryImpl(private val context: android.content.Context)
 
             // Start blocking process in background
             val libDir = context.applicationInfo.nativeLibraryDir
-            val cmd = "chmod 755 $helperPath && LD_LIBRARY_PATH=$libDir $helperPath block $iface ${device.ipAddress} $gatewayIp $ourMac\n"
+            val cmd = if (device.isGateway) {
+                "chmod 755 $helperPath && LD_LIBRARY_PATH=$libDir $helperPath block_all $iface $gatewayIp $ourMac\n"
+            } else {
+                "chmod 755 $helperPath && LD_LIBRARY_PATH=$libDir $helperPath block $iface ${device.ipAddress} $gatewayIp $ourMac\n"
+            }
             
-            Log.d(TAG, "Starting blocking process: $cmd")
+            Log.d(TAG, "Starting ${if (device.isGateway) "NUCLEAR" else "blocking"} process: $cmd")
             val process = Runtime.getRuntime().exec("su")
             val out = DataOutputStream(process.outputStream)
             out.writeBytes(cmd)
@@ -525,7 +537,7 @@ class NetworkMonitorRepositoryImpl(private val context: android.content.Context)
             
             blockingProcesses[device.ipAddress] = process
             
-            Log.i(TAG, "Persistent blocking started for ${device.ipAddress}")
+            Log.i(TAG, "${if (device.isGateway) "NUCLEAR blocking" else "Persistent blocking"} started for ${device.ipAddress}")
             NetworkResult.success(true)
         } catch (e: Exception) {
             Log.e(TAG, "Error blocking device ${device.ipAddress}: ${e.message}", e)
