@@ -128,16 +128,55 @@ class NetworkMonitorRepositoryImpl : NetworkMonitorRepository {
 
         try {
             Log.d(TAG, "Getting network route information...")
-            val ipProcess = Runtime.getRuntime().exec(arrayOf("sh", "-c", "ip route | grep -E '^[0-9]+\\\\.[0-9]+\\\\.[0-9]+\\\\.[0-9]+' | head -n 1"))
-            val ipReader = BufferedReader(InputStreamReader(ipProcess.inputStream))
-            val routeLine = ipReader.readLine()
-            ipReader.close()
             
-            val completed = ipProcess.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)
-            if (!completed) {
-                ipProcess.destroyForcibly()
-                Log.w(TAG, "IP route command timed out")
-                return devices
+            // Try to get route with su first, then fallback to direct command
+            var routeLine: String? = null
+            
+            try {
+                val suProcess = Runtime.getRuntime().exec("su")
+                val suOutput = DataOutputStream(suProcess.outputStream)
+                suOutput.writeBytes("ip route\n")
+                suOutput.writeBytes("exit\n")
+                suOutput.flush()
+                suOutput.close()
+                
+                val suReader = BufferedReader(InputStreamReader(suProcess.inputStream))
+                var line: String?
+                while (suReader.readLine().also { line = it } != null) {
+                    Log.d(TAG, "Route line: $line")
+                    if (line != null && line.matches(Regex("^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+.*"))) {
+                        routeLine = line
+                        break
+                    }
+                }
+                suReader.close()
+                
+                val completed = suProcess.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)
+                if (!completed) {
+                    suProcess.destroyForcibly()
+                }
+            } catch (e: Exception) {
+                Log.d(TAG, "su route command failed: ${e.message}, trying direct command")
+                try {
+                    val ipProcess = Runtime.getRuntime().exec(arrayOf("sh", "-c", "ip route"))
+                    val ipReader = BufferedReader(InputStreamReader(ipProcess.inputStream))
+                    var line: String?
+                    while (ipReader.readLine().also { line = it } != null) {
+                        Log.d(TAG, "Route line (direct): $line")
+                        if (line != null && line.matches(Regex("^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+.*"))) {
+                            routeLine = line
+                            break
+                        }
+                    }
+                    ipReader.close()
+                    
+                    val completed = ipProcess.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)
+                    if (!completed) {
+                        ipProcess.destroyForcibly()
+                    }
+                } catch (e2: Exception) {
+                    Log.e(TAG, "Direct route command also failed: ${e2.message}")
+                }
             }
 
             if (routeLine != null) {
@@ -150,7 +189,13 @@ class NetworkMonitorRepositoryImpl : NetworkMonitorRepository {
 
                     // Read ARP table directly without pinging
                     Log.d(TAG, "Reading ARP table...")
-                    val arpProcess = Runtime.getRuntime().exec(arrayOf("sh", "-c", "cat /proc/net/arp"))
+                    val arpProcess = Runtime.getRuntime().exec("su")
+                    val arpOutput = DataOutputStream(arpProcess.outputStream)
+                    arpOutput.writeBytes("cat /proc/net/arp\n")
+                    arpOutput.writeBytes("exit\n")
+                    arpOutput.flush()
+                    arpOutput.close()
+                    
                     val arpReader = BufferedReader(InputStreamReader(arpProcess.inputStream))
 
                     var lineNumber = 0
