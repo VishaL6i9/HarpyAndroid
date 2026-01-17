@@ -17,6 +17,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.vishal.harpy.R
 import com.vishal.harpy.core.utils.NetworkDevice
+import com.vishal.harpy.features.network_monitor.presentation.ui.SettingsFragment
 import com.vishal.harpy.features.network_monitor.presentation.viewmodel.NetworkMonitorViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
@@ -52,7 +53,7 @@ class NetworkMonitorFragment : Fragment() {
         }
 
         val debugButton = binding.findViewById<android.widget.ImageButton>(R.id.debugButton)
-        debugButton.setOnClickListener { showDebugMenu(it) }
+        debugButton.setOnClickListener { navigateToSettings() }
 
         // Setup filter buttons
         val filterIPv4 = binding.findViewById<com.google.android.material.button.MaterialButton>(R.id.filterIPv4)
@@ -291,34 +292,12 @@ class NetworkMonitorFragment : Fragment() {
         android.widget.Toast.makeText(requireContext(), "Error details copied to clipboard", android.widget.Toast.LENGTH_SHORT).show()
     }
 
-    private fun showDebugMenu(view: View) {
-        androidx.appcompat.widget.PopupMenu(requireContext(), view).apply {
-            menu.add(0, 1, 0, "Clear all custom names")
-            
-            setOnMenuItemClickListener { item ->
-                when (item.itemId) {
-                    1 -> {
-                        androidx.appcompat.app.AlertDialog.Builder(requireContext())
-                            .setTitle("Clear all custom names?")
-                            .setMessage("This will remove all custom device names you've set.")
-                            .setPositiveButton("Clear") { _, _ ->
-                                viewModel.clearAllDeviceNames()
-                                android.widget.Toast.makeText(
-                                    requireContext(),
-                                    "All custom names cleared",
-                                    android.widget.Toast.LENGTH_SHORT
-                                ).show()
-                            }
-                            .setNegativeButton("Cancel") { _, _ -> }
-                            .create()
-                            .show()
-                        true
-                    }
-                    else -> false
-                }
-            }
-            show()
-        }
+    private fun navigateToSettings() {
+        val settingsFragment = SettingsFragment()
+        parentFragmentManager.beginTransaction()
+            .replace(R.id.container, settingsFragment)
+            .addToBackStack("settings")
+            .commit()
     }
 
     private fun showEditNameDialog(device: NetworkDevice) {
