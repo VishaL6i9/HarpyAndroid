@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <com.google.android.material.switchmaterial.SwitchMaterial
+        android:id="@+id/verboseLoggingSwitch"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Debug Mode"
+        android:textSize="16sp"
+        android:padding="8dp" />
+
+    <TextView
+        android:id="@+id/descriptionText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Logs will continue to grow in a single file"
+        android:textSize="12sp"
+        android:textColor="@android:color/darker_gray"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="16dp" />
+
+    <Button
+        android:id="@+id/deleteLogsButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Delete All Logs"
+        android:textColor="@android:color/white"
+        android:backgroundTint="@android:color/holo_red_dark"
+        android:layout_marginTop="8dp" />
+
+</LinearLayout>
