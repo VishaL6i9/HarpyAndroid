@@ -5,7 +5,8 @@
 #include <vector>
 #include "arp_operations.h"
 #include "network_scan.h"
-#include "dns_spoofing.h"
+#include "dns_handler.h"
+#include "dhcp_spoofing.h"
 
 #define LOG_TAG "HarpyNative"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
@@ -205,11 +206,186 @@ Java_com_vishal_harpy_core_native_NativeNetworkOps_cleanupNativeOps(
 
     network_scan_cleanup();
     arp_cleanup();
+    dhcp_spoof_cleanup();
 
     g_initialized = false;
     LOGD("Native resources cleaned up");
     return JNI_TRUE;
 }
 
+
+/**
+ * Initialize DHCP spoofing
+ */
+JNIEXPORT jboolean JNICALL
+Java_com_vishal_harpy_core_native_NativeNetworkOps_initializeDHCPSpoof(
+    JNIEnv *env, jclass clazz) {
+    (void)env;  // Unused parameter
+    (void)clazz;  // Unused parameter
+
+    LOGD("Initializing DHCP spoofing operations");
+    bool result = dhcp_spoof_init();
+    return result ? JNI_TRUE : JNI_FALSE;
+}
+
+/**
+ * Start DHCP spoofing
+ */
+JNIEXPORT jboolean JNICALL
+Java_com_vishal_harpy_core_native_NativeNetworkOps_startDHCPSpoof(
+    JNIEnv *env, jclass clazz,
+    jstring interfaceName,
+    jobjectArray targetMacs,
+    jobjectArray spoofedIPs,
+    jobjectArray gatewayIPs,
+    jobjectArray subnetMasks,
+    jobjectArray dnsServers) {
+    (void)clazz;  // Unused parameter
+
+    if (!g_initialized) {
+        LOGE("Native operations not initialized");
+        return JNI_FALSE;
+    }
+
+    const char *iface = env->GetStringUTFChars(interfaceName, nullptr);
+
+    jsize arraySize = env->GetArrayLength(targetMacs);
+    if (arraySize != env->GetArrayLength(spoofedIPs) ||
+        arraySize != env->GetArrayLength(gatewayIPs) ||
+        arraySize != env->GetArrayLength(subnetMasks) ||
+        arraySize != env->GetArrayLength(dnsServers)) {
+        LOGE("All DHCP spoofing arrays must have the same size");
+        env->ReleaseStringUTFChars(interfaceName, iface);
+        return JNI_FALSE;
+    }
+
+    // Build rules vector
+    std::vector<DHCPSpoofRule> rules;
+    for (jsize i = 0; i < arraySize; i++) {
+        jstring target_mac = (jstring)env->GetObjectArrayElement(targetMacs, i);
+        jstring ip = (jstring)env->GetObjectArrayElement(spoofedIPs, i);
+        jstring gateway = (jstring)env->GetObjectArrayElement(gatewayIPs, i);
+        jstring subnet = (jstring)env->GetObjectArrayElement(subnetMasks, i);
+        jstring dns = (jstring)env->GetObjectArrayElement(dnsServers, i);
+
+        const char *target_mac_str = env->GetStringUTFChars(target_mac, nullptr);
+        const char *ip_str = env->GetStringUTFChars(ip, nullptr);
+        const char *gateway_str = env->GetStringUTFChars(gateway, nullptr);
+        const char *subnet_str = env->GetStringUTFChars(subnet, nullptr);
+        const char *dns_str = env->GetStringUTFChars(dns, nullptr);
+
+        rules.push_back({
+            std::string(target_mac_str),
+            std::string(ip_str),
+            std::string(gateway_str),
+            std::string(subnet_str),
+            std::string(dns_str)
+        });
+
+        env->ReleaseStringUTFChars(target_mac, target_mac_str);
+        env->ReleaseStringUTFChars(ip, ip_str);
+        env->ReleaseStringUTFChars(gateway, gateway_str);
+        env->ReleaseStringUTFChars(subnet, subnet_str);
+        env->ReleaseStringUTFChars(dns, dns_str);
+
+        env->DeleteLocalRef(target_mac);
+        env->DeleteLocalRef(ip);
+        env->DeleteLocalRef(gateway);
+        env->DeleteLocalRef(subnet);
+        env->DeleteLocalRef(dns);
+    }
+
+    bool result = dhcp_start_spoofing(iface, rules);
+
+    env->ReleaseStringUTFChars(interfaceName, iface);
+
+    return result ? JNI_TRUE : JNI_FALSE;
+}
+
+/**
+ * Stop DHCP spoofing
+ */
+JNIEXPORT void JNICALL
+Java_com_vishal_harpy_core_native_NativeNetworkOps_stopDHCPSpoof(
+    JNIEnv *env, jclass clazz) {
+    (void)env;  // Unused parameter
+    (void)clazz;  // Unused parameter
+
+    if (!g_initialized) {
+        LOGE("Native operations not initialized");
+        return;
+    }
+
+    dhcp_stop_spoofing();
+}
+
+/**
+ * Add DHCP spoofing rule
+ */
+JNIEXPORT void JNICALL
+Java_com_vishal_harpy_core_native_NativeNetworkOps_addDHCPSpoofRule(
+    JNIEnv *env, jclass clazz,
+    jstring targetMac, jstring spoofedIP, jstring gatewayIP,
+    jstring subnetMask, jstring dnsServer) {
+    (void)clazz;  // Unused parameter
+
+    if (!g_initialized) {
+        LOGE("Native operations not initialized");
+        return;
+    }
+
+    const char *target_mac_str = env->GetStringUTFChars(targetMac, nullptr);
+    const char *ip_str = env->GetStringUTFChars(spoofedIP, nullptr);
+    const char *gateway_str = env->GetStringUTFChars(gatewayIP, nullptr);
+    const char *subnet_str = env->GetStringUTFChars(subnetMask, nullptr);
+    const char *dns_str = env->GetStringUTFChars(dnsServer, nullptr);
+
+    dhcp_add_rule(target_mac_str, ip_str, gateway_str, subnet_str, dns_str);
+
+    env->ReleaseStringUTFChars(targetMac, target_mac_str);
+    env->ReleaseStringUTFChars(spoofedIP, ip_str);
+    env->ReleaseStringUTFChars(gatewayIP, gateway_str);
+    env->ReleaseStringUTFChars(subnetMask, subnet_str);
+    env->ReleaseStringUTFChars(dnsServer, dns_str);
+}
+
+/**
+ * Remove DHCP spoofing rule
+ */
+JNIEXPORT void JNICALL
+Java_com_vishal_harpy_core_native_NativeNetworkOps_removeDHCPSpoofRule(
+    JNIEnv *env, jclass clazz,
+    jstring targetMac) {
+    (void)clazz;  // Unused parameter
+
+    if (!g_initialized) {
+        LOGE("Native operations not initialized");
+        return;
+    }
+
+    const char *target_mac_str = env->GetStringUTFChars(targetMac, nullptr);
+
+    dhcp_remove_rule(target_mac_str);
+
+    env->ReleaseStringUTFChars(targetMac, target_mac_str);
+}
+
+/**
+ * Check if DHCP spoofing is active
+ */
+JNIEXPORT jboolean JNICALL
+Java_com_vishal_harpy_core_native_NativeNetworkOps_isDHCPSpoofActive(
+    JNIEnv *env, jclass clazz) {
+    (void)env;  // Unused parameter
+    (void)clazz;  // Unused parameter
+
+    if (!g_initialized) {
+        LOGE("Native operations not initialized");
+        return JNI_FALSE;
+    }
+
+    bool result = dhcp_is_active();
+    return result ? JNI_TRUE : JNI_FALSE;
+}
 
 } // extern "C"

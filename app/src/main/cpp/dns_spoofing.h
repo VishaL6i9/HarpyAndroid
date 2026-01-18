@@ -8,8 +8,8 @@
  * Structure to represent a DNS spoofing rule
  */
 struct DNSSpoofRule {
-    std::string domain;  // Domain to spoof (e.g., "example.com")
-    std::string spoofed_ip;  // IP address to return instead (e.g., "192.168.1.100")
+    std::string domain;      // Domain to spoof (e.g., "example.com")
+    std::string spoofed_ip;  // IP address to return instead (e.g., "8.8.8.8")
 };
 
 /**
