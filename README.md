@@ -24,6 +24,12 @@ A network monitoring and control application for Android, inspired by the iOS ja
   - Domain-to-IP redirection
   - Debug menu for testing DNS spoofing functionality
   - Root helper command support for DNS interception
+- DHCP spoofing and response interception
+  - DHCP request interception on port 67
+  - Spoofed IP assignment to target devices
+  - Custom gateway and DNS server injection
+  - Rule-based targeting by MAC address
+  - Debug menu for DHCP spoofing management
 
 ### Logging & Debugging
 - Real-time file logging with automatic log rotation (5MB per file)
@@ -58,6 +64,14 @@ The DNS spoofing feature uses a UDP socket listener on port 53 to intercept DNS 
 - **DNS Packet Processing**: Decodes DNS names from wire format, validates query headers, and injects spoofed IP addresses into responses
 - **Response Crafting**: Constructs valid DNS response packets with TTL and proper DNS record format for IPv4 addresses
 - **Root Helper Integration**: Runs as a background process via the root helper binary to listen on port 53 and intercept all DNS queries on the network
+
+### DHCP Spoofing Implementation
+The DHCP spoofing feature intercepts DHCP requests and sends spoofed responses to assign custom IP configurations. The implementation includes:
+- **DHCP Packet Handler** (`dhcp_spoofing.cpp`): Parses DHCP requests, validates magic cookies, and crafts spoofed responses
+- **DHCP Packet Processing**: Decodes DHCP headers, extracts client MAC addresses, and injects spoofed IP/gateway/DNS configurations
+- **Response Crafting**: Constructs valid DHCP response packets with proper header flags and network byte order encoding
+- **Rule Management**: Thread-safe rule storage with MAC address-based targeting for selective device spoofing
+- **Root Helper Integration**: Listens on port 67 (DHCP server port) to intercept all DHCP requests on the network
 
 ### Root Helper Binary
 A standalone executable (`libharpy_root_helper.so`) is packaged with the app and can be invoked via `su` to perform privileged network operations without requiring the entire app to run as root. This provides better security isolation and allows for more granular permission control.
@@ -247,6 +261,7 @@ To build the project, ensure you have the Android SDK properly configured with t
     - [x] Support for MAC address resolution via su
     - [x] Support for ARP spoofing via su
     - [x] Support for DNS spoofing via su
+    - [x] Support for DHCP spoofing via su
   - [ ] Full libpcap integration for network scanning
   - [ ] Full libnet integration for ARP operations
 - [x] JNI integration for ARP manipulation
@@ -271,6 +286,26 @@ To build the project, ensure you have the Android SDK properly configured with t
   - [x] Repository methods for DNS spoofing
   - [x] ViewModel support for DNS spoofing
   - [x] Debug menu UI for DNS spoofing testing
+- [x] DHCP spoofing integration
+  - [x] DHCP spoofing C++ implementation files
+  - [x] DHCP packet handler with request parsing
+    - [x] DHCP header parsing and validation
+    - [x] Client MAC address extraction from packets
+    - [x] DHCP response crafting with custom IP/gateway/DNS
+    - [x] Network byte order encoding for DHCP responses
+  - [x] DHCP spoofing server in root helper
+    - [x] UDP socket listener on port 67
+    - [x] DHCP request interception and handling
+    - [x] Spoofed response transmission to clients
+    - [x] Root privilege requirement handling
+  - [x] Rule-based targeting by MAC address
+    - [x] Thread-safe rule storage and management
+    - [x] Dynamic rule addition/removal
+    - [x] Rule matching for selective device targeting
+  - [x] Kotlin API layer for DHCP operations
+  - [x] Repository methods for DHCP spoofing
+  - [x] ViewModel support for DHCP spoofing
+  - [x] Debug menu UI for DHCP spoofing testing
 - [x] libpcap/libnet integration structure
   - [x] Network scan using shell commands (fallback)
   - [x] ARP operations using shell commands (fallback)
@@ -320,7 +355,15 @@ To build the project, ensure you have the Android SDK properly configured with t
   - [x] Kotlin API layer for DNS spoofing operations
   - [x] Debug menu integration for testing
   - [x] Domain-to-IP redirection support
-- [ ] DHCP spoofing and response interception
+  - [x] DNS packet parsing and response crafting
+- [x] DHCP spoofing and response interception
+  - [x] DHCP packet handler with request parsing
+  - [x] Spoofed response crafting with custom IP/gateway/DNS
+  - [x] Rule-based targeting by MAC address
+  - [x] Thread-safe rule management
+  - [x] Root helper integration on port 67
+  - [x] Kotlin API layer for DHCP spoofing operations
+  - [x] Debug menu integration for testing
 - [ ] SSL/TLS interception and man-in-the-middle capabilities
 - [ ] HTTP/HTTPS proxying and content manipulation
 - [ ] Host header manipulation for complete domain redirection
@@ -332,7 +375,7 @@ To build the project, ensure you have the Android SDK properly configured with t
 - [ ] libpcap integration for raw packet capture
 - [ ] libnet integration for low-level packet crafting
 
-Note: DNS spoofing has been implemented using the root helper architecture. The feature is accessible via the debug menu (long press the bug icon in the main app). The implementation includes a root helper command for DNS spoofing that can redirect domain queries to specified IP addresses. The remaining features can be developed using the current raw socket implementation and do not require complete libpcap/libnet integration to begin implementation. The libpcap/libnet integration is planned as a future enhancement for improved packet processing capabilities. Additional features like HTTP/HTTPS proxying and SSL/TLS interception are planned to enable complete domain redirection functionality.
+Note: DNS spoofing and DHCP spoofing have been implemented using the root helper architecture. Both features are accessible via the debug menu (long press the bug icon in the main app). DNS spoofing redirects domain queries to specified IP addresses, while DHCP spoofing intercepts DHCP requests and assigns custom IP configurations to target devices. The remaining features can be developed using the current raw socket implementation and do not require complete libpcap/libnet integration to begin implementation. The libpcap/libnet integration is planned as a future enhancement for improved packet processing capabilities. Additional features like HTTP/HTTPS proxying and SSL/TLS interception are planned to enable complete domain redirection functionality.
 
 ## Acknowledgements
 
