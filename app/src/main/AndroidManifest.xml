@@ -8,6 +8,18 @@
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
 
+    <!-- Storage permission for log export -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="29" />
+
+    <!-- Special permission for Android 11+ to manage all files -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage"
+        android:minSdkVersion="30" />
+
+    <!-- Vibration permission for haptic feedback -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+
     <application
         android:name=".HarpyApplication"
         android:allowBackup="true"
@@ -21,6 +33,9 @@
         android:extractNativeLibs="true"
         tools:targetApi="31">
         <activity
+            android:name=".core.ui.PermissionsActivity"
+            android:exported="false" />
+        <activity
             android:name=".main.MainActivity"
             android:exported="true">
             <intent-filter>
@@ -28,6 +43,16 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 
 </manifest>

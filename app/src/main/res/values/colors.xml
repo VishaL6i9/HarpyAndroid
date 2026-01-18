@@ -37,6 +37,10 @@
     <color name="status_warning">#FFB74D</color>
     <color name="status_info">#29B6F6</color>
 
+    <!-- Permission Status Colors -->
+    <color name="text_success">#4CAF50</color>
+    <color name="text_error">#FF5252</color>
+
     <!-- Button Colors -->
     <color name="button_block">#FF5252</color>
     <color name="button_unblock">#66BB6A</color>
