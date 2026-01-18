@@ -53,7 +53,13 @@ class NetworkMonitorFragment : Fragment() {
         }
 
         val debugButton = binding.findViewById<android.widget.ImageButton>(R.id.debugButton)
-        debugButton.setOnClickListener { navigateToSettings() }
+        debugButton.setOnLongClickListener {
+            showDebugMenu()
+            true
+        }
+
+        val settingsButton = binding.findViewById<android.widget.ImageButton>(R.id.settingsButton)
+        settingsButton.setOnClickListener { navigateToSettings() }
 
         // Setup filter buttons
         val filterIPv4 = binding.findViewById<com.google.android.material.button.MaterialButton>(R.id.filterIPv4)
@@ -332,6 +338,260 @@ class NetworkMonitorFragment : Fragment() {
             .create()
             .show()
     }
+
+    private fun showDebugMenu() {
+        val debugOptions = arrayOf(
+            "DNS Spoofing Test",
+            "Start DNS Spoofing",
+            "Stop DNS Spoofing",
+            "Add DNS Rule",
+            "Remove DNS Rule",
+            "Check DNS Status"
+        )
+
+        androidx.appcompat.app.AlertDialog.Builder(requireContext())
+            .setTitle("🔧 Debug Menu 🔧")
+            .setItems(debugOptions) { _, which ->
+                when (which) {
+                    0 -> performDNSSpoofingTest()
+                    1 -> startDNSSpoofing()
+                    2 -> stopDNSSpoofing()
+                    3 -> addDNSRule()
+                    4 -> removeDNSRule()
+                    5 -> checkDNSStatus()
+                }
+            }
+            .setNegativeButton("Close", null)
+            .create()
+            .show()
+    }
+
+    private fun performDNSSpoofingTest() {
+        // Test DNS spoofing functionality using root helper
+        android.widget.Toast.makeText(
+            requireContext(),
+            "DNS spoofing test initiated via root helper",
+            android.widget.Toast.LENGTH_LONG
+        ).show()
+
+        // Log the test initiation
+        com.vishal.harpy.core.utils.LogUtils.d("DebugMenu", "DNS Spoofing Test initiated")
+
+        // Actually start DNS spoofing for test purposes
+        viewModel.startDNSSpoofing("example.com", "8.8.8.8", "wlan0")
+
+        // Log the expected behavior
+        com.vishal.harpy.core.utils.LogUtils.d("DebugMenu", "Expected: Root helper would start DNS spoofing for test domains")
+    }
+
+    private fun startDNSSpoofing() {
+        // Get domains and IPs from user input
+        val domainInput = android.widget.EditText(requireContext()).apply {
+            hint = "Enter domain to spoof"
+            setText("example.com")
+        }
+
+        val ipInput = android.widget.EditText(requireContext()).apply {
+            hint = "Enter spoofed IP"
+            setText("192.168.1.100")
+        }
+
+        val interfaceInput = android.widget.EditText(requireContext()).apply {
+            hint = "Enter network interface"
+            setText("wlan0")
+        }
+
+        val layout = android.widget.LinearLayout(requireContext()).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            addView(domainInput)
+            addView(ipInput)
+            addView(interfaceInput)
+        }
+
+        androidx.appcompat.app.AlertDialog.Builder(requireContext())
+            .setTitle("Start DNS Spoofing")
+            .setView(layout)
+            .setPositiveButton("Start") { _, _ ->
+                val domain = domainInput.text.toString().trim()
+                val spoofedIP = ipInput.text.toString().trim()
+                val interfaceName = interfaceInput.text.toString().trim()
+
+                if (domain.isEmpty() || spoofedIP.isEmpty()) {
+                    android.widget.Toast.makeText(
+                        requireContext(),
+                        "Domain and spoofed IP are required",
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                    return@setPositiveButton
+                }
+
+                // Log the DNS spoofing start
+                com.vishal.harpy.core.utils.LogUtils.d("DebugMenu", "Starting DNS spoofing: $domain -> $spoofedIP on interface $interfaceName")
+
+                // Execute DNS spoofing via ViewModel
+                viewModel.startDNSSpoofing(domain, spoofedIP, interfaceName)
+            }
+            .setNegativeButton("Cancel", null)
+            .create()
+            .show()
+    }
+
+    private fun stopDNSSpoofing() {
+        // Get domain to stop spoofing for
+        val domainInput = android.widget.EditText(requireContext()).apply {
+            hint = "Enter domain to stop spoofing for"
+            setText("example.com")
+        }
+
+        androidx.appcompat.app.AlertDialog.Builder(requireContext())
+            .setTitle("Stop DNS Spoofing")
+            .setView(domainInput)
+            .setPositiveButton("Stop") { _, _ ->
+                val domain = domainInput.text.toString().trim()
+
+                if (domain.isEmpty()) {
+                    android.widget.Toast.makeText(
+                        requireContext(),
+                        "Domain is required",
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                    return@setPositiveButton
+                }
+
+                // Log the stop command
+                com.vishal.harpy.core.utils.LogUtils.d("DebugMenu", "Stopping DNS spoofing for domain: $domain")
+
+                // Execute stop via ViewModel
+                viewModel.stopDNSSpoofing(domain)
+            }
+            .setNegativeButton("Cancel", null)
+            .create()
+            .show()
+    }
+
+    private fun addDNSRule() {
+        val domainInput = android.widget.EditText(requireContext()).apply {
+            hint = "Enter domain to spoof"
+            setText("example.com")
+        }
+
+        val ipInput = android.widget.EditText(requireContext()).apply {
+            hint = "Enter spoofed IP"
+            setText("192.168.1.100")
+        }
+
+        val layout = android.widget.LinearLayout(requireContext()).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            addView(domainInput)
+            addView(ipInput)
+        }
+
+        androidx.appcompat.app.AlertDialog.Builder(requireContext())
+            .setTitle("Add DNS Rule")
+            .setView(layout)
+            .setPositiveButton("Add") { _, _ ->
+                val domain = domainInput.text.toString().trim()
+                val ip = ipInput.text.toString().trim()
+
+                if (domain.isEmpty() || ip.isEmpty()) {
+                    android.widget.Toast.makeText(
+                        requireContext(),
+                        "Both domain and IP are required",
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                    return@setPositiveButton
+                }
+
+                // Log the rule addition
+                com.vishal.harpy.core.utils.LogUtils.d("DebugMenu", "DNS rule added: $domain -> $ip (would be applied via root helper)")
+
+                android.widget.Toast.makeText(
+                    requireContext(),
+                    "DNS rule added: $domain -> $ip (would be applied via root helper)",
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
+            }
+            .setNegativeButton("Cancel", null)
+            .create()
+            .show()
+    }
+
+    private fun removeDNSRule() {
+        val domainInput = android.widget.EditText(requireContext()).apply {
+            hint = "Enter domain to remove"
+            setText("example.com")
+        }
+
+        androidx.appcompat.app.AlertDialog.Builder(requireContext())
+            .setTitle("Remove DNS Rule")
+            .setView(domainInput)
+            .setPositiveButton("Remove") { _, _ ->
+                val domain = domainInput.text.toString().trim()
+
+                if (domain.isEmpty()) {
+                    android.widget.Toast.makeText(
+                        requireContext(),
+                        "Domain is required",
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                    return@setPositiveButton
+                }
+
+                // Log the rule removal
+                com.vishal.harpy.core.utils.LogUtils.d("DebugMenu", "DNS rule removed for: $domain (would be handled by root helper)")
+
+                android.widget.Toast.makeText(
+                    requireContext(),
+                    "DNS rule removed for: $domain (would be handled by root helper)",
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
+            }
+            .setNegativeButton("Cancel", null)
+            .create()
+            .show()
+    }
+
+    private fun checkDNSStatus() {
+        // Get domain to check status for
+        val domainInput = android.widget.EditText(requireContext()).apply {
+            hint = "Enter domain to check status for"
+            setText("example.com")
+        }
+
+        androidx.appcompat.app.AlertDialog.Builder(requireContext())
+            .setTitle("Check DNS Spoofing Status")
+            .setView(domainInput)
+            .setPositiveButton("Check") { _, _ ->
+                val domain = domainInput.text.toString().trim()
+
+                if (domain.isEmpty()) {
+                    android.widget.Toast.makeText(
+                        requireContext(),
+                        "Domain is required",
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                    return@setPositiveButton
+                }
+
+                // Log the status check
+                com.vishal.harpy.core.utils.LogUtils.d("DebugMenu", "Checking DNS spoofing status for domain: $domain")
+
+                val isActive = viewModel.isDNSSpoofingActive(domain)
+                val statusMessage = "DNS Spoofing Status for $domain: ${if (isActive) "ACTIVE" else "INACTIVE"}"
+
+                android.widget.Toast.makeText(
+                    requireContext(),
+                    statusMessage,
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
+
+                com.vishal.harpy.core.utils.LogUtils.d("DebugMenu", statusMessage)
+            }
+            .setNegativeButton("Cancel", null)
+            .create()
+            .show()
+    }
+
 
     override fun onDestroyView() {
         super.onDestroyView()
