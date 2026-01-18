@@ -52,6 +52,13 @@ A network monitoring and control application for Android, inspired by the iOS ja
 
 The root-based implementation is built using native Kotlin for the Android application layer, with native C/C++ code using raw socket implementations for low-level network operations when root access is available. The app leverages root access to execute ARP spoofing techniques similar to the original iOS Harpy tweak. Future plans include migrating to libpcap/libnet libraries for enhanced packet capture and crafting capabilities.
 
+### DNS Spoofing Implementation
+The DNS spoofing feature uses a UDP socket listener on port 53 to intercept DNS queries. The implementation includes:
+- **DNS Query Handler** (`dns_handler.cpp`): Parses incoming DNS packets, extracts domain names, and crafts spoofed responses
+- **DNS Packet Processing**: Decodes DNS names from wire format, validates query headers, and injects spoofed IP addresses into responses
+- **Response Crafting**: Constructs valid DNS response packets with TTL and proper DNS record format for IPv4 addresses
+- **Root Helper Integration**: Runs as a background process via the root helper binary to listen on port 53 and intercept all DNS queries on the network
+
 ### Root Helper Binary
 A standalone executable (`libharpy_root_helper.so`) is packaged with the app and can be invoked via `su` to perform privileged network operations without requiring the entire app to run as root. This provides better security isolation and allows for more granular permission control.
 
@@ -249,6 +256,16 @@ To build the project, ensure you have the Android SDK properly configured with t
   - [ ] Native libnet implementation
 - [x] DNS spoofing integration
   - [x] DNS spoofing C++ implementation files
+  - [x] DNS query handler with packet parsing
+    - [x] DNS header parsing and validation
+    - [x] Domain name decoding from DNS packets
+    - [x] DNS response crafting with spoofed IP injection
+    - [x] IPv4 address encoding in DNS responses
+  - [x] DNS spoofing server in root helper
+    - [x] UDP socket listener on port 53
+    - [x] DNS query interception and handling
+    - [x] Spoofed response transmission to clients
+    - [x] Root privilege requirement handling
   - [x] Root helper DNS spoofing command
   - [x] Kotlin API layer for DNS operations
   - [x] Repository methods for DNS spoofing
