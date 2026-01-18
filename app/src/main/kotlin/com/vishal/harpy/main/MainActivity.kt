@@ -1,5 +1,6 @@
 package com.vishal.harpy.main
 
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.view.View
@@ -7,6 +8,8 @@ import android.view.WindowInsets
 import android.view.WindowInsetsController
 import androidx.appcompat.app.AppCompatActivity
 import com.vishal.harpy.R
+import com.vishal.harpy.core.ui.PermissionsActivity
+import com.vishal.harpy.core.utils.PermissionChecker
 import com.vishal.harpy.features.network_monitor.presentation.ui.NetworkMonitorFragment
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -15,6 +18,16 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Check if all required permissions are granted
+        if (!PermissionChecker.areAllPermissionsGranted(this)) {
+            // If not all permissions are granted, show the permissions activity
+            val intent = Intent(this, PermissionsActivity::class.java)
+            startActivity(intent)
+            finish() // Finish this activity so the user returns here after granting permissions
+            return
+        }
+
         setContentView(R.layout.activity_main)
 
         enableImmersiveMode()
