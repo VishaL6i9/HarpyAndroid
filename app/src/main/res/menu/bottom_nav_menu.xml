@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/nav_network_monitor"
+        android:icon="@drawable/network_manage_24px"
+        android:title="Network" />
+    <item
+        android:id="@+id/nav_dns_spoofing"
+        android:icon="@drawable/dns_24px"
+        android:title="DNS" />
+    <item
+        android:id="@+id/nav_dhcp_spoofing"
+        android:icon="@drawable/router_24px"
+        android:title="DHCP" />
+</menu>
