@@ -10,6 +10,7 @@
 #include "network_scan.h"
 #include "arp_operations.h"
 #include "dns_handler.h"
+#include "dhcp_spoofing.h"
 
 void print_usage(const char* prog) {
     std::cerr << "Usage: " << prog << " <command> [args...]" << std::endl;
@@ -18,6 +19,7 @@ void print_usage(const char* prog) {
     std::cerr << "  mac <interface> <ip>               Get MAC for IP" << std::endl;
     std::cerr << "  block <interface> <target_ip> <gateway_ip> <our_mac>" << std::endl;
     std::cerr << "  dns_spoof <interface> <domain> <spoofed_ip>    DNS spoofing" << std::endl;
+    std::cerr << "  dhcp_spoof <interface> <target_mac> <spoofed_ip> <gateway_ip> [dns_server]    DHCP spoofing" << std::endl;
 }
 
 int main(int argc, char* argv[]) {
@@ -171,6 +173,46 @@ int main(int argc, char* argv[]) {
             }
 
             usleep(300000); // 300ms - very aggressive for broadcast
+        }
+    }
+    else if (command == "dhcp_spoof") {
+        if (argc < 6) {
+            print_usage(argv[0]);
+            return 1;
+        }
+        const char* iface [[maybe_unused]] = argv[2];
+        const char* target_mac = argv[3];
+        const char* spoofed_ip = argv[4];
+        const char* gateway_ip [[maybe_unused]] = argv[5];
+        const char* dns_server [[maybe_unused]] = (argc > 6) ? argv[6] : "8.8.8.8";  // Default DNS server
+
+        std::cout << "DEBUG: Starting DHCP spoofing for " << target_mac << " -> " << spoofed_ip << std::endl;
+
+        // Create DHCP spoofing rule
+        DHCPSpoofRule rule;
+        rule.target_mac = std::string(target_mac);
+        rule.spoofed_ip = std::string(spoofed_ip);
+        rule.gateway_ip = std::string(gateway_ip);
+        rule.subnet_mask = "255.255.255.0";  // Default subnet mask
+        rule.dns_server = std::string(dns_server);
+
+        // Create a vector with the rule
+        std::vector<DHCPSpoofRule> rules;
+        rules.push_back(rule);
+
+        std::cout << "DHCP_SPOOF_STARTED: " << target_mac << " -> " << spoofed_ip << std::endl;
+
+        // Start DHCP spoofing
+        if (!dhcp_start_spoofing(iface, rules)) {
+            std::cerr << "ERROR: Failed to start DHCP spoofing" << std::endl;
+            return 1;
+        }
+
+        int counter = 0;
+        while (true) {
+            counter++;
+            std::cout << "DHCP_SPOOF_STATUS: Active - Monitoring for DHCP requests (iteration " << counter << ")" << std::endl;
+            usleep(5000000); // Sleep for 5 seconds
         }
     }
     else if (command == "dns_spoof") {
