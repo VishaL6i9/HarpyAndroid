@@ -342,15 +342,7 @@ class NetworkMonitorFragment : Fragment() {
     private fun showDebugMenu() {
         val debugOptions = arrayOf(
             "DNS Spoofing Test",
-            "Start DNS Spoofing",
-            "Stop DNS Spoofing",
-            "Add DNS Rule",
-            "Remove DNS Rule",
-            "Check DNS Status",
-            "DHCP Spoofing Test",
-            "Start DHCP Spoofing",
-            "Stop DHCP Spoofing",
-            "Check DHCP Status"
+            "DHCP Spoofing Test"
         )
 
         androidx.appcompat.app.AlertDialog.Builder(requireContext())
@@ -358,15 +350,7 @@ class NetworkMonitorFragment : Fragment() {
             .setItems(debugOptions) { _, which ->
                 when (which) {
                     0 -> performDNSSpoofingTest()
-                    1 -> startDNSSpoofing()
-                    2 -> stopDNSSpoofing()
-                    3 -> addDNSRule()
-                    4 -> removeDNSRule()
-                    5 -> checkDNSStatus()
-                    6 -> performDHCPSpoofingTest()
-                    7 -> startDHCPSpoofing()
-                    8 -> stopDHCPSpoofing()
-                    9 -> checkDHCPSpoofingStatus()
+                    1 -> performDHCPSpoofingTest()
                 }
             }
             .setNegativeButton("Close", null)
@@ -415,6 +399,72 @@ class NetworkMonitorFragment : Fragment() {
 
         // Log the expected behavior
         com.vishal.harpy.core.utils.LogUtils.d("DebugMenu", "Expected: Root helper would start DHCP spoofing for test devices")
+    }
+
+    private fun performNetworkScanTest() {
+        // Test network scanning functionality
+        android.widget.Toast.makeText(
+            requireContext(),
+            "Network scan test initiated",
+            android.widget.Toast.LENGTH_LONG
+        ).show()
+
+        // Log the test initiation
+        com.vishal.harpy.core.utils.LogUtils.d("DebugMenu", "Network Scan Test initiated")
+
+        // Execute network scan via ViewModel
+        viewModel.scanNetwork()
+
+        // Log the expected behavior
+        com.vishal.harpy.core.utils.LogUtils.d("DebugMenu", "Expected: Root helper would scan network and return device list")
+    }
+
+    private fun performARPSpoofingTest() {
+        // Test ARP spoofing functionality
+        android.widget.Toast.makeText(
+            requireContext(),
+            "ARP spoofing test initiated",
+            android.widget.Toast.LENGTH_LONG
+        ).show()
+
+        // Log the test initiation
+        com.vishal.harpy.core.utils.LogUtils.d("DebugMenu", "ARP Spoofing Test initiated")
+
+        // Log the expected behavior
+        com.vishal.harpy.core.utils.LogUtils.d("DebugMenu", "Expected: Root helper would initiate ARP spoofing attack")
+    }
+
+    private fun performRootAccessTest() {
+        // Test root access functionality
+        android.widget.Toast.makeText(
+            requireContext(),
+            "Root access test initiated",
+            android.widget.Toast.LENGTH_LONG
+        ).show()
+
+        // Log the test initiation
+        com.vishal.harpy.core.utils.LogUtils.d("DebugMenu", "Root Access Test initiated")
+
+        // Execute root check via ViewModel
+        viewModel.checkRootAccess()
+
+        // Log the expected behavior
+        com.vishal.harpy.core.utils.LogUtils.d("DebugMenu", "Expected: Root helper would verify root access and return status")
+    }
+
+    private fun performNativeLibraryTest() {
+        // Test native library functionality
+        android.widget.Toast.makeText(
+            requireContext(),
+            "Native library test initiated",
+            android.widget.Toast.LENGTH_LONG
+        ).show()
+
+        // Log the test initiation
+        com.vishal.harpy.core.utils.LogUtils.d("DebugMenu", "Native Library Test initiated")
+
+        // Log the expected behavior
+        com.vishal.harpy.core.utils.LogUtils.d("DebugMenu", "Expected: Native library would be loaded and tested for functionality")
     }
 
     private fun startDNSSpoofing() {

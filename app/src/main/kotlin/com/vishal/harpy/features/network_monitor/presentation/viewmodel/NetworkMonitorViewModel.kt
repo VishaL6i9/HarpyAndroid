@@ -70,10 +70,10 @@ class NetworkMonitorViewModel @Inject constructor(
     val filteredDevices: StateFlow<List<NetworkDevice>> = _filteredDevices.asStateFlow()
 
     init {
-        checkRootAccess()
+        checkRootAccessInternal()
     }
 
-    private fun checkRootAccess() {
+    private fun checkRootAccessInternal() {
         viewModelScope.launch {
             _isLoading.value = true
             _error.value = null
@@ -476,6 +476,16 @@ class NetworkMonitorViewModel @Inject constructor(
     }
 
     /**
+     * Stop all DNS spoofing (parameterless version)
+     */
+    fun stopDNSSpoofing() {
+        // This would stop all DNS spoofing processes
+        // For now, we'll just show a message
+        com.vishal.harpy.core.utils.LogUtils.i("NetworkMonitorVM", "Stopping all DNS spoofing processes")
+        _error.value = "Stopping all DNS spoofing processes is not implemented yet"
+    }
+
+    /**
      * Check if DNS spoofing is active for a domain
      */
     fun isDNSSpoofingActive(domain: String): Boolean {
@@ -585,5 +595,41 @@ class NetworkMonitorViewModel @Inject constructor(
      */
     fun resetScanSuccess() {
         _scanSuccess.value = false
+    }
+
+    /**
+     * Check root access status
+     */
+    fun checkRootAccess() {
+        viewModelScope.launch {
+            _isLoading.value = true
+            _error.value = null
+            try {
+                val result = isDeviceRootedUseCase()
+                when (result) {
+                    is NetworkResult.Success -> {
+                        _isRooted.value = result.data
+                        if (result.data) {
+                            com.vishal.harpy.core.utils.LogUtils.i("NetworkMonitorVM", "Root access confirmed")
+                            _error.value = "Root access confirmed"
+                        } else {
+                            com.vishal.harpy.core.utils.LogUtils.w("NetworkMonitorVM", "Root access not available")
+                            _error.value = "Root access not available"
+                        }
+                    }
+
+                    is NetworkResult.Error -> {
+                        _lastError.value = result.error
+                        _error.value = result.error.message
+                    }
+                }
+            } catch (e: Exception) {
+                val error = NetworkError.UnknownError(e)
+                _lastError.value = error
+                _error.value = e.message
+            } finally {
+                _isLoading.value = false
+            }
+        }
     }
 }
