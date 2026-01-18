@@ -2,8 +2,10 @@
 #include <android/log.h>
 #include <string>
 #include <cstring>
+#include <vector>
 #include "arp_operations.h"
 #include "network_scan.h"
+#include "dns_spoofing.h"
 
 #define LOG_TAG "HarpyNative"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
@@ -21,26 +23,29 @@ extern "C" {
 JNIEXPORT jboolean JNICALL
 Java_com_vishal_harpy_core_native_NativeNetworkOps_initializeNativeOps(
     JNIEnv *env, jclass clazz) {
+    (void)env;  // Unused parameter
+    (void)clazz;  // Unused parameter
+
     LOGD("Initializing native network operations");
-    
+
     if (g_initialized) {
         LOGD("Already initialized");
         return JNI_TRUE;
     }
-    
+
     // Initialize ARP operations
     if (!arp_init()) {
         LOGE("Failed to initialize ARP operations");
         return JNI_FALSE;
     }
-    
+
     // Initialize network scan
     if (!network_scan_init()) {
         LOGE("Failed to initialize network scan");
         arp_cleanup();
         return JNI_FALSE;
     }
-    
+
     g_initialized = true;
     LOGD("Native operations initialized successfully");
     return JNI_TRUE;
@@ -54,6 +59,8 @@ Java_com_vishal_harpy_core_native_NativeNetworkOps_performARPSpoof(
     JNIEnv *env, jclass clazz,
     jstring targetIP, jstring targetMAC,
     jstring gatewayIP, jstring ourMAC) {
+    (void)env;  // Unused parameter
+    (void)clazz;  // Unused parameter
     
     if (!g_initialized) {
         LOGE("Native operations not initialized");
@@ -84,6 +91,8 @@ JNIEXPORT jobjectArray JNICALL
 Java_com_vishal_harpy_core_native_NativeNetworkOps_scanNetworkNative(
     JNIEnv *env, jclass clazz,
     jstring interfaceName, jstring subnet, jint timeoutSeconds) {
+    (void)env;  // Unused parameter
+    (void)clazz;  // Unused parameter
     
     if (!g_initialized) {
         LOGE("Native operations not initialized");
@@ -119,6 +128,8 @@ JNIEXPORT jstring JNICALL
 Java_com_vishal_harpy_core_native_NativeNetworkOps_getMACForIP(
     JNIEnv *env, jclass clazz,
     jstring ip, jstring interfaceName) {
+    (void)env;  // Unused parameter
+    (void)clazz;  // Unused parameter
     
     if (!g_initialized) {
         LOGE("Native operations not initialized");
@@ -150,6 +161,8 @@ Java_com_vishal_harpy_core_native_NativeNetworkOps_sendARPPacket(
     JNIEnv *env, jclass clazz,
     jstring interfaceName, jstring sourceIP, jstring sourceMAC,
     jstring targetIP, jstring targetMAC, jboolean isRequest) {
+    (void)env;  // Unused parameter
+    (void)clazz;  // Unused parameter
     
     if (!g_initialized) {
         LOGE("Native operations not initialized");
@@ -181,19 +194,22 @@ Java_com_vishal_harpy_core_native_NativeNetworkOps_sendARPPacket(
 JNIEXPORT jboolean JNICALL
 Java_com_vishal_harpy_core_native_NativeNetworkOps_cleanupNativeOps(
     JNIEnv *env, jclass clazz) {
-    
+    (void)env;  // Unused parameter
+    (void)clazz;  // Unused parameter
+
     LOGD("Cleaning up native resources");
-    
+
     if (!g_initialized) {
         return JNI_TRUE;
     }
-    
+
     network_scan_cleanup();
     arp_cleanup();
-    
+
     g_initialized = false;
     LOGD("Native resources cleaned up");
     return JNI_TRUE;
 }
+
 
 } // extern "C"
