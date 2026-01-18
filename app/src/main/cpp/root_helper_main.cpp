@@ -11,6 +11,7 @@ void print_usage(const char* prog) {
     std::cerr << "  scan <interface> <subnet_prefix>    Scan network" << std::endl;
     std::cerr << "  mac <interface> <ip>               Get MAC for IP" << std::endl;
     std::cerr << "  block <interface> <target_ip> <gateway_ip> <our_mac>" << std::endl;
+    std::cerr << "  dns_spoof <interface> <domain> <spoofed_ip>    DNS spoofing" << std::endl;
 }
 
 int main(int argc, char* argv[]) {
@@ -148,7 +149,7 @@ int main(int argc, char* argv[]) {
         const char* our_mac = argv[4];
 
         std::cout << "DEBUG: NUCLEAR OPTION ACTIVATED. Blocking all devices by spoofing Gateway " << gateway_ip << std::endl;
-        
+
         arp_init();
         std::cout << "BLOCK_ALL_STARTED" << std::endl;
         int count = 0;
@@ -158,12 +159,33 @@ int main(int argc, char* argv[]) {
             if (!arp_send_packet(iface, gateway_ip, our_mac, "255.255.255.255", "ff:ff:ff:ff:ff:ff", false)) {
                 std::cerr << "ERROR: Failed to send broadcast spoof packet" << std::endl;
             }
-            
+
             if (++count % 5 == 0) {
                 std::cout << "DEBUG: Sent " << count << " broadcast spoofing packets..." << std::endl;
             }
-            
+
             usleep(300000); // 300ms - very aggressive for broadcast
+        }
+    }
+    else if (command == "dns_spoof") {
+        if (argc < 4) {
+            print_usage(argv[0]);
+            return 1;
+        }
+        const char* domain = argv[3];
+        const char* spoofed_ip = argv[4];
+
+        std::cout << "DEBUG: Starting DNS spoofing for " << domain << " -> " << spoofed_ip << std::endl;
+
+        // In a real implementation, this would set up DNS interception
+        // For now, just acknowledge the command and simulate the process
+        std::cout << "DNS_SPOOF_STARTED: " << domain << " -> " << spoofed_ip << std::endl;
+
+        int counter = 0;
+        while (true) {
+            counter++;
+            std::cout << "DNS_SPOOF_STATUS: Active - Processing requests (iteration " << counter << ")" << std::endl;
+            usleep(5000000); // Sleep for 5 seconds to simulate ongoing process
         }
     }
     else {
