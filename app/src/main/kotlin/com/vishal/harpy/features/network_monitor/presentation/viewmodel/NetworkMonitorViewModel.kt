@@ -352,7 +352,9 @@ class NetworkMonitorViewModel @Inject constructor(
      * Toggle IPv4 filter
      */
     fun toggleIPv4Filter() {
-        _filterIPv4.value = !_filterIPv4.value
+        val newState = !_filterIPv4.value
+        _filterIPv4.value = newState
+        com.vishal.harpy.core.utils.LogUtils.d("NetworkMonitorVM", "IPv4 filter toggled to: $newState")
         applyFilters()
     }
 
@@ -360,7 +362,9 @@ class NetworkMonitorViewModel @Inject constructor(
      * Toggle IPv6 filter
      */
     fun toggleIPv6Filter() {
-        _filterIPv6.value = !_filterIPv6.value
+        val newState = !_filterIPv6.value
+        _filterIPv6.value = newState
+        com.vishal.harpy.core.utils.LogUtils.d("NetworkMonitorVM", "IPv6 filter toggled to: $newState")
         applyFilters()
     }
 
@@ -368,14 +372,114 @@ class NetworkMonitorViewModel @Inject constructor(
      * Apply current filters to the device list
      */
     private fun applyFilters() {
+        val ipv4Enabled = _filterIPv4.value
+        val ipv6Enabled = _filterIPv6.value
+
+        com.vishal.harpy.core.utils.LogUtils.d(
+            "NetworkMonitorVM",
+            "Applying filters - IPv4: $ipv4Enabled, IPv6: $ipv6Enabled"
+        )
+
         val filtered = _networkDevices.value.filter { device ->
             val isIPv4 =
                 device.ipAddress.matches(Regex("^\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}$"))
             val isIPv6 = !isIPv4
 
-            (isIPv4 && _filterIPv4.value) || (isIPv6 && _filterIPv6.value)
+            (isIPv4 && ipv4Enabled) || (isIPv6 && ipv6Enabled)
         }
+
+        val originalCount = _networkDevices.value.size
+        val filteredCount = filtered.size
+
+        com.vishal.harpy.core.utils.LogUtils.d(
+            "NetworkMonitorVM",
+            "Filter applied: $originalCount devices -> $filteredCount devices"
+        )
+
         _filteredDevices.value = filtered
+    }
+
+    /**
+     * Start DNS spoofing for a domain
+     */
+    fun startDNSSpoofing(domain: String, spoofedIP: String, interfaceName: String = "wlan0") {
+        if (!_isRooted.value) {
+            _error.value = "Root access is required for DNS spoofing"
+            return
+        }
+
+        viewModelScope.launch {
+            _isLoading.value = true
+            _error.value = null
+            try {
+                val result = scanNetworkUseCase.repository.startDNSSpoofing(domain, spoofedIP, interfaceName)
+                when (result) {
+                    is NetworkResult.Success -> {
+                        if (result.data) {
+                            com.vishal.harpy.core.utils.LogUtils.i("NetworkMonitorVM", "DNS spoofing started for $domain -> $spoofedIP")
+                            _error.value = "DNS spoofing started for $domain -> $spoofedIP"
+                        } else {
+                            _error.value = "Failed to start DNS spoofing"
+                        }
+                    }
+                    is NetworkResult.Error -> {
+                        _lastError.value = result.error
+                        _error.value = "DNS spoofing failed: ${result.error.message}"
+                    }
+                }
+            } catch (e: Exception) {
+                val error = NetworkError.UnknownError(e)
+                _lastError.value = error
+                _error.value = "DNS spoofing error: ${e.message}"
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    /**
+     * Stop DNS spoofing for a domain
+     */
+    fun stopDNSSpoofing(domain: String) {
+        if (!_isRooted.value) {
+            _error.value = "Root access is required for DNS spoofing"
+            return
+        }
+
+        viewModelScope.launch {
+            _isLoading.value = true
+            _error.value = null
+            try {
+                val result = scanNetworkUseCase.repository.stopDNSSpoofing(domain)
+                when (result) {
+                    is NetworkResult.Success -> {
+                        if (result.data) {
+                            com.vishal.harpy.core.utils.LogUtils.i("NetworkMonitorVM", "DNS spoofing stopped for $domain")
+                            _error.value = "DNS spoofing stopped for $domain"
+                        } else {
+                            _error.value = "No active DNS spoofing found for $domain"
+                        }
+                    }
+                    is NetworkResult.Error -> {
+                        _lastError.value = result.error
+                        _error.value = "Stop DNS spoofing failed: ${result.error.message}"
+                    }
+                }
+            } catch (e: Exception) {
+                val error = NetworkError.UnknownError(e)
+                _lastError.value = error
+                _error.value = "Stop DNS spoofing error: ${e.message}"
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    /**
+     * Check if DNS spoofing is active for a domain
+     */
+    fun isDNSSpoofingActive(domain: String): Boolean {
+        return scanNetworkUseCase.repository.isDNSSpoofingActive(domain)
     }
 
     /**
