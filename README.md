@@ -305,6 +305,9 @@ To build the project, ensure you have the Android SDK properly configured with t
   - [x] Domain-to-IP redirection support
 - [ ] DHCP spoofing and response interception
 - [ ] SSL/TLS interception and man-in-the-middle capabilities
+- [ ] HTTP/HTTPS proxying and content manipulation
+- [ ] Host header manipulation for complete domain redirection
+- [ ] SSL certificate handling for HTTPS interception
 - [ ] Custom packet injection and crafting
 - [ ] Protocol-specific filtering (HTTP, HTTPS, DNS, etc.)
 - [ ] Traffic shaping and bandwidth throttling per device
@@ -312,7 +315,7 @@ To build the project, ensure you have the Android SDK properly configured with t
 - [ ] libpcap integration for raw packet capture
 - [ ] libnet integration for low-level packet crafting
 
-Note: DNS spoofing has been implemented using the root helper architecture. The feature is accessible via the debug menu (long press the bug icon in the main app). The implementation includes a root helper command for DNS spoofing that can redirect domain queries to specified IP addresses. The remaining features can be developed using the current raw socket implementation and do not require complete libpcap/libnet integration to begin implementation. The libpcap/libnet integration is planned as a future enhancement for improved packet processing capabilities.
+Note: DNS spoofing has been implemented using the root helper architecture. The feature is accessible via the debug menu (long press the bug icon in the main app). The implementation includes a root helper command for DNS spoofing that can redirect domain queries to specified IP addresses. The remaining features can be developed using the current raw socket implementation and do not require complete libpcap/libnet integration to begin implementation. The libpcap/libnet integration is planned as a future enhancement for improved packet processing capabilities. Additional features like HTTP/HTTPS proxying and SSL/TLS interception are planned to enable complete domain redirection functionality.
 
 ## Acknowledgements
 
