@@ -10,6 +10,7 @@ import com.vishal.harpy.core.utils.RootErrorMapper
 import com.vishal.harpy.core.utils.VendorLookup
 import com.vishal.harpy.core.native.NativeNetworkWrapper
 import android.util.Log
+import com.vishal.harpy.core.utils.LogUtils
 import java.io.BufferedReader
 import java.io.DataOutputStream
 import java.io.IOException
@@ -33,18 +34,18 @@ class NetworkMonitorRepositoryImpl(private val context: android.content.Context)
 
     override suspend fun scanNetwork(): NetworkResult<List<NetworkDevice>> = withContext(Dispatchers.IO) {
         try {
-            Log.d(TAG, "Scanning network for connected devices...")
+            LogUtils.d(TAG, "Scanning network for connected devices...")
 
             val isRootedResult = isDeviceRooted()
             if (isRootedResult is NetworkResult.Success && isRootedResult.data) {
                 val devices = scanNetworkWithRoot()
                 NetworkResult.success(devices)
             } else {
-                Log.w(TAG, "Device is not rooted. Limited functionality available.")
+                LogUtils.w(TAG, "Device is not rooted. Limited functionality available.")
                 NetworkResult.success(emptyList())
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error scanning network: ${e.message}", e)
+            LogUtils.e(TAG, "Error scanning network: ${e.message}", e)
             NetworkResult.error(NetworkError.NetworkScanError(e))
         }
     }
