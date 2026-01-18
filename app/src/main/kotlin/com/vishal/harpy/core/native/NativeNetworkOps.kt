@@ -136,4 +136,76 @@ object NativeNetworkOps {
         // DNS spoofing is handled by root helper, not native library
         return false
     }
+
+    /**
+     * Initialize DHCP spoofing operations
+     */
+    fun initializeDHCPSpoof(): Boolean {
+        // DHCP spoofing is handled by root helper, not native library
+        return true
+    }
+
+    /**
+     * Start DHCP spoofing on a specific interface
+     * @param interfaceName Network interface name (e.g., "wlan0")
+     * @param targetMacs Array of target MAC addresses to spoof
+     * @param spoofedIPs Array of spoofed IP addresses corresponding to targets
+     * @param gatewayIPs Array of gateway IPs to provide
+     * @param subnetMasks Array of subnet masks to provide
+     * @param dnsServers Array of DNS servers to provide
+     * @return true if successful, false otherwise
+     */
+    fun startDHCPSpoof(
+        interfaceName: String,
+        targetMacs: Array<String>,
+        spoofedIPs: Array<String>,
+        gatewayIPs: Array<String>,
+        subnetMasks: Array<String>,
+        dnsServers: Array<String>
+    ): Boolean {
+        // DHCP spoofing is handled by root helper, not native library
+        return false
+    }
+
+    /**
+     * Stop DHCP spoofing
+     */
+    fun stopDHCPSpoof() {
+        // DHCP spoofing is handled by root helper, not native library
+    }
+
+    /**
+     * Add a DHCP spoofing rule
+     * @param targetMac MAC address to target
+     * @param spoofedIP IP address to assign to target
+     * @param gatewayIP Gateway IP to provide
+     * @param subnetMask Subnet mask to provide
+     * @param dnsServer DNS server to provide
+     */
+    fun addDHCPSpoofRule(
+        targetMac: String,
+        spoofedIP: String,
+        gatewayIP: String,
+        subnetMask: String,
+        dnsServer: String
+    ) {
+        // DHCP spoofing is handled by root helper, not native library
+    }
+
+    /**
+     * Remove a DHCP spoofing rule
+     * @param targetMac MAC address to remove from spoofing rules
+     */
+    fun removeDHCPSpoofRule(targetMac: String) {
+        // DHCP spoofing is handled by root helper, not native library
+    }
+
+    /**
+     * Check if DHCP spoofing is currently active
+     * @return true if active, false otherwise
+     */
+    fun isDHCPSpoofActive(): Boolean {
+        // DHCP spoofing is handled by root helper, not native library
+        return false
+    }
 }

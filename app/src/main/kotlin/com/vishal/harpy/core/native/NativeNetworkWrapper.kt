@@ -194,6 +194,64 @@ class NativeNetworkWrapper {
     }
 
     /**
+     * Initialize DHCP spoofing
+     */
+    fun initializeDHCPSpoof(): Boolean {
+        Log.d(TAG, "DHCP spoofing initialization is handled by root helper")
+        return true
+    }
+
+    /**
+     * Start DHCP spoofing
+     */
+    fun startDHCPSpoof(
+        interfaceName: String,
+        targetMacs: Array<String>,
+        spoofedIPs: Array<String>,
+        gatewayIPs: Array<String>,
+        subnetMasks: Array<String>,
+        dnsServers: Array<String>
+    ): Boolean {
+        Log.d(TAG, "DHCP spoofing is handled by root helper, not native library")
+        return false
+    }
+
+    /**
+     * Stop DHCP spoofing
+     */
+    fun stopDHCPSpoof() {
+        Log.d(TAG, "DHCP spoofing stop is handled by root helper")
+    }
+
+    /**
+     * Add DHCP spoofing rule
+     */
+    fun addDHCPSpoofRule(
+        targetMac: String,
+        spoofedIP: String,
+        gatewayIP: String,
+        subnetMask: String,
+        dnsServer: String
+    ) {
+        Log.d(TAG, "DHCP spoofing rules are handled by root helper: $targetMac -> $spoofedIP")
+    }
+
+    /**
+     * Remove DHCP spoofing rule
+     */
+    fun removeDHCPSpoofRule(targetMac: String) {
+        Log.d(TAG, "DHCP spoofing rule removal is handled by root helper: $targetMac")
+    }
+
+    /**
+     * Check if DHCP spoofing is active
+     */
+    fun isDHCPSpoofActive(): Boolean {
+        Log.d(TAG, "DHCP spoofing status check is handled by root helper")
+        return false
+    }
+
+    /**
      * Cleanup native resources
      */
     fun cleanup() {
