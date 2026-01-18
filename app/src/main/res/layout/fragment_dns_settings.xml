@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/background_color"
+    android:fitsSystemWindows="true">
+
+    <!-- Header Section -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="16dp"
+        android:background="@color/oled_black_elevated"
+        android:gravity="center_vertical">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="DNS Spoofing"
+                android:textSize="24sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary"
+                android:layout_marginBottom="8dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Configure DNS spoofing options"
+                android:textSize="14sp"
+                android:textColor="@color/text_secondary" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Main Content -->
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:padding="16dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingTop="16dp">
+
+            <!-- Start DNS Spoofing Button -->
+            <Button
+                android:id="@+id/startDnsSpoofButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Start DNS Spoofing"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:background="@drawable/button_background"
+                android:textColor="@color/oled_black"
+                android:layout_marginBottom="16dp" />
+
+            <!-- Stop DNS Spoofing Button -->
+            <Button
+                android:id="@+id/stopDnsSpoofButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Stop DNS Spoofing"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:background="@drawable/button_background"
+                android:textColor="@color/oled_black"
+                android:layout_marginBottom="16dp" />
+
+            <!-- Add DNS Rule Button -->
+            <Button
+                android:id="@+id/addDnsRuleButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Add DNS Rule"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:background="@drawable/button_background"
+                android:textColor="@color/oled_black"
+                android:layout_marginBottom="16dp" />
+
+            <!-- Remove DNS Rule Button -->
+            <Button
+                android:id="@+id/removeDnsRuleButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Remove DNS Rule"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:background="@drawable/button_background"
+                android:textColor="@color/oled_black"
+                android:layout_marginBottom="16dp" />
+
+            <!-- Check Status Button -->
+            <Button
+                android:id="@+id/checkDnsStatusButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Check DNS Status"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:background="@drawable/button_background"
+                android:textColor="@color/oled_black" />
+
+        </LinearLayout>
+    </ScrollView>
+
+</LinearLayout>
