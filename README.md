@@ -20,6 +20,10 @@ A network monitoring and control application for Android, inspired by the iOS ja
 - Device ping testing to verify connectivity
 - Root helper binary for privileged network operations
 - Bottom sheet UI for device actions with confirmation dialogs
+- DNS spoofing and redirection via root helper
+  - Domain-to-IP redirection
+  - Debug menu for testing DNS spoofing functionality
+  - Root helper command support for DNS interception
 
 ### Logging & Debugging
 - Real-time file logging with automatic log rotation (5MB per file)
@@ -57,6 +61,7 @@ Supported commands:
 - `block <interface> <target_ip> <gateway_ip> <our_mac>` - Bidirectional ARP spoofing for device blocking
 - `block_all <interface> <gateway_ip> <our_mac>` - Nuclear option: Block all devices via gateway spoofing
 - `unblock <interface> <target_ip> <target_mac> <gateway_ip> <gateway_mac>` - ARP cache restoration to unblock device
+- `dns_spoof <interface> <domain> <spoofed_ip>` - DNS spoofing for domain redirection
 
 ## Requirements
 
@@ -234,6 +239,7 @@ To build the project, ensure you have the Android SDK properly configured with t
     - [x] Support for network scanning via su
     - [x] Support for MAC address resolution via su
     - [x] Support for ARP spoofing via su
+    - [x] Support for DNS spoofing via su
   - [ ] Full libpcap integration for network scanning
   - [ ] Full libnet integration for ARP operations
 - [x] JNI integration for ARP manipulation
@@ -241,6 +247,13 @@ To build the project, ensure you have the Android SDK properly configured with t
   - [x] MAC address resolution interface (shell fallback ready)
   - [x] Raw ARP packet sending interface (shell fallback ready)
   - [ ] Native libnet implementation
+- [x] DNS spoofing integration
+  - [x] DNS spoofing C++ implementation files
+  - [x] Root helper DNS spoofing command
+  - [x] Kotlin API layer for DNS operations
+  - [x] Repository methods for DNS spoofing
+  - [x] ViewModel support for DNS spoofing
+  - [x] Debug menu UI for DNS spoofing testing
 - [x] libpcap/libnet integration structure
   - [x] Network scan using shell commands (fallback)
   - [x] ARP operations using shell commands (fallback)
@@ -284,8 +297,12 @@ To build the project, ensure you have the Android SDK properly configured with t
 - [ ] Feature parity assessment
 - [ ] Alternative network scanning methods
 
-### Phase 8: Advanced Network Protocols (Future Plan)
-- [ ] DNS spoofing and redirection
+### Phase 8: Advanced Network Protocols (In Progress)
+- [x] DNS spoofing and redirection
+  - [x] Root helper command for DNS spoofing
+  - [x] Kotlin API layer for DNS spoofing operations
+  - [x] Debug menu integration for testing
+  - [x] Domain-to-IP redirection support
 - [ ] DHCP spoofing and response interception
 - [ ] SSL/TLS interception and man-in-the-middle capabilities
 - [ ] Custom packet injection and crafting
@@ -295,7 +312,7 @@ To build the project, ensure you have the Android SDK properly configured with t
 - [ ] libpcap integration for raw packet capture
 - [ ] libnet integration for low-level packet crafting
 
-Note: These features can be developed using the current raw socket implementation and do not require complete libpcap/libnet integration to begin implementation. The libpcap/libnet integration is planned as a future enhancement for improved packet processing capabilities.
+Note: DNS spoofing has been implemented using the root helper architecture. The feature is accessible via the debug menu (long press the bug icon in the main app). The implementation includes a root helper command for DNS spoofing that can redirect domain queries to specified IP addresses. The remaining features can be developed using the current raw socket implementation and do not require complete libpcap/libnet integration to begin implementation. The libpcap/libnet integration is planned as a future enhancement for improved packet processing capabilities.
 
 ## Acknowledgements
 
