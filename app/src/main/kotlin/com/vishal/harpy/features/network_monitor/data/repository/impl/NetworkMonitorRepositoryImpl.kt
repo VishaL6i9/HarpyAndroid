@@ -18,6 +18,7 @@ import java.io.InputStreamReader
 import kotlin.text.Regex
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.launch
 
 class NetworkMonitorRepositoryImpl(private val context: android.content.Context) : NetworkMonitorRepository {
 
@@ -31,6 +32,147 @@ class NetworkMonitorRepositoryImpl(private val context: android.content.Context)
     }
 
     private val blockingProcesses = java.util.concurrent.ConcurrentHashMap<String, Process>()
+    private val dnsSpoofingProcesses = java.util.concurrent.ConcurrentHashMap<String, Process>()
+
+    /**
+     * Start DNS spoofing for a specific domain
+     */
+    override suspend fun startDNSSpoofing(domain: String, spoofedIP: String, interfaceName: String): NetworkResult<Boolean> = withContext(Dispatchers.IO) {
+        try {
+            LogUtils.d(TAG, "Starting DNS spoofing: $domain -> $spoofedIP on interface $interfaceName")
+
+            val helperPath = NativeNetworkWrapper.getRootHelperPath(context) ?: run {
+                LogUtils.e(TAG, "Root helper not found")
+                return@withContext NetworkResult.error(NetworkError.NativeLibraryError(Exception("Root helper not found")))
+            }
+
+            // Check if root access is available
+            val isRootedResult = isDeviceRooted()
+            if (isRootedResult is com.vishal.harpy.core.utils.NetworkResult.Success && !isRootedResult.data) {
+                LogUtils.e(TAG, "Root access not available for DNS spoofing")
+                return@withContext NetworkResult.error(NetworkError.DeviceNotRootedError())
+            }
+
+            // Kill any existing DNS spoofing process for this domain
+            val processKey = "dns_$domain"
+            dnsSpoofingProcesses[processKey]?.destroyForcibly()
+
+            // Build the command to execute the root helper with DNS spoofing
+            val command = arrayOf("su", "-c", "$helperPath dns_spoof $interfaceName $domain $spoofedIP")
+
+            LogUtils.d(TAG, "Executing DNS spoofing command: ${command.joinToString(" ")}")
+
+            val process = Runtime.getRuntime().exec(command)
+            dnsSpoofingProcesses[processKey] = process
+
+            // Handle output streams
+            val inputStream = process.inputStream
+            val errorStream = process.errorStream
+
+            // Read output in a background thread
+            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                val reader = java.io.BufferedReader(java.io.InputStreamReader(inputStream))
+                try {
+                    var line: String?
+                    while (process.isAlive) {
+                        line = reader.readLine()
+                        if (line != null) {
+                            LogUtils.d(TAG, "DNS Spoofing Output: $line")
+                            // Check for specific status messages
+                            if (line.contains("DNS_SPOOF_STARTED")) {
+                                LogUtils.i(TAG, "DNS spoofing started successfully for $domain -> $spoofedIP")
+                            } else if (line.contains("DNS_SPOOF_STATUS")) {
+                                LogUtils.d(TAG, "DNS Spoofing Status: $line")
+                            }
+                        } else {
+                            // If readline returns null, the stream is closed
+                            break
+                        }
+                    }
+                } catch (e: Exception) {
+                    LogUtils.e(TAG, "Error reading DNS spoofing output: ${e.message}", e)
+                } finally {
+                    reader.close()
+                }
+            }
+
+            // Read error stream in a background thread
+            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                val errorReader = java.io.BufferedReader(java.io.InputStreamReader(errorStream))
+                try {
+                    var errorLine: String?
+                    while (process.isAlive) {
+                        errorLine = errorReader.readLine()
+                        if (errorLine != null) {
+                            LogUtils.e(TAG, "DNS Spoofing Error: $errorLine")
+                        } else {
+                            // If readline returns null, the stream is closed
+                            break
+                        }
+                    }
+                } catch (e: Exception) {
+                    LogUtils.e(TAG, "Error reading DNS spoofing error stream: ${e.message}", e)
+                } finally {
+                    errorReader.close()
+                }
+            }
+
+            // Wait a bit to see if the process started successfully
+            kotlinx.coroutines.delay(1000)
+
+            if (process.isAlive) {
+                LogUtils.i(TAG, "DNS spoofing process started successfully for $domain -> $spoofedIP")
+                NetworkResult.success(true)
+            } else {
+                LogUtils.e(TAG, "DNS spoofing process failed to start for $domain -> $spoofedIP")
+                NetworkResult.error(NetworkError.CommandExecutionError(Exception("DNS spoofing process exited early")))
+            }
+        } catch (e: Exception) {
+            LogUtils.e(TAG, "Error starting DNS spoofing: ${e.message}", e)
+            NetworkResult.error(NetworkError.CommandExecutionError(e))
+        }
+    }
+
+    /**
+     * Stop DNS spoofing for a specific domain
+     */
+    override suspend fun stopDNSSpoofing(domain: String): NetworkResult<Boolean> = withContext(Dispatchers.IO) {
+        try {
+            LogUtils.d(TAG, "Stopping DNS spoofing for domain: $domain")
+
+            val processKey = "dns_$domain"
+            val process = dnsSpoofingProcesses[processKey]
+
+            if (process != null && process.isAlive) {
+                process.destroyForcibly()
+                dnsSpoofingProcesses.remove(processKey)
+                LogUtils.i(TAG, "DNS spoofing stopped for domain: $domain")
+                NetworkResult.success(true)
+            } else {
+                LogUtils.w(TAG, "No active DNS spoofing process found for domain: $domain")
+                NetworkResult.success(false) // Not an error, just not running
+            }
+        } catch (e: Exception) {
+            LogUtils.e(TAG, "Error stopping DNS spoofing: ${e.message}", e)
+            NetworkResult.error(NetworkError.CommandExecutionError(e))
+        }
+    }
+
+    /**
+     * Check if DNS spoofing is active for a specific domain
+     */
+    override fun isDNSSpoofingActive(domain: String): Boolean {
+        val processKey = "dns_$domain"
+        val process = dnsSpoofingProcesses[processKey]
+        return process != null && process.isAlive
+    }
+
+    /**
+     * Start DNS spoofing for a specific domain (overload with default interface name)
+     */
+    suspend fun startDNSSpoofing(domain: String, spoofedIP: String): NetworkResult<Boolean> {
+        return startDNSSpoofing(domain, spoofedIP, "wlan0")
+    }
 
     override suspend fun scanNetwork(): NetworkResult<List<NetworkDevice>> = withContext(Dispatchers.IO) {
         try {
