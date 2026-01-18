@@ -11,4 +11,9 @@ interface NetworkMonitorRepository {
     suspend fun unblockDevice(device: NetworkDevice): NetworkResult<Boolean>
     suspend fun mapNetworkTopology(): NetworkResult<NetworkTopology>
     suspend fun testPing(device: NetworkDevice): NetworkResult<Boolean>
+
+    // DNS Spoofing methods
+    suspend fun startDNSSpoofing(domain: String, spoofedIP: String, interfaceName: String): NetworkResult<Boolean>
+    suspend fun stopDNSSpoofing(domain: String): NetworkResult<Boolean>
+    fun isDNSSpoofingActive(domain: String): Boolean
 }
