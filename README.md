@@ -4,6 +4,12 @@ A network monitoring and control application for Android, inspired by the iOS ja
 
 ## Features
 
+### Multi-Feature Navigation
+The app now features a bottom navigation bar providing easy access to three main features:
+- **Network Monitor** - Device discovery and management
+- **DNS Spoofing** - DNS query interception and redirection
+- **DHCP Spoofing** - DHCP request interception and IP assignment
+
 ### Root-Based Functionality (Current Implementation)
 - Network device discovery using ARP scanning with instant results
 - Detailed device information (IP address, MAC address, hostname, vendor)
@@ -22,14 +28,14 @@ A network monitoring and control application for Android, inspired by the iOS ja
 - Bottom sheet UI for device actions with confirmation dialogs
 - DNS spoofing and redirection via root helper
   - Domain-to-IP redirection
-  - Debug menu for testing DNS spoofing functionality
+  - Dedicated DNS Spoofing feature fragment
   - Root helper command support for DNS interception
 - DHCP spoofing and response interception
   - DHCP request interception on port 67
   - Spoofed IP assignment to target devices
   - Custom gateway and DNS server injection
   - Rule-based targeting by MAC address
-  - Debug menu for DHCP spoofing management
+  - Dedicated DHCP Spoofing feature fragment
 
 ### Logging & Debugging
 - Real-time file logging with automatic log rotation (5MB per file)
@@ -111,6 +117,10 @@ The project follows a modern Android architecture with feature modules:
   - `domain/` - Business logic (UseCases)
   - `presentation/` - UI logic (ViewModels, Fragments/Activities)
   - `di/` - Dependency injection setup
+- `features/dns/` - DNS spoofing feature with:
+  - `presentation/ui/` - DNSSpoofingFragment for DNS rule management
+- `features/dhcp/` - DHCP spoofing feature with:
+  - `presentation/ui/` - DHCPSpoofingFragment for DHCP rule management
 - `features/device_manager/` - Device management feature with the same layered architecture
 
 ### Architecture Principles
@@ -119,6 +129,14 @@ The project follows a modern Android architecture with feature modules:
 - **Feature-First Organization**: Related functionality is grouped together
 - **Dependency Injection**: Proper decoupling of components
 - **State Management**: Using Kotlin Flows for reactive programming
+- **Bottom Navigation**: Multi-feature navigation with dedicated fragments for each feature
+
+### Navigation Structure
+The app uses Android's BottomNavigationView to provide seamless navigation between features:
+- Each feature is implemented as a separate Fragment
+- Navigation state is managed by MainActivity
+- Fragment switching is handled through the bottom navigation menu
+- Each feature can maintain its own state and UI independently
 
 To build the project, ensure you have the Android SDK properly configured with the required API level and build tools.
 
@@ -196,6 +214,11 @@ To build the project, ensure you have the Android SDK properly configured with t
   - [x] Immediate UI updates after block/unblock operations
   - [x] Bottom sheet UI for device actions
   - [x] Two-stage confirmation dialogs for nuclear option
+  - [x] Bottom navigation bar for multi-feature navigation
+  - [x] Dedicated DNS Spoofing feature fragment
+  - [x] Dedicated DHCP Spoofing feature fragment
+  - [x] Material Design navigation icons
+  - [x] Seamless fragment switching between features
 - [x] Error handling improvements
   - [x] NetworkError sealed class hierarchy
   - [x] RootError sealed class hierarchy for root-specific errors
