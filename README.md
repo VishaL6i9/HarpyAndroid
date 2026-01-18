@@ -46,7 +46,7 @@ A network monitoring and control application for Android, inspired by the iOS ja
 
 ## Technical Implementation
 
-The root-based implementation is built using native Kotlin for the Android application layer, with native C/C++ code using libpcap/libnet libraries accessed through JNI for low-level network operations when root access is available. The app leverages root access to execute ARP spoofing techniques similar to the original iOS Harpy tweak.
+The root-based implementation is built using native Kotlin for the Android application layer, with native C/C++ code using raw socket implementations for low-level network operations when root access is available. The app leverages root access to execute ARP spoofing techniques similar to the original iOS Harpy tweak. Future plans include migrating to libpcap/libnet libraries for enhanced packet capture and crafting capabilities.
 
 ### Root Helper Binary
 A standalone executable (`libharpy_root_helper.so`) is packaged with the app and can be invoked via `su` to perform privileged network operations without requiring the entire app to run as root. This provides better security isolation and allows for more granular permission control.
@@ -247,6 +247,7 @@ To build the project, ensure you have the Android SDK properly configured with t
   - [x] Graceful fallback to shell commands when native unavailable
   - [x] Integration guide (LIBPCAP_LIBNET_INTEGRATION.md)
   - [x] Root helper binary for privileged operations
+  - [x] Current implementation uses raw socket implementations (not libpcap/libnet yet)
   - [ ] Pre-built binary linking
   - [ ] Full libpcap packet capture
   - [ ] Full libnet packet crafting
@@ -293,6 +294,8 @@ To build the project, ensure you have the Android SDK properly configured with t
 - [ ] Deep packet inspection for content-based filtering
 - [ ] libpcap integration for raw packet capture
 - [ ] libnet integration for low-level packet crafting
+
+Note: These features can be developed using the current raw socket implementation and do not require complete libpcap/libnet integration to begin implementation. The libpcap/libnet integration is planned as a future enhancement for improved packet processing capabilities.
 
 ## Acknowledgements
 
