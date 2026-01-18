@@ -79,4 +79,61 @@ object NativeNetworkOps {
      * Cleanup native resources
      */
     external fun cleanupNativeOps(): Boolean
+
+    /**
+     * Initialize DNS spoofing operations
+     */
+    fun initializeDNSSpoof(): Boolean {
+        // DNS spoofing is handled by root helper, not native library
+        return true
+    }
+
+    /**
+     * Start DNS spoofing on a specific interface
+     * @param interfaceName Network interface name (e.g., "wlan0")
+     * @param domains Array of domain names to spoof
+     * @param spoofedIPs Array of spoofed IP addresses corresponding to domains
+     * @return true if successful, false otherwise
+     */
+    fun startDNSSpoof(
+        interfaceName: String,
+        domains: Array<String>,
+        spoofedIPs: Array<String>
+    ): Boolean {
+        // DNS spoofing is handled by root helper, not native library
+        return false
+    }
+
+    /**
+     * Stop DNS spoofing
+     */
+    fun stopDNSSpoof() {
+        // DNS spoofing is handled by root helper, not native library
+    }
+
+    /**
+     * Add a DNS spoofing rule
+     * @param domain Domain to spoof
+     * @param spoofedIP IP address to return instead
+     */
+    fun addDNSSpoofRule(domain: String, spoofedIP: String) {
+        // DNS spoofing is handled by root helper, not native library
+    }
+
+    /**
+     * Remove a DNS spoofing rule
+     * @param domain Domain to remove from spoofing rules
+     */
+    fun removeDNSSpoofRule(domain: String) {
+        // DNS spoofing is handled by root helper, not native library
+    }
+
+    /**
+     * Check if DNS spoofing is currently active
+     * @return true if active, false otherwise
+     */
+    fun isDNSSpoofActive(): Boolean {
+        // DNS spoofing is handled by root helper, not native library
+        return false
+    }
 }

@@ -145,6 +145,55 @@ class NativeNetworkWrapper {
     fun isNativeAvailable(): Boolean = isNativeAvailable
 
     /**
+     * Initialize DNS spoofing
+     */
+    fun initializeDNSSpoof(): Boolean {
+        Log.d(TAG, "DNS spoofing initialization is handled by root helper")
+        return true
+    }
+
+    /**
+     * Start DNS spoofing
+     */
+    fun startDNSSpoof(
+        interfaceName: String,
+        domains: Array<String>,
+        spoofedIPs: Array<String>
+    ): Boolean {
+        Log.d(TAG, "DNS spoofing is handled by root helper, not native library")
+        return false
+    }
+
+    /**
+     * Stop DNS spoofing
+     */
+    fun stopDNSSpoof() {
+        Log.d(TAG, "DNS spoofing stop is handled by root helper")
+    }
+
+    /**
+     * Add DNS spoofing rule
+     */
+    fun addDNSSpoofRule(domain: String, spoofedIP: String) {
+        Log.d(TAG, "DNS spoofing rules are handled by root helper: $domain -> $spoofedIP")
+    }
+
+    /**
+     * Remove DNS spoofing rule
+     */
+    fun removeDNSSpoofRule(domain: String) {
+        Log.d(TAG, "DNS spoofing rule removal is handled by root helper: $domain")
+    }
+
+    /**
+     * Check if DNS spoofing is active
+     */
+    fun isDNSSpoofActive(): Boolean {
+        Log.d(TAG, "DNS spoofing status check is handled by root helper")
+        return false
+    }
+
+    /**
      * Cleanup native resources
      */
     fun cleanup() {
