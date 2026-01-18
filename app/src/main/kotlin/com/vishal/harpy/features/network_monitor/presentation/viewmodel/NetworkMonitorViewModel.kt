@@ -482,6 +482,104 @@ class NetworkMonitorViewModel @Inject constructor(
         return scanNetworkUseCase.repository.isDNSSpoofingActive(domain)
     }
 
+
+    /**
+     * Check if DHCP spoofing is active
+     */
+    fun isDHCPSpoofingActive(): Boolean {
+        return scanNetworkUseCase.repository.isDHCPSpoofingActive()
+    }
+
+    /**
+     * Start DHCP spoofing for specific devices
+     */
+    fun startDHCPSpoofing(
+        interfaceName: String = "wlan0",
+        targetMacs: Array<String>,
+        spoofedIPs: Array<String>,
+        gatewayIPs: Array<String>,
+        subnetMasks: Array<String>,
+        dnsServers: Array<String>
+    ) {
+        if (!_isRooted.value) {
+            _error.value = "Root access is required for DHCP spoofing"
+            return
+        }
+
+        viewModelScope.launch {
+            _isLoading.value = true
+            _error.value = null
+            try {
+                val result = scanNetworkUseCase.repository.startDHCPSpoofing(
+                    interfaceName,
+                    targetMacs,
+                    spoofedIPs,
+                    gatewayIPs,
+                    subnetMasks,
+                    dnsServers
+                )
+                when (result) {
+                    is NetworkResult.Success -> {
+                        if (result.data) {
+                            com.vishal.harpy.core.utils.LogUtils.i("NetworkMonitorVM", "DHCP spoofing started for ${targetMacs.size} devices")
+                            _error.value = "DHCP spoofing started for ${targetMacs.size} devices"
+                        } else {
+                            _error.value = "Failed to start DHCP spoofing"
+                        }
+                    }
+                    is NetworkResult.Error -> {
+                        _lastError.value = result.error
+                        _error.value = "DHCP spoofing failed: ${result.error.message}"
+                    }
+                }
+            } catch (e: Exception) {
+                val error = NetworkError.UnknownError(e)
+                _lastError.value = error
+                _error.value = "DHCP spoofing error: ${e.message}"
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    /**
+     * Stop DHCP spoofing
+     */
+    fun stopDHCPSpoofing() {
+        if (!_isRooted.value) {
+            _error.value = "Root access is required for DHCP spoofing"
+            return
+        }
+
+        viewModelScope.launch {
+            _isLoading.value = true
+            _error.value = null
+            try {
+                val result = scanNetworkUseCase.repository.stopDHCPSpoofing()
+                when (result) {
+                    is NetworkResult.Success -> {
+                        if (result.data) {
+                            com.vishal.harpy.core.utils.LogUtils.i("NetworkMonitorVM", "DHCP spoofing stopped")
+                            _error.value = "DHCP spoofing stopped"
+                        } else {
+                            _error.value = "No active DHCP spoofing found"
+                        }
+                    }
+                    is NetworkResult.Error -> {
+                        _lastError.value = result.error
+                        _error.value = "Stop DHCP spoofing failed: ${result.error.message}"
+                    }
+                }
+            } catch (e: Exception) {
+                val error = NetworkError.UnknownError(e)
+                _lastError.value = error
+                _error.value = "Stop DHCP spoofing error: ${e.message}"
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
     /**
      * Reset the scan success flag
      */
