@@ -21,6 +21,23 @@ A network monitoring and control application for Android, inspired by the iOS ja
 - Root helper binary for privileged network operations
 - Bottom sheet UI for device actions with confirmation dialogs
 
+### Logging & Debugging
+- Real-time file logging with automatic log rotation (5MB per file)
+- Debug mode toggle for continuous logging without rotation
+- Log export functionality with file sharing support
+- Log buffer clearing with 3-second hold gesture and haptic feedback
+- Logcat capture for native and system logs
+- Centralized logging utility (LogUtils) for consistent app-wide logging
+- Logging settings accessible from the settings menu
+
+### Permissions & Security
+- Runtime permission management with dedicated permissions activity
+- Comprehensive permission checking on app startup
+- Support for Android 11+ storage permissions (MANAGE_EXTERNAL_STORAGE)
+- Graceful fallback for older Android versions (WRITE_EXTERNAL_STORAGE)
+- Visual permission status display with grant/deny indicators
+- File provider configuration for secure log file sharing
+
 ### Non-Root Approach (Future Plan)
 - Network monitoring using Android's VpnService
 - Traffic analysis for the device's own network usage
@@ -172,6 +189,37 @@ To build the project, ensure you have the Android SDK properly configured with t
   - [x] Fallback to hardcoded common vendors
 - [ ] Localization support
 - [ ] Accessibility features
+
+### Phase 4.5: Logging & Permissions (Completed)
+- [x] Centralized logging utility (LogUtils)
+  - [x] Real-time file logging with timestamp
+  - [x] Automatic log rotation when files exceed 5MB
+  - [x] Debug mode toggle to disable rotation for continuous logging
+  - [x] Logcat capture for native and system logs
+  - [x] Async log writing with queue-based system
+  - [x] Thread-safe logging operations
+- [x] Permissions management system
+  - [x] PermissionChecker utility for runtime permission validation
+  - [x] Comprehensive permission list (network, storage, vibration)
+  - [x] Android 11+ storage permission handling (MANAGE_EXTERNAL_STORAGE)
+  - [x] Fallback for older Android versions (WRITE_EXTERNAL_STORAGE)
+  - [x] PermissionsActivity for requesting permissions on app startup
+  - [x] Visual permission status display with grant/deny indicators
+  - [x] File provider configuration for secure log sharing
+- [x] Logging UI integration
+  - [x] Logging settings menu item in settings fragment
+  - [x] Logging settings dialog with debug mode toggle
+  - [x] Log export functionality with file sharing
+  - [x] Log deletion with confirmation dialog
+  - [x] 3-second hold gesture to clear log buffer
+  - [x] Haptic feedback (vibration) on successful actions
+  - [x] Toast notifications for user feedback
+- [x] Vibration utilities
+  - [x] Cross-SDK vibration support (API 24+)
+  - [x] VibrationEffect for Android 8.0+
+  - [x] Deprecated method fallback for older versions
+  - [x] Pattern-based vibration support
+  - [x] Device vibrator capability checking
 
 ### Phase 5: Native Integration (In Progress)
 - [x] Native C/C++ libraries for low-level network operations
