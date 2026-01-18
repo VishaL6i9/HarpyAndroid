@@ -10,6 +10,7 @@ add_library(harpy_native SHARED
     harpy_native.cpp
     arp_operations.cpp
     network_scan.cpp
+    dns_handler.cpp
 )
 
 # Add the standalone root helper binary
@@ -19,6 +20,7 @@ add_executable(harpy_root_helper
     root_helper_main.cpp
     arp_operations.cpp
     network_scan.cpp
+    dns_handler.cpp
 )
 
 # Force the name to follow Android library naming conventions for packaging
