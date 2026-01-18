@@ -346,7 +346,11 @@ class NetworkMonitorFragment : Fragment() {
             "Stop DNS Spoofing",
             "Add DNS Rule",
             "Remove DNS Rule",
-            "Check DNS Status"
+            "Check DNS Status",
+            "DHCP Spoofing Test",
+            "Start DHCP Spoofing",
+            "Stop DHCP Spoofing",
+            "Check DHCP Status"
         )
 
         androidx.appcompat.app.AlertDialog.Builder(requireContext())
@@ -359,6 +363,10 @@ class NetworkMonitorFragment : Fragment() {
                     3 -> addDNSRule()
                     4 -> removeDNSRule()
                     5 -> checkDNSStatus()
+                    6 -> performDHCPSpoofingTest()
+                    7 -> startDHCPSpoofing()
+                    8 -> stopDHCPSpoofing()
+                    9 -> checkDHCPSpoofingStatus()
                 }
             }
             .setNegativeButton("Close", null)
@@ -382,6 +390,31 @@ class NetworkMonitorFragment : Fragment() {
 
         // Log the expected behavior
         com.vishal.harpy.core.utils.LogUtils.d("DebugMenu", "Expected: Root helper would start DNS spoofing for test domains")
+    }
+
+    private fun performDHCPSpoofingTest() {
+        // Test DHCP spoofing functionality using root helper
+        android.widget.Toast.makeText(
+            requireContext(),
+            "DHCP spoofing test initiated via root helper",
+            android.widget.Toast.LENGTH_LONG
+        ).show()
+
+        // Log the test initiation
+        com.vishal.harpy.core.utils.LogUtils.d("DebugMenu", "DHCP Spoofing Test initiated")
+
+        // Actually start DHCP spoofing for test purposes with default values
+        viewModel.startDHCPSpoofing(
+            interfaceName = "wlan0",
+            targetMacs = arrayOf("aa:bb:cc:dd:ee:ff"),
+            spoofedIPs = arrayOf("192.168.1.100"),
+            gatewayIPs = arrayOf("192.168.1.1"),
+            subnetMasks = arrayOf("255.255.255.0"),
+            dnsServers = arrayOf("8.8.8.8")
+        )
+
+        // Log the expected behavior
+        com.vishal.harpy.core.utils.LogUtils.d("DebugMenu", "Expected: Root helper would start DHCP spoofing for test devices")
     }
 
     private fun startDNSSpoofing() {
@@ -590,6 +623,102 @@ class NetworkMonitorFragment : Fragment() {
             .setNegativeButton("Cancel", null)
             .create()
             .show()
+    }
+
+    private fun startDHCPSpoofing() {
+        // Get DHCP spoofing parameters from user input
+        val targetMacInput = android.widget.EditText(requireContext()).apply {
+            hint = "Enter target MAC address (e.g., aa:bb:cc:dd:ee:ff)"
+            setText("aa:bb:cc:dd:ee:ff")
+        }
+
+        val spoofedIpInput = android.widget.EditText(requireContext()).apply {
+            hint = "Enter spoofed IP address (e.g., 192.168.1.100)"
+            setText("192.168.1.100")
+        }
+
+        val gatewayIpInput = android.widget.EditText(requireContext()).apply {
+            hint = "Enter gateway IP (e.g., 192.168.1.1)"
+            setText("192.168.1.1")
+        }
+
+        val dnsServerInput = android.widget.EditText(requireContext()).apply {
+            hint = "Enter DNS server (e.g., 8.8.8.8)"
+            setText("8.8.8.8")
+        }
+
+        val layout = android.widget.LinearLayout(requireContext()).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            addView(targetMacInput)
+            addView(spoofedIpInput)
+            addView(gatewayIpInput)
+            addView(dnsServerInput)
+        }
+
+        androidx.appcompat.app.AlertDialog.Builder(requireContext())
+            .setTitle("Start DHCP Spoofing")
+            .setView(layout)
+            .setPositiveButton("Start") { _, _ ->
+                val targetMac = targetMacInput.text.toString().trim()
+                val spoofedIp = spoofedIpInput.text.toString().trim()
+                val gatewayIp = gatewayIpInput.text.toString().trim()
+                val dnsServer = dnsServerInput.text.toString().trim()
+
+                if (targetMac.isEmpty() || spoofedIp.isEmpty() || gatewayIp.isEmpty() || dnsServer.isEmpty()) {
+                    android.widget.Toast.makeText(
+                        requireContext(),
+                        "All fields are required",
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                    return@setPositiveButton
+                }
+
+                // Log the DHCP spoofing start
+                com.vishal.harpy.core.utils.LogUtils.d("DebugMenu", "Starting DHCP spoofing: $targetMac -> $spoofedIp")
+
+                // Execute DHCP spoofing via ViewModel
+                viewModel.startDHCPSpoofing(
+                    interfaceName = "wlan0",
+                    targetMacs = arrayOf(targetMac),
+                    spoofedIPs = arrayOf(spoofedIp),
+                    gatewayIPs = arrayOf(gatewayIp),
+                    subnetMasks = arrayOf("255.255.255.0"),
+                    dnsServers = arrayOf(dnsServer)
+                )
+            }
+            .setNegativeButton("Cancel", null)
+            .create()
+            .show()
+    }
+
+    private fun stopDHCPSpoofing() {
+        // Log the stop command
+        com.vishal.harpy.core.utils.LogUtils.d("DebugMenu", "Stopping DHCP spoofing command issued")
+
+        // Execute stop via ViewModel
+        viewModel.stopDHCPSpoofing()
+
+        android.widget.Toast.makeText(
+            requireContext(),
+            "DHCP spoofing stop command sent",
+            android.widget.Toast.LENGTH_LONG
+        ).show()
+    }
+
+    private fun checkDHCPSpoofingStatus() {
+        // Log the status check
+        com.vishal.harpy.core.utils.LogUtils.d("DebugMenu", "Checking DHCP spoofing status")
+
+        val isActive = viewModel.isDHCPSpoofingActive()
+        val statusMessage = "DHCP Spoofing Status: ${if (isActive) "ACTIVE" else "INACTIVE"}"
+
+        android.widget.Toast.makeText(
+            requireContext(),
+            statusMessage,
+            android.widget.Toast.LENGTH_LONG
+        ).show()
+
+        com.vishal.harpy.core.utils.LogUtils.d("DebugMenu", statusMessage)
     }
 
 
