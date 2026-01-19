@@ -23,6 +23,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+enum class LoadingState {
+    None, Scanning, Blocking, Unblocking, MappingTopology, TestingPing, DNSSpoofing, DHCPSpoofing
+}
+
 @HiltViewModel
 class NetworkMonitorViewModel @Inject constructor(
     private val scanNetworkUseCase: ScanNetworkUseCase,
@@ -45,8 +49,8 @@ class NetworkMonitorViewModel @Inject constructor(
     private val _networkTopology = MutableStateFlow<NetworkTopology?>(null)
     val networkTopology: StateFlow<NetworkTopology?> = _networkTopology.asStateFlow()
 
-    private val _isLoading = MutableStateFlow(false)
-    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+    private val _loadingState: MutableStateFlow<LoadingState> = MutableStateFlow(LoadingState.None)
+    val loadingState: StateFlow<LoadingState> = _loadingState.asStateFlow()
 
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
@@ -75,7 +79,7 @@ class NetworkMonitorViewModel @Inject constructor(
 
     private fun checkRootAccessInternal() {
         viewModelScope.launch {
-            _isLoading.value = true
+            _loadingState.value = LoadingState.Scanning
             _error.value = null
             try {
                 val result = isDeviceRootedUseCase()
@@ -94,7 +98,7 @@ class NetworkMonitorViewModel @Inject constructor(
                 _lastError.value = error
                 _error.value = e.message
             } finally {
-                _isLoading.value = false
+                _loadingState.value = LoadingState.None
             }
         }
     }
@@ -106,7 +110,7 @@ class NetworkMonitorViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            _isLoading.value = true
+            _loadingState.value = LoadingState.Scanning
             _error.value = null
             try {
                 val result = scanNetworkUseCase()
@@ -145,7 +149,7 @@ class NetworkMonitorViewModel @Inject constructor(
                 _lastError.value = error
                 _error.value = e.message
             } finally {
-                _isLoading.value = false
+                _loadingState.value = LoadingState.None
             }
         }
     }
@@ -154,7 +158,7 @@ class NetworkMonitorViewModel @Inject constructor(
         if (!_isRooted.value) return
 
         viewModelScope.launch {
-            _isLoading.value = true
+            _loadingState.value = LoadingState.Blocking
             _error.value = null
             try {
                 val result = blockDeviceUseCase(device)
@@ -182,7 +186,7 @@ class NetworkMonitorViewModel @Inject constructor(
                 _lastError.value = error
                 _error.value = e.message
             } finally {
-                _isLoading.value = false
+                _loadingState.value = LoadingState.None
             }
         }
     }
@@ -191,7 +195,7 @@ class NetworkMonitorViewModel @Inject constructor(
         if (!_isRooted.value) return
 
         viewModelScope.launch {
-            _isLoading.value = true
+            _loadingState.value = LoadingState.Unblocking
             _error.value = null
             try {
                 val result = unblockDeviceUseCase(device)
@@ -219,7 +223,7 @@ class NetworkMonitorViewModel @Inject constructor(
                 _lastError.value = error
                 _error.value = e.message
             } finally {
-                _isLoading.value = false
+                _loadingState.value = LoadingState.None
             }
         }
     }
@@ -228,7 +232,7 @@ class NetworkMonitorViewModel @Inject constructor(
         if (!_isRooted.value) return
 
         viewModelScope.launch {
-            _isLoading.value = true
+            _loadingState.value = LoadingState.MappingTopology
             _error.value = null
             try {
                 val result = mapNetworkTopologyUseCase()
@@ -247,14 +251,14 @@ class NetworkMonitorViewModel @Inject constructor(
                 _lastError.value = error
                 _error.value = e.message
             } finally {
-                _isLoading.value = false
+                _loadingState.value = LoadingState.None
             }
         }
     }
 
     fun testPing(device: NetworkDevice) {
         viewModelScope.launch {
-            _isLoading.value = true
+            _loadingState.value = LoadingState.TestingPing
             _testPingResult.value = null
             try {
                 val result = testPingUseCase(device)
@@ -271,7 +275,7 @@ class NetworkMonitorViewModel @Inject constructor(
                 _testPingResult.value = Pair(device.ipAddress, false)
                 _error.value = "Ping test error: ${e.message}"
             } finally {
-                _isLoading.value = false
+                _loadingState.value = LoadingState.None
             }
         }
     }
@@ -409,7 +413,7 @@ class NetworkMonitorViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            _isLoading.value = true
+            _loadingState.value = LoadingState.DNSSpoofing
             _error.value = null
             try {
                 val result = scanNetworkUseCase.repository.startDNSSpoofing(domain, spoofedIP, interfaceName)
@@ -432,7 +436,7 @@ class NetworkMonitorViewModel @Inject constructor(
                 _lastError.value = error
                 _error.value = "DNS spoofing error: ${e.message}"
             } finally {
-                _isLoading.value = false
+                _loadingState.value = LoadingState.None
             }
         }
     }
@@ -447,7 +451,7 @@ class NetworkMonitorViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            _isLoading.value = true
+            _loadingState.value = LoadingState.DNSSpoofing
             _error.value = null
             try {
                 val result = scanNetworkUseCase.repository.stopDNSSpoofing(domain)
@@ -470,7 +474,7 @@ class NetworkMonitorViewModel @Inject constructor(
                 _lastError.value = error
                 _error.value = "Stop DNS spoofing error: ${e.message}"
             } finally {
-                _isLoading.value = false
+                _loadingState.value = LoadingState.None
             }
         }
     }
@@ -517,7 +521,7 @@ class NetworkMonitorViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            _isLoading.value = true
+            _loadingState.value = LoadingState.DHCPSpoofing
             _error.value = null
             try {
                 val result = scanNetworkUseCase.repository.startDHCPSpoofing(
@@ -547,7 +551,7 @@ class NetworkMonitorViewModel @Inject constructor(
                 _lastError.value = error
                 _error.value = "DHCP spoofing error: ${e.message}"
             } finally {
-                _isLoading.value = false
+                _loadingState.value = LoadingState.None
             }
         }
     }
@@ -562,7 +566,7 @@ class NetworkMonitorViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            _isLoading.value = true
+            _loadingState.value = LoadingState.DHCPSpoofing
             _error.value = null
             try {
                 val result = scanNetworkUseCase.repository.stopDHCPSpoofing()
@@ -585,7 +589,7 @@ class NetworkMonitorViewModel @Inject constructor(
                 _lastError.value = error
                 _error.value = "Stop DHCP spoofing error: ${e.message}"
             } finally {
-                _isLoading.value = false
+                _loadingState.value = LoadingState.None
             }
         }
     }
@@ -602,7 +606,7 @@ class NetworkMonitorViewModel @Inject constructor(
      */
     fun checkRootAccess() {
         viewModelScope.launch {
-            _isLoading.value = true
+            _loadingState.value = LoadingState.Scanning
             _error.value = null
             try {
                 val result = isDeviceRootedUseCase()
@@ -628,7 +632,7 @@ class NetworkMonitorViewModel @Inject constructor(
                 _lastError.value = error
                 _error.value = e.message
             } finally {
-                _isLoading.value = false
+                _loadingState.value = LoadingState.None
             }
         }
     }
