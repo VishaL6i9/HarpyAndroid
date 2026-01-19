@@ -26,6 +26,17 @@ The app now features a bottom navigation bar providing easy access to three main
 - Device ping testing to verify connectivity
 - Root helper binary for privileged network operations
 - Bottom sheet UI for device actions with confirmation dialogs
+- Blocking indicator overlay with progress feedback
+  - Semi-transparent overlay during device blocking operations
+  - Centered progress indicator and status text
+  - Smooth fade animations for visibility transitions
+- Granular loading state management
+  - Distinct states for Scanning, Blocking, Unblocking, MappingTopology, TestingPing, DNSSpoofing, DHCPSpoofing
+  - Precise UI feedback for each operation type
+- Animated visibility transitions
+  - Smooth fade-in/fade-out animations for device list items
+  - AccelerateInterpolator for show animations
+  - DecelerateInterpolator for hide animations
 - DNS spoofing and redirection via root helper
   - Domain-to-IP redirection
   - Dedicated DNS Spoofing feature fragment
@@ -217,8 +228,12 @@ To build the project, ensure you have the Android SDK properly configured with t
   - [x] Bottom navigation bar for multi-feature navigation
   - [x] Dedicated DNS Spoofing feature fragment
   - [x] Dedicated DHCP Spoofing feature fragment
-  - [x] Material Design navigation icons
+  - [x] Material Design icons
   - [x] Seamless fragment switching between features
+  - [x] Blocking indicator overlay with progress feedback
+  - [x] Granular loading state management (Scanning, Blocking, Unblocking, etc.)
+  - [x] Animated visibility transitions with interpolators
+  - [x] Rounded card background drawable for UI components
 - [x] Error handling improvements
   - [x] NetworkError sealed class hierarchy
   - [x] RootError sealed class hierarchy for root-specific errors
