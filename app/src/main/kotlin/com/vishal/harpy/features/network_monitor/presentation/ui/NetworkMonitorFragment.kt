@@ -5,6 +5,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
@@ -19,6 +20,7 @@ import com.vishal.harpy.R
 import com.vishal.harpy.core.utils.NetworkDevice
 import com.vishal.harpy.features.network_monitor.presentation.ui.SettingsFragment
 import com.vishal.harpy.features.network_monitor.presentation.viewmodel.NetworkMonitorViewModel
+import com.vishal.harpy.features.network_monitor.presentation.viewmodel.LoadingState
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 
@@ -47,44 +49,45 @@ class NetworkMonitorFragment : Fragment() {
         setupRecyclerView()
         observeViewModel()
 
-        val scanButton = binding.findViewById<Button>(R.id.scanButton)
-        scanButton.setOnClickListener {
+        val scanButton = (_binding as? ViewGroup)?.findViewById<Button>(R.id.scanButton)
+        scanButton?.setOnClickListener {
             viewModel.scanNetwork()
         }
 
-        val debugButton = binding.findViewById<android.widget.ImageButton>(R.id.debugButton)
-        debugButton.setOnLongClickListener {
+        val debugButton = (_binding as? ViewGroup)?.findViewById<android.widget.ImageButton>(R.id.debugButton)
+        debugButton?.setOnLongClickListener {
             showDebugMenu()
             true
         }
 
-        val settingsButton = binding.findViewById<android.widget.ImageButton>(R.id.settingsButton)
-        settingsButton.setOnClickListener { navigateToSettings() }
+        val settingsButton = (_binding as? ViewGroup)?.findViewById<android.widget.ImageButton>(R.id.settingsButton)
+        settingsButton?.setOnClickListener { navigateToSettings() }
 
         // Setup filter buttons
-        val filterIPv4 = binding.findViewById<com.google.android.material.button.MaterialButton>(R.id.filterIPv4)
-        val filterIPv6 = binding.findViewById<com.google.android.material.button.MaterialButton>(R.id.filterIPv6)
+        val filterIPv4 = (_binding as? ViewGroup)?.findViewById<com.google.android.material.button.MaterialButton>(R.id.filterIPv4)
+        val filterIPv6 = (_binding as? ViewGroup)?.findViewById<com.google.android.material.button.MaterialButton>(R.id.filterIPv6)
 
-        filterIPv4.setOnClickListener {
+        filterIPv4?.setOnClickListener {
             viewModel.toggleIPv4Filter()
         }
 
-        filterIPv6.setOnClickListener {
+        filterIPv6?.setOnClickListener {
             viewModel.toggleIPv6Filter()
         }
     }
 
     private fun setupRecyclerView() {
-        val recyclerView = binding.findViewById<RecyclerView>(R.id.devicesRecyclerView)
-        recyclerView.layoutManager = LinearLayoutManager(context)
-        adapter = NetworkDeviceAdapter(
-            onBlockClick = { device -> showDeviceActions(device) },
-            onUnblockClick = { device -> viewModel.unblockDevice(device) },
-            onPinClick = { device -> viewModel.toggleDevicePin(device) },
-            onEditNameClick = { device -> showEditNameDialog(device) },
-            onLongPress = { device, _ -> showDeviceActions(device) }
-        )
-        recyclerView.adapter = adapter
+        val recyclerView = (_binding as? ViewGroup)?.findViewById<RecyclerView>(R.id.devicesRecyclerView)
+        recyclerView?.apply {
+            layoutManager = LinearLayoutManager(context)
+            adapter = NetworkDeviceAdapter(
+                onBlockClick = { device -> showDeviceActions(device) },
+                onUnblockClick = { device -> viewModel.unblockDevice(device) },
+                onPinClick = { device -> viewModel.toggleDevicePin(device) },
+                onEditNameClick = { device -> showEditNameDialog(device) },
+                onLongPress = { device, _ -> showDeviceActions(device) }
+            ).also { this@NetworkMonitorFragment.adapter = it }
+        }
     }
 
     private fun showDeviceActions(device: NetworkDevice) {
@@ -143,8 +146,8 @@ class NetworkMonitorFragment : Fragment() {
 
         viewLifecycleOwner.lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.isLoading.collect { isLoading ->
-                    updateLoadingState(isLoading)
+                viewModel.loadingState.collect { loadingState ->
+                    updateLoadingState(loadingState)
                 }
             }
         }
@@ -162,8 +165,8 @@ class NetworkMonitorFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.filterIPv4.collect { isChecked ->
-                    val filterIPv4 = binding.findViewById<com.google.android.material.button.MaterialButton>(R.id.filterIPv4)
-                    filterIPv4.isChecked = isChecked
+                    val filterIPv4 = (_binding as? ViewGroup)?.findViewById<com.google.android.material.button.MaterialButton>(R.id.filterIPv4)
+                    filterIPv4?.isChecked = isChecked
                 }
             }
         }
@@ -171,8 +174,8 @@ class NetworkMonitorFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.filterIPv6.collect { isChecked ->
-                    val filterIPv6 = binding.findViewById<com.google.android.material.button.MaterialButton>(R.id.filterIPv6)
-                    filterIPv6.isChecked = isChecked
+                    val filterIPv6 = (_binding as? ViewGroup)?.findViewById<com.google.android.material.button.MaterialButton>(R.id.filterIPv6)
+                    filterIPv6?.isChecked = isChecked
                 }
             }
         }
@@ -210,50 +213,127 @@ class NetworkMonitorFragment : Fragment() {
         }
     }
 
-    private fun updateLoadingState(isLoading: Boolean) {
-        val progressSection = binding.findViewById<LinearLayout>(R.id.progressSection)
-        val scanButton = binding.findViewById<Button>(R.id.scanButton)
-        
-        if (isLoading) {
-            progressSection.visibility = View.VISIBLE
-            scanButton.isEnabled = false
-        } else {
-            progressSection.visibility = View.GONE
-            scanButton.isEnabled = true
+    private fun updateLoadingState(loadingState: LoadingState) {
+        val progressSection = (_binding as? ViewGroup)?.findViewById<LinearLayout>(R.id.progressSection)
+        val scanButton = (_binding as? ViewGroup)?.findViewById<Button>(R.id.scanButton)
+        val blockingIndicator = (_binding as? ViewGroup)?.findViewById<FrameLayout>(R.id.blockingIndicator)
+        val progressText = (_binding as? ViewGroup)?.findViewById<TextView>(R.id.progressText)
+
+        when (loadingState) {
+            LoadingState.None -> {
+                // Hide both progress sections with fade out
+                fadeOut(progressSection)
+                fadeOut(blockingIndicator)
+                scanButton?.isEnabled = true
+            }
+            LoadingState.Scanning -> {
+                // Show main progress section for scanning
+                fadeOut(blockingIndicator)
+                fadeIn(progressSection)
+                progressText?.text = "Scanning network..."
+                scanButton?.isEnabled = false
+            }
+            LoadingState.Blocking -> {
+                // Show blocking indicator over the device list
+                fadeOut(progressSection)
+                fadeIn(blockingIndicator)
+                blockingIndicator?.findViewById<TextView>(R.id.blockingText)?.text = "Blocking device..."
+                scanButton?.isEnabled = true
+            }
+            LoadingState.Unblocking -> {
+                // Show blocking indicator over the device list
+                fadeOut(progressSection)
+                fadeIn(blockingIndicator)
+                blockingIndicator?.findViewById<TextView>(R.id.blockingText)?.text = "Unblocking device..."
+                scanButton?.isEnabled = true
+            }
+            LoadingState.MappingTopology -> {
+                fadeOut(blockingIndicator)
+                fadeIn(progressSection)
+                progressText?.text = "Mapping network topology..."
+                scanButton?.isEnabled = false
+            }
+            LoadingState.TestingPing -> {
+                fadeOut(blockingIndicator)
+                fadeIn(progressSection)
+                progressText?.text = "Testing ping..."
+                scanButton?.isEnabled = true
+            }
+            LoadingState.DNSSpoofing -> {
+                fadeOut(blockingIndicator)
+                fadeIn(progressSection)
+                progressText?.text = "Configuring DNS spoofing..."
+                scanButton?.isEnabled = false
+            }
+            LoadingState.DHCPSpoofing -> {
+                fadeOut(blockingIndicator)
+                fadeIn(progressSection)
+                progressText?.text = "Configuring DHCP spoofing..."
+                scanButton?.isEnabled = false
+            }
+        }
+    }
+
+    private fun fadeIn(view: android.view.View?) {
+        view?.let {
+            if (it.visibility != View.VISIBLE) {
+                it.alpha = 0f
+                it.visibility = View.VISIBLE
+                it.animate()
+                    .alpha(1f)
+                    .setDuration(300)
+                    .setInterpolator(android.view.animation.AccelerateInterpolator())
+                    .start()
+            }
+        }
+    }
+
+    private fun fadeOut(view: android.view.View?) {
+        view?.let {
+            if (it.visibility == View.VISIBLE) {
+                it.animate()
+                    .alpha(0f)
+                    .setDuration(300)
+                    .setInterpolator(android.view.animation.DecelerateInterpolator())
+                    .withEndAction {
+                        it.visibility = View.GONE
+                    }
+                    .start()
+            }
         }
     }
 
     private fun updateDeviceCount(count: Int) {
-        val deviceCountSection = binding.findViewById<LinearLayout>(R.id.deviceCountSection)
-        val filterSection = binding.findViewById<LinearLayout>(R.id.filterSection)
-        val deviceCountText = binding.findViewById<TextView>(R.id.deviceCount)
+        val deviceCountSection = (_binding as? ViewGroup)?.findViewById<LinearLayout>(R.id.deviceCountSection)
+        val filterSection = (_binding as? ViewGroup)?.findViewById<LinearLayout>(R.id.filterSection)
+        val deviceCountText = (_binding as? ViewGroup)?.findViewById<TextView>(R.id.deviceCount)
         
         // Show device count and filter section if we have scanned (even if filtered results are empty)
         val hasScanned = viewModel.networkDevices.value.isNotEmpty()
         
         if (hasScanned) {
-            deviceCountSection.visibility = View.VISIBLE
-            filterSection.visibility = View.VISIBLE
-            deviceCountText.text = count.toString()
+            fadeIn(deviceCountSection)
+            fadeIn(filterSection)
+            deviceCountText?.text = count.toString()
         } else {
-            deviceCountSection.visibility = View.GONE
-            filterSection.visibility = View.GONE
+            fadeOut(deviceCountSection)
+            fadeOut(filterSection)
         }
     }
 
     private fun updateEmptyState(isEmpty: Boolean) {
-        val emptyState = binding.findViewById<LinearLayout>(R.id.emptyState)
-        val recyclerView = binding.findViewById<RecyclerView>(R.id.devicesRecyclerView)
+        val emptyState = (_binding as? ViewGroup)?.findViewById<LinearLayout>(R.id.emptyState)
+        val recyclerView = (_binding as? ViewGroup)?.findViewById<RecyclerView>(R.id.devicesRecyclerView)
         
         // Only show empty state if we have no scanned devices at all
         val hasScanned = viewModel.networkDevices.value.isNotEmpty()
         
         if (isEmpty && !hasScanned) {
-            emptyState.visibility = View.VISIBLE
-            recyclerView.visibility = View.GONE
+            fadeIn(emptyState)
+            fadeOut(recyclerView)
         } else {
-            emptyState.visibility = View.GONE
-            recyclerView.visibility = View.VISIBLE
+            fadeOut(emptyState)
+            fadeIn(recyclerView)
         }
     }
 
