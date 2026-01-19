@@ -61,17 +61,17 @@ class NetworkDeviceAdapter(
             // Show hostname only if it's not "Unknown"
             if (item.hostname != null && item.hostname != "Unknown") {
                 hostname.text = item.hostname
-                hostname.visibility = View.VISIBLE
+                animateVisibility(hostname, View.VISIBLE)
             } else {
-                hostname.visibility = View.GONE
+                animateVisibility(hostname, View.GONE)
             }
             
             // Show device name in header if set
             if (item.deviceName != null) {
                 deviceNameHeader.text = item.deviceName
-                deviceNameHeader.visibility = View.VISIBLE
+                animateVisibility(deviceNameHeader, View.VISIBLE)
             } else {
-                deviceNameHeader.visibility = View.GONE
+                animateVisibility(deviceNameHeader, View.GONE)
             }
             
             deviceType.text = item.deviceType ?: "Unknown"
@@ -85,15 +85,41 @@ class NetworkDeviceAdapter(
             }
 
             if (item.isBlocked) {
-                blockedStatus.visibility = View.VISIBLE
-                blockButton.visibility = View.GONE
-                unblockButton.visibility = View.VISIBLE
+                animateVisibility(blockedStatus, View.VISIBLE)
+                animateVisibility(blockButton, View.GONE)
+                animateVisibility(unblockButton, View.VISIBLE)
                 unblockButton.setOnClickListener { onUnblockClick(item) }
             } else {
-                blockedStatus.visibility = View.GONE
-                blockButton.visibility = View.VISIBLE
-                unblockButton.visibility = View.GONE
+                animateVisibility(blockedStatus, View.GONE)
+                animateVisibility(blockButton, View.VISIBLE)
+                animateVisibility(unblockButton, View.GONE)
                 blockButton.setOnClickListener { onBlockClick(item) }
+            }
+        }
+
+        private fun animateVisibility(view: View, targetVisibility: Int) {
+            if (view.visibility == targetVisibility) return
+
+            when (targetVisibility) {
+                View.VISIBLE -> {
+                    view.alpha = 0f
+                    view.visibility = View.VISIBLE
+                    view.animate()
+                        .alpha(1f)
+                        .setDuration(200)
+                        .setInterpolator(android.view.animation.AccelerateInterpolator())
+                        .start()
+                }
+                View.GONE -> {
+                    view.animate()
+                        .alpha(0f)
+                        .setDuration(200)
+                        .setInterpolator(android.view.animation.DecelerateInterpolator())
+                        .withEndAction {
+                            view.visibility = View.GONE
+                        }
+                        .start()
+                }
             }
         }
     }
