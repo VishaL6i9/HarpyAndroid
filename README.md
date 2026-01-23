@@ -18,8 +18,11 @@ The app now features a bottom navigation bar providing easy access to three main
 - Nuclear option: Block all devices on the network by spoofing the gateway
 - Device management interface for controlling network access
 - Real-time network monitoring
-- Custom device naming for easy identification
+- Custom device naming for easy identification with persistent storage
+  - Device names saved to SharedPreferences and persist across app restarts
+  - Named devices automatically appear at the top of the device listing
 - Device pinning to keep important devices at the top
+  - Pinned devices appear below named devices in the listing
 - Vendor lookup using OUI database for accurate manufacturer identification
 - Immersive fullscreen mode with auto-hiding status bar
 - OLED-optimized dark theme with true blacks
@@ -74,6 +77,26 @@ The app now features a bottom navigation bar providing easy access to three main
 ## Technical Implementation
 
 The root-based implementation is built using native Kotlin for the Android application layer, with native C/C++ code using raw socket implementations for low-level network operations when root access is available. The app leverages root access to execute ARP spoofing techniques similar to the original iOS Harpy tweak. Future plans include migrating to libpcap/libnet libraries for enhanced packet capture and crafting capabilities.
+
+### Device Preference System
+The app includes a comprehensive device preference system for managing custom device settings:
+- **Device Naming**: Users can assign custom names to devices for easy identification
+  - Names are stored in SharedPreferences with the device's MAC address as the key
+  - Names persist across app restarts and device reboots
+  - Named devices automatically appear at the top of the device listing
+  - Proper error handling and logging for debugging name save failures
+- **Device Pinning**: Users can pin important devices to keep them visible
+  - Pinned devices appear below named devices in the listing
+  - Pin status is also persisted to SharedPreferences
+- **Smart Sorting**: Device listing uses a three-tier sort order:
+  1. Devices with saved names (always at top)
+  2. Pinned devices (without names)
+  3. All other devices (sorted by IP address)
+- **Preference Storage**: Uses Android's SharedPreferences for reliable persistence
+  - Data stored in `device_preferences` SharedPreferences file
+  - Each device preference stored as JSON with MAC address as unique identifier
+  - Preferences loaded automatically during network scan
+  - Suspend functions with proper coroutine handling for thread-safe operations
 
 ### DNS Spoofing Implementation
 The DNS spoofing feature uses a UDP socket listener on port 53 to intercept DNS queries. The implementation includes:
@@ -217,6 +240,8 @@ To build the project, ensure you have the Android SDK properly configured with t
   - [x] Immersive fullscreen mode with auto-hiding status bar
   - [x] Custom device naming for easy identification
   - [x] Device pinning to keep important devices at the top
+  - [x] Device name persistence across app restarts
+  - [x] Smart device listing sort order (named devices first, then pinned, then by IP)
   - [x] Long-press context menu for device actions
   - [x] Debug menu for clearing custom names
   - [x] Red highlighting for blocked devices
