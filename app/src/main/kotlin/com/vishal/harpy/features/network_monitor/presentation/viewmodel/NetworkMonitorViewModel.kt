@@ -126,9 +126,13 @@ class NetworkMonitorViewModel @Inject constructor(
                             )
                         }
 
-                        // Sort: pinned devices first, then by IP
+                        // Sort: devices with saved names first, then pinned devices, then by IP
                         val sortedDevices = devicesWithPreferences.sortedWith(
-                            compareBy({ !it.isPinned }, { it.ipAddress })
+                            compareBy(
+                                { it.deviceName == null },  // Devices with names first (false < true)
+                                { !it.isPinned },            // Then pinned devices
+                                { it.ipAddress }             // Then by IP address
+                            )
                         )
 
                         _networkDevices.value = sortedDevices
@@ -303,14 +307,26 @@ class NetworkMonitorViewModel @Inject constructor(
      */
     fun setDeviceName(device: NetworkDevice, deviceName: String?) {
         viewModelScope.launch {
-            devicePreferenceRepository.setDeviceName(device.macAddress, deviceName)
-            // Update the device in the list
-            _networkDevices.value = _networkDevices.value.map {
-                if (it.macAddress == device.macAddress) {
-                    it.copy(deviceName = deviceName)
-                } else {
-                    it
+            try {
+                // Save to repository first
+                devicePreferenceRepository.setDeviceName(device.macAddress, deviceName)
+                
+                // Update the device in the list
+                _networkDevices.value = _networkDevices.value.map {
+                    if (it.macAddress == device.macAddress) {
+                        it.copy(deviceName = deviceName)
+                    } else {
+                        it
+                    }
                 }
+                
+                // Apply filters to update the filtered list
+                applyFilters()
+                
+                com.vishal.harpy.core.utils.LogUtils.d("NetworkMonitorVM", "Device name set for ${device.macAddress}: $deviceName")
+            } catch (e: Exception) {
+                com.vishal.harpy.core.utils.LogUtils.e("NetworkMonitorVM", "Error setting device name: ${e.message}")
+                _error.value = "Failed to set device name: ${e.message}"
             }
         }
     }
@@ -329,11 +345,16 @@ class NetworkMonitorViewModel @Inject constructor(
                     it
                 }
             }
-            // Re-sort: pinned devices first
+            // Re-sort: devices with saved names first, then pinned devices, then by IP
             val sortedDevices = updatedDevices.sortedWith(
-                compareBy({ !it.isPinned }, { it.ipAddress })
+                compareBy(
+                    { it.deviceName == null },  // Devices with names first (false < true)
+                    { !it.isPinned },            // Then pinned devices
+                    { it.ipAddress }             // Then by IP address
+                )
             )
             _networkDevices.value = sortedDevices
+            applyFilters()
         }
     }
 
