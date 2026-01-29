@@ -442,7 +442,8 @@ class NetworkMonitorViewModel @Inject constructor(
                     is NetworkResult.Success -> {
                         if (result.data) {
                             com.vishal.harpy.core.utils.LogUtils.i("NetworkMonitorVM", "DNS spoofing started for $domain -> $spoofedIP")
-                            _error.value = "DNS spoofing started for $domain -> $spoofedIP"
+                            // Show success message via Toast instead of error field
+                            _error.value = null
                         } else {
                             _error.value = "Failed to start DNS spoofing"
                         }
@@ -557,7 +558,9 @@ class NetworkMonitorViewModel @Inject constructor(
                     is NetworkResult.Success -> {
                         if (result.data) {
                             com.vishal.harpy.core.utils.LogUtils.i("NetworkMonitorVM", "DHCP spoofing started for ${targetMacs.size} devices")
-                            _error.value = "DHCP spoofing started for ${targetMacs.size} devices"
+                            // Show success message via Toast instead of error field
+                            _error.value = null
+                            // TODO: Add a success message state flow if needed
                         } else {
                             _error.value = "Failed to start DHCP spoofing"
                         }

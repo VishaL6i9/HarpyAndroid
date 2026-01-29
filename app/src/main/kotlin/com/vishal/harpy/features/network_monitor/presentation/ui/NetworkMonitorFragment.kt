@@ -593,6 +593,13 @@ class NetworkMonitorFragment : Fragment() {
 
                 // Execute DNS spoofing via ViewModel
                 viewModel.startDNSSpoofing(domain, spoofedIP, interfaceName)
+                
+                // Show success message
+                android.widget.Toast.makeText(
+                    requireContext(),
+                    "DNS spoofing started!\nDomain: $domain\nSpoofed IP: $spoofedIP\n\nSet gateway to your device IP for target devices",
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
             }
             .setNegativeButton("Cancel", null)
             .create()
@@ -815,6 +822,13 @@ class NetworkMonitorFragment : Fragment() {
                     subnetMasks = arrayOf("255.255.255.0"),
                     dnsServers = arrayOf(dnsServer)
                 )
+                
+                // Show success message
+                android.widget.Toast.makeText(
+                    requireContext(),
+                    "DHCP spoofing started!\nTarget: $targetMac\nSpoofed IP: $spoofedIp\nGateway: $gatewayIp\n\nNow trigger DHCP request on target device (forget WiFi and reconnect)",
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
             }
             .setNegativeButton("Cancel", null)
             .create()
