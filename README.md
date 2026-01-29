@@ -207,9 +207,13 @@ The project follows a modern Android architecture with feature modules:
 - **MVVM Pattern**: Clean separation of View, ViewModel, and Model
 - **Clean Architecture**: Each layer has a specific responsibility
 - **Feature-First Organization**: Related functionality is grouped together
-- **Dependency Injection**: Proper decoupling of components
+- **Dependency Injection**: Proper decoupling of components with Hilt
 - **State Management**: Using Kotlin Flows for reactive programming
 - **Bottom Navigation**: Multi-feature navigation with dedicated fragments for each feature
+- **Shared ViewModel**: Activity-scoped ViewModel shared across all fragments for persistent state
+  - Network scan results persist across tab switches
+  - Blocked device state maintained during navigation
+  - Consistent state management across all features
 
 ### Navigation Structure
 The app uses Android's BottomNavigationView to provide seamless navigation between features:
@@ -217,6 +221,10 @@ The app uses Android's BottomNavigationView to provide seamless navigation betwe
 - Navigation state is managed by MainActivity
 - Fragment switching is handled through the bottom navigation menu
 - Each feature can maintain its own state and UI independently
+- Activity-scoped ViewModel ensures data persistence across tab switches
+  - Network scan results remain available when switching between tabs
+  - Device blocking state persists during navigation
+  - All fragments share the same ViewModel instance for consistent state
 
 To build the project, ensure you have the Android SDK properly configured with the required API level and build tools.
 
@@ -319,6 +327,8 @@ To build the project, ensure you have the Android SDK properly configured with t
   - [x] Granular loading state management (Scanning, Blocking, Unblocking, etc.)
   - [x] Animated visibility transitions with interpolators
   - [x] Rounded card background drawable for UI components
+  - [x] Activity-scoped ViewModel for persistent state across tab switches
+  - [x] Scan results persist when navigating between features
 - [x] Error handling improvements
   - [x] NetworkError sealed class hierarchy
   - [x] RootError sealed class hierarchy for root-specific errors
