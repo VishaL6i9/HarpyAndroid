@@ -72,13 +72,20 @@ class PermissionsActivity : AppCompatActivity() {
             descText.text = permission.description
             checkBox.isChecked = permission.isGranted
 
-            // Change appearance based on grant status
-            if (permission.isGranted) {
-                checkBox.setButtonDrawable(R.drawable.ic_check_circle)
-                nameText.setTextColor(ContextCompat.getColor(this, R.color.text_success))
-            } else {
-                checkBox.setButtonDrawable(R.drawable.ic_cancel)
-                nameText.setTextColor(ContextCompat.getColor(this, R.color.text_error))
+            // Change appearance based on grant status and warning type
+            when {
+                permission.isWarning -> {
+                    checkBox.setButtonDrawable(R.drawable.ic_info)
+                    nameText.setTextColor(ContextCompat.getColor(this, R.color.text_warning))
+                }
+                permission.isGranted -> {
+                    checkBox.setButtonDrawable(R.drawable.ic_check_circle)
+                    nameText.setTextColor(ContextCompat.getColor(this, R.color.text_success))
+                }
+                else -> {
+                    checkBox.setButtonDrawable(R.drawable.ic_cancel)
+                    nameText.setTextColor(ContextCompat.getColor(this, R.color.text_error))
+                }
             }
 
             permissionsContainer.addView(itemView)

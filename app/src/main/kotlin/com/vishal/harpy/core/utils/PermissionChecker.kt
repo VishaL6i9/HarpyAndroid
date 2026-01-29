@@ -11,7 +11,8 @@ data class PermissionInfo(
     val permission: String,
     val name: String,
     val description: String,
-    val isGranted: Boolean
+    val isGranted: Boolean,
+    val isWarning: Boolean = false
 )
 
 object PermissionChecker {
@@ -72,6 +73,41 @@ object PermissionChecker {
                 )
             )
         }
+
+        // Add DNS property access warning (varies by SDK)
+        val dnsWarning = when {
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q -> {
+                // Android 10+ has stricter property access restrictions
+                PermissionInfo(
+                    permission = "dns_property_access",
+                    name = "DNS Property Access",
+                    description = "System DNS properties restricted on Android 10+. Using alternative detection methods.",
+                    isGranted = false,
+                    isWarning = true
+                )
+            }
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.P -> {
+                // Android 9 has moderate restrictions
+                PermissionInfo(
+                    permission = "dns_property_access",
+                    name = "DNS Property Access",
+                    description = "Some DNS properties may require elevated permissions on Android 9+.",
+                    isGranted = false,
+                    isWarning = true
+                )
+            }
+            else -> {
+                // Android 7-8 has minimal restrictions
+                PermissionInfo(
+                    permission = "dns_property_access",
+                    name = "DNS Property Access",
+                    description = "DNS property access available with standard permissions.",
+                    isGranted = true,
+                    isWarning = false
+                )
+            }
+        }
+        REQUIRED_PERMISSIONS.add(dnsWarning)
     }
 
     fun getAllPermissions(context: Context): List<PermissionInfo> {
@@ -83,6 +119,11 @@ object PermissionChecker {
 
     private fun isPermissionGranted(context: Context, permission: String): Boolean {
         return when (permission) {
+            "dns_property_access" -> {
+                // DNS property access is always considered "not granted" as a warning
+                // This is informational - the app will handle DNS access gracefully
+                false
+            }
             android.Manifest.permission.MANAGE_EXTERNAL_STORAGE -> {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                     Environment.isExternalStorageManager()
@@ -97,7 +138,11 @@ object PermissionChecker {
     }
 
     fun getMissingPermissions(context: Context): List<PermissionInfo> {
-        return getAllPermissions(context).filter { !it.isGranted }
+        return getAllPermissions(context).filter { !it.isGranted && !it.isWarning }
+    }
+
+    fun getWarnings(context: Context): List<PermissionInfo> {
+        return getAllPermissions(context).filter { it.isWarning }
     }
 
     fun areAllPermissionsGranted(context: Context): Boolean {
