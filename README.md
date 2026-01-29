@@ -67,6 +67,11 @@ The app now features a bottom navigation bar providing easy access to three main
 - Graceful fallback for older Android versions (WRITE_EXTERNAL_STORAGE)
 - Visual permission status display with grant/deny indicators
 - File provider configuration for secure log file sharing
+- SDK-aware DNS property access warnings
+  - Android 7-8: DNS access available with standard permissions
+  - Android 9: Moderate restrictions on DNS properties
+  - Android 10+: Strict restrictions with fallback to alternative detection methods
+  - Warning-based notifications that don't block app access
 
 ### Non-Root Approach (Future Plan)
 - Network monitoring using Android's VpnService
@@ -115,6 +120,15 @@ The DHCP spoofing feature intercepts DHCP requests and sends spoofed responses t
 
 ### Root Helper Binary
 A standalone executable (`libharpy_root_helper.so`) is packaged with the app and can be invoked via `su` to perform privileged network operations without requiring the entire app to run as root. This provides better security isolation and allows for more granular permission control.
+
+The root helper uses optimized raw socket implementations with advanced packet processing:
+- **Poll-based packet reception**: Non-blocking I/O with proper timeout handling for better responsiveness
+- **Comprehensive packet validation**: Multi-layer validation of Ethernet headers, ARP fields, IP addresses, and MAC addresses
+- **Adaptive sweep pacing**: Fast first pass (0.5ms between packets) followed by thorough second pass (1.5ms between packets)
+- **Socket buffer optimization**: 256KB buffers for handling burst traffic without packet loss
+- **Response reliability tracking**: Monitors response counts per IP for network diagnostics
+- **Error handling with backoff**: Automatic retry logic with exponential backoff on send failures
+- **Optional third pass**: For longer scans (10+ seconds) to catch slow-responding devices
 
 Supported commands:
 - `scan <interface> <subnet> [timeout]` - Network device discovery (default 10s timeout)
@@ -225,6 +239,13 @@ To build the project, ensure you have the Android SDK properly configured with t
   - [x] Reduced memory allocations in loops
   - [x] Efficient string parsing with regex caching
   - [x] 2-pass ARP sweep with improved pacing (1ms between packets, 20ms between batches)
+  - [x] Adaptive sweep pacing with fast first pass (0.5ms) and thorough second pass (1.5ms)
+  - [x] Poll-based packet reception with proper timeout handling
+  - [x] Comprehensive ARP packet validation (Ethernet, IP, MAC address filtering)
+  - [x] Socket buffer optimization (256KB) for burst traffic handling
+  - [x] Response reliability tracking with per-IP response counts
+  - [x] Error handling with send error tracking and automatic backoff
+  - [x] Optional third pass for longer scans to catch slow responders
   - [x] Configurable timeout for root helper scan (default 10 seconds)
   - [x] Timeout handling with proper process termination
 - [x] UI/UX enhancements
@@ -295,6 +316,8 @@ To build the project, ensure you have the Android SDK properly configured with t
   - [x] PermissionsActivity for requesting permissions on app startup
   - [x] Visual permission status display with grant/deny indicators
   - [x] File provider configuration for secure log sharing
+  - [x] SDK-aware DNS property access warnings (Android 7-8, 9, 10+)
+  - [x] Warning-based notifications that don't block app access
 - [x] Logging UI integration
   - [x] Logging settings menu item in settings fragment
   - [x] Logging settings dialog with debug mode toggle
