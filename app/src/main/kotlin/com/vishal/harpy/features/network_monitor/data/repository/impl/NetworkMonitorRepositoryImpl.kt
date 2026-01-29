@@ -482,7 +482,7 @@ class NetworkMonitorRepositoryImpl(private val context: android.content.Context)
             }
             
             // Fallback: If no subnet from route, derive from gateway IP
-            if (subnet == null && gatewayIp.isNotEmpty()) {
+            if (subnet == null && !gatewayIp.isNullOrEmpty()) {
                 val gatewayParts = gatewayIp.split(".")
                 if (gatewayParts.size >= 3) {
                     subnet = "${gatewayParts[0]}.${gatewayParts[1]}.${gatewayParts[2]}"
