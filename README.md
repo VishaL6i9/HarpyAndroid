@@ -65,6 +65,14 @@ The app now features a bottom navigation bar providing easy access to three main
 - Logcat capture for native and system logs
 - Centralized logging utility (LogUtils) for consistent app-wide logging
 - Logging settings accessible from the settings menu
+- Comprehensive About dialog with app information
+  - App version display with auto-detection
+  - Developer information and contact links
+  - GitHub repository and email quick access buttons
+  - Updates section with auto-check toggle and manual check
+  - Donate section (Ko-fi, PayPal, UPI with clipboard copy)
+  - Acknowledgements and legal notice
+  - Beautiful CardView-based design matching app theme
 
 ### Permissions & Security
 - Runtime permission management with dedicated permissions activity
@@ -329,6 +337,13 @@ To build the project, ensure you have the Android SDK properly configured with t
   - [x] Rounded card background drawable for UI components
   - [x] Activity-scoped ViewModel for persistent state across tab switches
   - [x] Scan results persist when navigating between features
+  - [x] Comprehensive About dialog in settings
+    - [x] App version display with auto-detection
+    - [x] Developer info with GitHub and email links
+    - [x] Updates section with auto-check toggle (TODO: GitHub API)
+    - [x] Donate section with Ko-fi, PayPal, and UPI options
+    - [x] Beautiful CardView-based design
+    - [x] Acknowledgements and legal notice sections
 - [x] Error handling improvements
   - [x] NetworkError sealed class hierarchy
   - [x] RootError sealed class hierarchy for root-specific errors
