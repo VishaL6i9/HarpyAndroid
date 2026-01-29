@@ -23,6 +23,12 @@ The app now features a bottom navigation bar providing easy access to three main
   - Named devices automatically appear at the top of the device listing
 - Device pinning to keep important devices at the top
   - Pinned devices appear below named devices in the listing
+- Persistent blocked device state tracking
+  - Blocked state saved to SharedPreferences and persists across app restarts
+  - Automatic verification and restoration of blocks after app restart
+  - Stale blocked states cleaned up for devices no longer on network
+  - "Unblock All" functionality to remove all device blocks at once
+  - Prominent "Unblock All" button appears when blocked devices exist
 - Vendor lookup using OUI database for accurate manufacturer identification
 - Immersive fullscreen mode with auto-hiding status bar
 - OLED-optimized dark theme with true blacks
@@ -113,6 +119,12 @@ The app includes a comprehensive device preference system for managing custom de
 - **Device Pinning**: Users can pin important devices to keep them visible
   - Pinned devices appear below named devices in the listing
   - Pin status is also persisted to SharedPreferences
+- **Blocked Device State Tracking**: Persistent tracking of blocked devices
+  - Blocked state stored in SharedPreferences alongside device preferences
+  - Automatic verification on each network scan
+  - Restoration of blocks after app restart or kill
+  - Cleanup of stale blocked states for devices no longer on network
+  - "Unblock All" functionality accessible from main screen and settings
 - **Smart Sorting**: Device listing uses a three-tier sort order:
   1. Devices with saved names (always at top)
   2. Pinned devices (without names)
@@ -240,6 +252,13 @@ To build the project, ensure you have the Android SDK properly configured with t
   - [x] Nuclear option for blocking all devices via gateway spoofing
   - [x] Broadcast ARP spoofing packets (300ms interval)
   - [x] Gateway detection and identification
+- [x] Persistent blocked device state management
+  - [x] Blocked state persistence in SharedPreferences
+  - [x] Automatic verification and restoration on network scan
+  - [x] Cleanup of stale blocked states
+  - [x] "Unblock All" functionality with confirmation dialogs
+  - [x] Prominent UI button for unblocking all devices
+  - [x] Settings menu integration for unblock all
 
 ### Phase 3: Advanced Features (Completed)
 - [x] ARP spoofing implementation for device blocking
