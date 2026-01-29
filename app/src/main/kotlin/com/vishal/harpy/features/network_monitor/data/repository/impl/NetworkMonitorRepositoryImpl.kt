@@ -411,6 +411,7 @@ class NetworkMonitorRepositoryImpl(private val context: android.content.Context)
             
             // Try to get route with su first, then fallback to direct command
             var routeLine: String? = null
+            val allRoutes = mutableListOf<String>()
             
             try {
                 val suProcess = Runtime.getRuntime().exec("su")
@@ -425,8 +426,7 @@ class NetworkMonitorRepositoryImpl(private val context: android.content.Context)
                 while (suReader.readLine().also { line = it } != null) {
                     Log.d(TAG, "Route line: $line")
                     if (line != null && line.matches(Regex("^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+.*"))) {
-                        routeLine = line
-                        break
+                        allRoutes.add(line)
                     }
                 }
                 suReader.close()
@@ -444,8 +444,7 @@ class NetworkMonitorRepositoryImpl(private val context: android.content.Context)
                     while (ipReader.readLine().also { line = it } != null) {
                         Log.d(TAG, "Route line (direct): $line")
                         if (line != null && line.matches(Regex("^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+.*"))) {
-                            routeLine = line
-                            break
+                            allRoutes.add(line)
                         }
                     }
                     ipReader.close()
@@ -459,13 +458,40 @@ class NetworkMonitorRepositoryImpl(private val context: android.content.Context)
                 }
             }
 
+            // Prioritize WiFi/Ethernet interfaces over VPN/tunnel interfaces
+            // Prefer: wlan0, eth0, rmnet, then others, avoid tun/tap/ppp
+            routeLine = allRoutes.firstOrNull { it.contains("dev wlan") } // WiFi first
+                ?: allRoutes.firstOrNull { it.contains("dev eth") }        // Ethernet second
+                ?: allRoutes.firstOrNull { it.contains("dev rmnet") }      // Mobile data third
+                ?: allRoutes.firstOrNull { !it.contains("dev tun") && !it.contains("dev tap") && !it.contains("dev ppp") } // Any non-VPN
+                ?: allRoutes.firstOrNull()                                  // Last resort: any route
+            
             if (routeLine != null) {
-                Log.d(TAG, "Found route: $routeLine")
-                val matchResult = SUBNET_PATTERN.find(routeLine)
+                Log.d(TAG, "Selected route (prioritized WiFi/Ethernet): $routeLine")
+            } else {
+                Log.d(TAG, "No suitable route found from ${allRoutes.size} routes")
+            }
 
+            // If we have a route, extract subnet from it
+            var subnet: String? = null
+            if (routeLine != null) {
+                val matchResult = SUBNET_PATTERN.find(routeLine)
                 if (matchResult != null) {
-                    val subnet = matchResult.groupValues[1]
-                    Log.d(TAG, "Scanning subnet: $subnet.0/24")
+                    subnet = matchResult.groupValues[1]
+                }
+            }
+            
+            // Fallback: If no subnet from route, derive from gateway IP
+            if (subnet == null && gatewayIp.isNotEmpty()) {
+                val gatewayParts = gatewayIp.split(".")
+                if (gatewayParts.size >= 3) {
+                    subnet = "${gatewayParts[0]}.${gatewayParts[1]}.${gatewayParts[2]}"
+                    Log.d(TAG, "Using gateway-derived subnet: $subnet")
+                }
+            }
+
+            if (subnet != null) {
+                Log.d(TAG, "Scanning subnet: $subnet.0/24")
 
                     // Try robust root helper binary first
                     Log.d(TAG, "Attempting robust root helper scan...")
