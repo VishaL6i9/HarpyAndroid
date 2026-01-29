@@ -962,6 +962,49 @@ class NetworkMonitorRepositoryImpl(private val context: android.content.Context)
         }
     }
 
+    override fun isDeviceBlocked(ipAddress: String): Boolean {
+        val process = blockingProcesses[ipAddress]
+        return process != null && process.isAlive
+    }
+
+    override suspend fun restoreBlockedDevices(devices: List<NetworkDevice>): NetworkResult<Int> = withContext(Dispatchers.IO) {
+        try {
+            val isRootedResult = isDeviceRooted()
+            if (!(isRootedResult is NetworkResult.Success && isRootedResult.data)) {
+                return@withContext NetworkResult.error(NetworkError.DeviceNotRootedError())
+            }
+
+            var restoredCount = 0
+            val devicesToRestore = devices.filter { device ->
+                // Device is marked as blocked in preferences but not actively blocked
+                device.isBlocked && !isDeviceBlocked(device.ipAddress)
+            }
+
+            Log.d(TAG, "Restoring ${devicesToRestore.size} previously blocked devices")
+
+            devicesToRestore.forEach { device ->
+                try {
+                    val blockResult = blockDevice(device)
+                    if (blockResult is NetworkResult.Success && blockResult.data) {
+                        restoredCount++
+                        Log.d(TAG, "Restored block for ${device.ipAddress}")
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error restoring block for ${device.ipAddress}: ${e.message}")
+                }
+            }
+
+            if (restoredCount > 0) {
+                Log.i(TAG, "Restored $restoredCount device blocks")
+            }
+            
+            NetworkResult.success(restoredCount)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error restoring blocked devices: ${e.message}", e)
+            NetworkResult.error(NetworkError.BlockDeviceError(e))
+        }
+    }
+
     private fun getGatewayMacInternal(iface: String, ip: String): String? {
         try {
             // First check ARP table via ip neigh

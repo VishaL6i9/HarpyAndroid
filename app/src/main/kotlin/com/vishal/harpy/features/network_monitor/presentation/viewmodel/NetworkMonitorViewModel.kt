@@ -140,6 +140,10 @@ class NetworkMonitorViewModel @Inject constructor(
                         _networkDevices.value = sortedDevices
                         applyFilters()
                         _scanSuccess.value = true
+                        
+                        // Verify and restore blocked devices
+                        verifyAndRestoreBlockedDevices(sortedDevices)
+                        
                         if (sortedDevices.isEmpty()) {
                             _error.value = "No devices found on the network"
                         }
@@ -156,6 +160,71 @@ class NetworkMonitorViewModel @Inject constructor(
                 _error.value = e.message
             } finally {
                 _loadingState.value = LoadingState.None
+            }
+        }
+    }
+
+    private fun verifyAndRestoreBlockedDevices(devices: List<NetworkDevice>) {
+        viewModelScope.launch {
+            try {
+                // Clean up stale blocked devices (devices no longer on network)
+                val currentMacs = devices.map { it.macAddress }
+                devicePreferenceRepository.cleanupStaleBlockedDevices(currentMacs)
+                
+                // Check which devices are marked as blocked but not actively blocked
+                val devicesToVerify = devices.filter { it.isBlocked }
+                
+                if (devicesToVerify.isEmpty()) {
+                    return@launch
+                }
+                
+                com.vishal.harpy.core.utils.LogUtils.d(
+                    "NetworkMonitorVM",
+                    "Verifying ${devicesToVerify.size} blocked devices"
+                )
+                
+                // Verify each device's block status
+                val devicesNeedingRestore = devicesToVerify.filter { device ->
+                    !scanNetworkUseCase.repository.isDeviceBlocked(device.ipAddress)
+                }
+                
+                if (devicesNeedingRestore.isNotEmpty()) {
+                    com.vishal.harpy.core.utils.LogUtils.i(
+                        "NetworkMonitorVM",
+                        "Restoring ${devicesNeedingRestore.size} device blocks"
+                    )
+                    
+                    // Restore blocks for devices that should be blocked
+                    val restoreResult = scanNetworkUseCase.repository.restoreBlockedDevices(devicesNeedingRestore)
+                    
+                    when (restoreResult) {
+                        is NetworkResult.Success -> {
+                            val restoredCount = restoreResult.data
+                            if (restoredCount > 0) {
+                                com.vishal.harpy.core.utils.LogUtils.i(
+                                    "NetworkMonitorVM",
+                                    "Successfully restored $restoredCount device blocks"
+                                )
+                            }
+                        }
+                        is NetworkResult.Error -> {
+                            com.vishal.harpy.core.utils.LogUtils.e(
+                                "NetworkMonitorVM",
+                                "Error restoring blocks: ${restoreResult.error.message}"
+                            )
+                        }
+                    }
+                } else {
+                    com.vishal.harpy.core.utils.LogUtils.d(
+                        "NetworkMonitorVM",
+                        "All blocked devices are actively blocked"
+                    )
+                }
+            } catch (e: Exception) {
+                com.vishal.harpy.core.utils.LogUtils.e(
+                    "NetworkMonitorVM",
+                    "Error verifying blocked devices: ${e.message}"
+                )
             }
         }
     }

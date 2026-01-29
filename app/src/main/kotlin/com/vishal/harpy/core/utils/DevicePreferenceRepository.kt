@@ -128,6 +128,38 @@ class DevicePreferenceRepository(context: Context) {
     }
     
     /**
+     * Clean up blocked state for devices not in the current scan
+     * This helps remove stale blocked states for devices that are no longer on the network
+     */
+    suspend fun cleanupStaleBlockedDevices(currentDeviceMacs: List<String>) {
+        withContext(Dispatchers.IO) {
+            try {
+                val staleDevices = mutableListOf<DevicePreference>()
+                sharedPreferences.all.forEach { (key, value) ->
+                    if (key.startsWith(KEY_PREFIX) && value is String) {
+                        val preference = parseDevicePreference(value, "")
+                        if (preference != null && preference.isBlocked && 
+                            !currentDeviceMacs.contains(preference.macAddress)) {
+                            staleDevices.add(preference.copy(isBlocked = false))
+                        }
+                    }
+                }
+                
+                // Save all updated preferences
+                staleDevices.forEach { preference ->
+                    saveDevicePreference(preference)
+                }
+                
+                if (staleDevices.isNotEmpty()) {
+                    Log.d(TAG, "Cleaned up ${staleDevices.size} stale blocked devices")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error cleaning up stale blocked devices: ${e.message}")
+            }
+        }
+    }
+    
+    /**
      * Get all pinned devices
      */
     fun getPinnedDevices(): List<String> {
