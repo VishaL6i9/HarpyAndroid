@@ -730,21 +730,37 @@ class NetworkMonitorRepositoryImpl(private val context: android.content.Context)
         // Try to resolve hostname if not provided and not our device (our device usually resolves easily or we already know it)
         if (resolvedHostname == null) {
             try {
-                val hostnameProcess = Runtime.getRuntime().exec(arrayOf("sh", "-c", "nslookup $ip"))
-                val hostnameReader = BufferedReader(InputStreamReader(hostnameProcess.inputStream))
-                var hostnameLine: String?
-                while (hostnameReader.readLine().also { hostnameLine = it } != null) {
-                    if (hostnameLine!!.contains("name = ")) {
-                        val nameMatch = HOSTNAME_PATTERN.find(hostnameLine!!)
-                        if (nameMatch != null) {
-                            resolvedHostname = nameMatch.groupValues[1].trimEnd('.')
-                            break
+                // SDK-aware hostname resolution to avoid DNS property access warnings
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                    // Android 10+: Use getaddrinfo via native command (avoids system property access)
+                    val hostnameProcess = Runtime.getRuntime().exec(arrayOf("sh", "-c", "getent hosts $ip 2>/dev/null | awk '{print \$2}'"))
+                    val hostnameReader = BufferedReader(InputStreamReader(hostnameProcess.inputStream))
+                    val result = hostnameReader.readLine()
+                    hostnameReader.close()
+                    hostnameProcess.waitFor(2, java.util.concurrent.TimeUnit.SECONDS)
+                    hostnameProcess.destroyForcibly()
+                    
+                    if (!result.isNullOrBlank() && result != ip) {
+                        resolvedHostname = result.trimEnd('.')
+                    }
+                } else {
+                    // Android 7-9: Use nslookup (DNS properties accessible)
+                    val hostnameProcess = Runtime.getRuntime().exec(arrayOf("sh", "-c", "nslookup $ip"))
+                    val hostnameReader = BufferedReader(InputStreamReader(hostnameProcess.inputStream))
+                    var hostnameLine: String?
+                    while (hostnameReader.readLine().also { hostnameLine = it } != null) {
+                        if (hostnameLine!!.contains("name = ")) {
+                            val nameMatch = HOSTNAME_PATTERN.find(hostnameLine!!)
+                            if (nameMatch != null) {
+                                resolvedHostname = nameMatch.groupValues[1].trimEnd('.')
+                                break
+                            }
                         }
                     }
+                    hostnameReader.close()
+                    hostnameProcess.waitFor(2, java.util.concurrent.TimeUnit.SECONDS)
+                    hostnameProcess.destroyForcibly()
                 }
-                hostnameReader.close()
-                hostnameProcess.waitFor(2, java.util.concurrent.TimeUnit.SECONDS)
-                hostnameProcess.destroyForcibly()
             } catch (e: Exception) {
                 Log.d(TAG, "Could not resolve hostname for $ip: ${e.message}")
             }
