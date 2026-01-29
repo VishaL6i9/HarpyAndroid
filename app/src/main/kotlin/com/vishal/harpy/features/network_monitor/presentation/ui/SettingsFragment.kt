@@ -77,8 +77,7 @@ class SettingsFragment : Fragment() {
         // Handle About item click
         val aboutItem = binding.findViewById<LinearLayout>(R.id.aboutItem)
         aboutItem.setOnClickListener {
-            // For now, just show a toast - later we can implement navigation to an About screen
-            android.widget.Toast.makeText(context, "About clicked", android.widget.Toast.LENGTH_SHORT).show()
+            showAboutDialog()
         }
 
         // Handle Clear All Device Names item click
@@ -160,6 +159,131 @@ class SettingsFragment : Fragment() {
             .setNegativeButton("Cancel") { _, _ -> }
             .create()
             .show()
+    }
+
+    private fun showAboutDialog() {
+        val dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_about, null)
+        
+        // Set version from BuildConfig
+        val versionText = dialogView.findViewById<android.widget.TextView>(R.id.versionText)
+        try {
+            val packageInfo = requireContext().packageManager.getPackageInfo(requireContext().packageName, 0)
+            versionText.text = "Version ${packageInfo.versionName}"
+        } catch (e: Exception) {
+            versionText.text = "Version 1.0.0"
+        }
+        
+        // GitHub button click handler
+        val githubButton = dialogView.findViewById<android.widget.Button>(R.id.githubButton)
+        githubButton.setOnClickListener {
+            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+                data = android.net.Uri.parse("https://github.com/VishaL6i9/HarpyAndroid")
+            }
+            try {
+                startActivity(intent)
+            } catch (e: Exception) {
+                android.widget.Toast.makeText(
+                    requireContext(),
+                    "No browser found",
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+        
+        // Email button click handler
+        val emailButton = dialogView.findViewById<android.widget.Button>(R.id.emailButton)
+        emailButton.setOnClickListener {
+            val intent = android.content.Intent(android.content.Intent.ACTION_SENDTO).apply {
+                data = android.net.Uri.parse("mailto:vishalkandakatla@gmail.com")
+                putExtra(android.content.Intent.EXTRA_SUBJECT, "Harpy Android - Feedback")
+            }
+            try {
+                startActivity(intent)
+            } catch (e: Exception) {
+                android.widget.Toast.makeText(
+                    requireContext(),
+                    "No email app found",
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+        
+        // Auto Update Switch
+        val autoUpdateSwitch = dialogView.findViewById<com.google.android.material.switchmaterial.SwitchMaterial>(R.id.autoUpdateSwitch)
+        val autoUpdateLayout = dialogView.findViewById<android.widget.LinearLayout>(R.id.autoUpdateLayout)
+        
+        // TODO: Load saved auto-update preference from SharedPreferences
+        autoUpdateSwitch.isChecked = false
+        
+        autoUpdateLayout.setOnClickListener {
+            autoUpdateSwitch.isChecked = !autoUpdateSwitch.isChecked
+        }
+        
+        autoUpdateSwitch.setOnCheckedChangeListener { _, isChecked ->
+            // TODO: Save auto-update preference to SharedPreferences
+            // TODO: If enabled, schedule periodic update checks
+            android.widget.Toast.makeText(
+                requireContext(),
+                if (isChecked) "Auto-update enabled" else "Auto-update disabled",
+                android.widget.Toast.LENGTH_SHORT
+            ).show()
+        }
+        
+        // Check for Updates Button
+        val checkUpdatesButton = dialogView.findViewById<android.widget.Button>(R.id.checkUpdatesButton)
+        checkUpdatesButton.setOnClickListener {
+            // TODO: Implement update checking logic
+            // TODO: Check GitHub releases API for latest version
+            // TODO: Compare with current version
+            // TODO: Show update dialog if newer version available
+            android.widget.Toast.makeText(
+                requireContext(),
+                "Update check not implemented yet",
+                android.widget.Toast.LENGTH_SHORT
+            ).show()
+        }
+        
+        // Ko-fi donation
+        val kofiLayout = dialogView.findViewById<android.widget.LinearLayout>(R.id.kofiLayout)
+        kofiLayout.setOnClickListener {
+            // TODO: Add your Ko-fi URL here
+            android.widget.Toast.makeText(
+                requireContext(),
+                "Ko-fi link not configured",
+                android.widget.Toast.LENGTH_SHORT
+            ).show()
+        }
+        
+        // PayPal donation
+        val paypalLayout = dialogView.findViewById<android.widget.LinearLayout>(R.id.paypalLayout)
+        paypalLayout.setOnClickListener {
+            // TODO: Add your PayPal URL here
+            android.widget.Toast.makeText(
+                requireContext(),
+                "PayPal link not configured",
+                android.widget.Toast.LENGTH_SHORT
+            ).show()
+        }
+        
+        // UPI donation - Copy to clipboard
+        val upiLayout = dialogView.findViewById<android.widget.LinearLayout>(R.id.upiLayout)
+        upiLayout.setOnClickListener {
+            val clipboard = requireContext().getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+            val clip = android.content.ClipData.newPlainText("UPI ID", "vishal6i9@slc")
+            clipboard.setPrimaryClip(clip)
+            android.widget.Toast.makeText(
+                requireContext(),
+                "UPI ID copied to clipboard",
+                android.widget.Toast.LENGTH_SHORT
+            ).show()
+        }
+        
+        val dialog = androidx.appcompat.app.AlertDialog.Builder(requireContext())
+            .setView(dialogView)
+            .setPositiveButton("Close", null)
+            .create()
+        
+        dialog.show()
     }
 
     private fun showUnblockAllConfirmation() {
