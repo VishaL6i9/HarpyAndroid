@@ -89,7 +89,20 @@
             android:textSize="16sp"
             android:textStyle="bold"
             android:background="@drawable/button_background"
-            android:textColor="@color/oled_black" />
+            android:textColor="@color/oled_black"
+            android:layout_marginEnd="8dp" />
+
+        <Button
+            android:id="@+id/unblockAllButton"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:text="Unblock All"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:background="@drawable/button_unblock_background"
+            android:textColor="@color/oled_black"
+            android:visibility="gone" />
     </LinearLayout>
 
     <!-- Progress Section -->

@@ -8,6 +8,7 @@ data class DevicePreference(
     val macAddress: String,
     val deviceName: String? = null,
     val isPinned: Boolean = false,
+    val isBlocked: Boolean = false,
     val lastSeen: Long = System.currentTimeMillis()
 ) {
     fun getDisplayName(defaultVendor: String?): String {

@@ -54,6 +54,11 @@ class NetworkMonitorFragment : Fragment() {
             viewModel.scanNetwork()
         }
 
+        val unblockAllButton = (_binding as? ViewGroup)?.findViewById<Button>(R.id.unblockAllButton)
+        unblockAllButton?.setOnClickListener {
+            showUnblockAllConfirmation()
+        }
+
         val debugButton = (_binding as? ViewGroup)?.findViewById<android.widget.ImageButton>(R.id.debugButton)
         debugButton?.setOnLongClickListener {
             showDebugMenu()
@@ -133,6 +138,18 @@ class NetworkMonitorFragment : Fragment() {
             .show()
     }
 
+    private fun showUnblockAllConfirmation() {
+        androidx.appcompat.app.AlertDialog.Builder(requireContext())
+            .setTitle("Unblock All Devices?")
+            .setMessage("This will remove all active device blocks and restore network access for all blocked devices.")
+            .setPositiveButton("Unblock All") { _, _ ->
+                viewModel.unblockAllDevices()
+            }
+            .setNegativeButton("Cancel", null)
+            .create()
+            .show()
+    }
+
     private fun observeViewModel() {
         viewLifecycleOwner.lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -140,6 +157,7 @@ class NetworkMonitorFragment : Fragment() {
                     adapter.submitList(devices)
                     updateDeviceCount(devices.size)
                     updateEmptyState(devices.isEmpty())
+                    updateUnblockAllButton(devices)
                 }
             }
         }
@@ -334,6 +352,17 @@ class NetworkMonitorFragment : Fragment() {
         } else {
             fadeOut(emptyState)
             fadeIn(recyclerView)
+        }
+    }
+
+    private fun updateUnblockAllButton(devices: List<NetworkDevice>) {
+        val unblockAllButton = (_binding as? ViewGroup)?.findViewById<Button>(R.id.unblockAllButton)
+        val hasBlockedDevices = devices.any { it.isBlocked }
+        
+        if (hasBlockedDevices) {
+            fadeIn(unblockAllButton)
+        } else {
+            fadeOut(unblockAllButton)
         }
     }
 

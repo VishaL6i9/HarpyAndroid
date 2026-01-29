@@ -908,6 +908,60 @@ class NetworkMonitorRepositoryImpl(private val context: android.content.Context)
         }
     }
 
+    override suspend fun unblockAllDevices(): NetworkResult<Int> = withContext(Dispatchers.IO) {
+        try {
+            val isRootedResult = isDeviceRooted()
+            if (!(isRootedResult is NetworkResult.Success && isRootedResult.data)) {
+                return@withContext NetworkResult.error(NetworkError.DeviceNotRootedError())
+            }
+
+            val blockedIPs = blockingProcesses.keys.toList()
+            var unblockCount = 0
+            
+            val gatewayIp = getGatewayIp()
+            val iface = getActiveInterface() ?: "wlan0"
+            val helperPath = NativeNetworkWrapper.getRootHelperPath(context)
+            
+            blockedIPs.forEach { ipAddress ->
+                try {
+                    val process = blockingProcesses.remove(ipAddress)
+                    if (process != null) {
+                        // Perform proactive restoration if possible
+                        if (gatewayIp != null && helperPath != null) {
+                            // We don't have the device MAC here, so we'll just kill the process
+                            // The ARP cache should restore naturally
+                        }
+                        
+                        process.destroy()
+                        unblockCount++
+                        Log.d(TAG, "Unblocked device: $ipAddress")
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error unblocking device $ipAddress: ${e.message}")
+                }
+            }
+            
+            // Kill all blocking processes
+            try {
+                val killer = Runtime.getRuntime().exec("su")
+                val out = DataOutputStream(killer.outputStream)
+                out.writeBytes("pkill -f libharpy_root_helper.so\n")
+                out.writeBytes("exit\n")
+                out.flush()
+                out.close()
+                killer.waitFor()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error killing blocking processes: ${e.message}")
+            }
+            
+            Log.i(TAG, "Unblocked $unblockCount devices")
+            NetworkResult.success(unblockCount)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error unblocking all devices: ${e.message}", e)
+            NetworkResult.error(NetworkError.BlockDeviceError(e))
+        }
+    }
+
     private fun getGatewayMacInternal(iface: String, ip: String): String? {
         try {
             // First check ARP table via ip neigh

@@ -87,6 +87,12 @@ class SettingsFragment : Fragment() {
             showClearNamesConfirmation()
         }
 
+        // Handle Unblock All Devices item click
+        val unblockAllItem = binding.findViewById<LinearLayout>(R.id.unblockAllItem)
+        unblockAllItem.setOnClickListener {
+            showUnblockAllConfirmation()
+        }
+
         // Handle Logging Settings item click and long press to clear logs (3 second hold)
         val loggingSettingsItem = binding.findViewById<LinearLayout>(R.id.loggingSettingsItem)
         var pressStartTime = 0L
@@ -148,6 +154,23 @@ class SettingsFragment : Fragment() {
                 android.widget.Toast.makeText(
                     requireContext(),
                     "All custom names cleared",
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+            }
+            .setNegativeButton("Cancel") { _, _ -> }
+            .create()
+            .show()
+    }
+
+    private fun showUnblockAllConfirmation() {
+        androidx.appcompat.app.AlertDialog.Builder(requireContext())
+            .setTitle("Unblock all devices?")
+            .setMessage("This will remove all active device blocks and restore network access for all blocked devices.")
+            .setPositiveButton("Unblock All") { _, _ ->
+                viewModel.unblockAllDevices()
+                android.widget.Toast.makeText(
+                    requireContext(),
+                    "All devices unblocked",
                     android.widget.Toast.LENGTH_SHORT
                 ).show()
             }

@@ -33,6 +33,7 @@ class NetworkMonitorViewModel @Inject constructor(
     private val isDeviceRootedUseCase: IsDeviceRootedUseCase,
     private val blockDeviceUseCase: BlockDeviceUseCase,
     private val unblockDeviceUseCase: UnblockDeviceUseCase,
+    private val unblockAllDevicesUseCase: UnblockAllDevicesUseCase,
     private val mapNetworkTopologyUseCase: MapNetworkTopologyUseCase,
     private val testPingUseCase: TestPingUseCase,
     @ApplicationContext private val context: Context
@@ -122,7 +123,8 @@ class NetworkMonitorViewModel @Inject constructor(
                                 devicePreferenceRepository.getDevicePreference(device.macAddress)
                             device.copy(
                                 deviceName = preference?.deviceName,
-                                isPinned = preference?.isPinned ?: false
+                                isPinned = preference?.isPinned ?: false,
+                                isBlocked = preference?.isBlocked ?: false
                             )
                         }
 
@@ -169,6 +171,9 @@ class NetworkMonitorViewModel @Inject constructor(
                 when (result) {
                     is NetworkResult.Success -> {
                         if (result.data) {
+                            // Persist blocked state
+                            devicePreferenceRepository.setBlockedStatus(device.macAddress, true)
+                            
                             _networkDevices.value = _networkDevices.value.map {
                                 if (it.ipAddress == device.ipAddress) {
                                     it.copy(isBlocked = true)
@@ -206,6 +211,9 @@ class NetworkMonitorViewModel @Inject constructor(
                 when (result) {
                     is NetworkResult.Success -> {
                         if (result.data) {
+                            // Persist unblocked state
+                            devicePreferenceRepository.setBlockedStatus(device.macAddress, false)
+                            
                             _networkDevices.value = _networkDevices.value.map {
                                 if (it.ipAddress == device.ipAddress) {
                                     it.copy(isBlocked = false)
@@ -215,6 +223,46 @@ class NetworkMonitorViewModel @Inject constructor(
                             }
                             applyFilters()
                         }
+                    }
+
+                    is NetworkResult.Error -> {
+                        _lastError.value = result.error
+                        _error.value = result.error.message
+                    }
+                }
+            } catch (e: Exception) {
+                val error = NetworkError.UnknownError(e)
+                _lastError.value = error
+                _error.value = e.message
+            } finally {
+                _loadingState.value = LoadingState.None
+            }
+        }
+    }
+
+    fun unblockAllDevices() {
+        if (!_isRooted.value) return
+
+        viewModelScope.launch {
+            _loadingState.value = LoadingState.Unblocking
+            _error.value = null
+            try {
+                val result = unblockAllDevicesUseCase()
+                when (result) {
+                    is NetworkResult.Success -> {
+                        val unblockCount = result.data
+                        
+                        // Persist unblocked state for all devices
+                        devicePreferenceRepository.unblockAllDevices()
+                        
+                        // Update all devices in memory
+                        _networkDevices.value = _networkDevices.value.map {
+                            it.copy(isBlocked = false)
+                        }
+                        applyFilters()
+                        
+                        _error.value = "Unblocked $unblockCount device(s)"
+                        com.vishal.harpy.core.utils.LogUtils.i("NetworkMonitorVM", "Unblocked $unblockCount devices")
                     }
 
                     is NetworkResult.Error -> {
