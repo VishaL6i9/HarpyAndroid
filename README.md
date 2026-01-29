@@ -72,6 +72,10 @@ The app now features a bottom navigation bar providing easy access to three main
   - Android 9: Moderate restrictions on DNS properties
   - Android 10+: Strict restrictions with fallback to alternative detection methods
   - Warning-based notifications that don't block app access
+- SDK-aware hostname resolution
+  - Android 7-9: Uses nslookup for hostname resolution
+  - Android 10+: Uses getent hosts to avoid DNS property access warnings
+  - Eliminates "Access denied finding property net.dns*" warnings on modern Android
 
 ### Non-Root Approach (Future Plan)
 - Network monitoring using Android's VpnService
@@ -82,6 +86,22 @@ The app now features a bottom navigation bar providing easy access to three main
 ## Technical Implementation
 
 The root-based implementation is built using native Kotlin for the Android application layer, with native C/C++ code using raw socket implementations for low-level network operations when root access is available. The app leverages root access to execute ARP spoofing techniques similar to the original iOS Harpy tweak. Future plans include migrating to libpcap/libnet libraries for enhanced packet capture and crafting capabilities.
+
+### SDK-Aware Network Operations
+The app implements different strategies based on Android SDK level to handle platform restrictions:
+
+**Route Detection (All SDK levels):**
+- Collects all available network routes
+- Prioritizes physical interfaces: WiFi (wlan0) > Ethernet (eth0) > Mobile data (rmnet)
+- Avoids VPN tunnel interfaces (tun, tap, ppp) for local network scanning
+- Falls back to gateway-derived subnet when route detection fails
+- Handles scenarios with Private DNS, VPN, and multiple active connections
+
+**Hostname Resolution:**
+- Android 7-9 (API 24-28): Uses `nslookup` command (DNS properties accessible)
+- Android 10+ (API 29+): Uses `getent hosts` command to avoid DNS property access warnings
+- Eliminates "Access denied finding property net.dns*" warnings on modern Android
+- Works seamlessly with Private DNS and encrypted DNS configurations
 
 ### Device Preference System
 The app includes a comprehensive device preference system for managing custom device settings:
@@ -318,6 +338,7 @@ To build the project, ensure you have the Android SDK properly configured with t
   - [x] File provider configuration for secure log sharing
   - [x] SDK-aware DNS property access warnings (Android 7-8, 9, 10+)
   - [x] Warning-based notifications that don't block app access
+  - [x] SDK-aware hostname resolution to eliminate DNS property warnings
 - [x] Logging UI integration
   - [x] Logging settings menu item in settings fragment
   - [x] Logging settings dialog with debug mode toggle
