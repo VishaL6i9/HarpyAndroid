@@ -493,215 +493,214 @@ class NetworkMonitorRepositoryImpl(private val context: android.content.Context)
             if (subnet != null) {
                 Log.d(TAG, "Scanning subnet: $subnet.0/24")
 
-                    // Try robust root helper binary first
-                    Log.d(TAG, "Attempting robust root helper scan...")
-                    val helperPath = NativeNetworkWrapper.getRootHelperPath(context)
-                    
-                    if (helperPath != null) {
-                        try {
-                            val helperProcess = Runtime.getRuntime().exec("su")
-                            val helperOutput = DataOutputStream(helperProcess.outputStream)
-                            
-                            // Ensure executable permission and run with proper library path
-                            val libDir = context.applicationInfo.nativeLibraryDir
-                            val cmd = "chmod 755 $helperPath && LD_LIBRARY_PATH=$libDir $helperPath scan wlan0 $subnet 10 2>&1\n"
-                            Log.d(TAG, "Executing root helper: $cmd")
-                            helperOutput.writeBytes(cmd)
-                            helperOutput.writeBytes("exit\n")
-                            helperOutput.flush()
-                            helperOutput.close()
+                // Try robust root helper binary first
+                Log.d(TAG, "Attempting robust root helper scan...")
+                val helperPath = NativeNetworkWrapper.getRootHelperPath(context)
+                
+                if (helperPath != null) {
+                    try {
+                        val helperProcess = Runtime.getRuntime().exec("su")
+                        val helperOutput = DataOutputStream(helperProcess.outputStream)
+                        
+                        // Ensure executable permission and run with proper library path
+                        val libDir = context.applicationInfo.nativeLibraryDir
+                        val cmd = "chmod 755 $helperPath && LD_LIBRARY_PATH=$libDir $helperPath scan wlan0 $subnet 10 2>&1\n"
+                        Log.d(TAG, "Executing root helper: $cmd")
+                        helperOutput.writeBytes(cmd)
+                        helperOutput.writeBytes("exit\n")
+                        helperOutput.flush()
+                        helperOutput.close()
 
-                            val helperReader = BufferedReader(InputStreamReader(helperProcess.inputStream))
-                            var helperLine: String?
-                            val helperFoundDevices = mutableListOf<String>()
-                            while (helperReader.readLine().also { helperLine = it } != null) {
-                                Log.d(TAG, "Root helper output: $helperLine")
-                                if (helperLine != null && helperLine!!.contains("|") && 
-                                    !helperLine!!.startsWith("DEBUG:") && !helperLine!!.startsWith("INFO:")) {
-                                    helperFoundDevices.add(helperLine!!)
-                                }
+                        val helperReader = BufferedReader(InputStreamReader(helperProcess.inputStream))
+                        var helperLine: String?
+                        val helperFoundDevices = mutableListOf<String>()
+                        while (helperReader.readLine().also { helperLine = it } != null) {
+                            Log.d(TAG, "Root helper output: $helperLine")
+                            if (helperLine != null && helperLine!!.contains("|") && 
+                                !helperLine!!.startsWith("DEBUG:") && !helperLine!!.startsWith("INFO:")) {
+                                helperFoundDevices.add(helperLine!!)
                             }
-                            helperReader.close()
-                            
-                            // Increase waitFor to 15 seconds to allow for the 10-second scan + overhead
-                            val completed = helperProcess.waitFor(15, java.util.concurrent.TimeUnit.SECONDS)
-                            if (!completed) {
-                                Log.w(TAG, "Root helper scan timed out, killing process")
-                                helperProcess.destroyForcibly()
-                            }
-                            
-                            if (helperFoundDevices.isNotEmpty()) {
-                                Log.d(TAG, "Root helper found ${helperFoundDevices.size} devices")
-                                for (deviceStr in helperFoundDevices) {
-                                    val parts = deviceStr.split("|")
-                                    if (parts.size == 2) {
-                                        val ip = parts[0]
-                                        val mac = parts[1]
-                                        addDeviceToList(devices, ip, mac, "wlan0", null, ourIp, gatewayIp)
-                                        Log.d(TAG, "Root helper found: $ip ($mac)")
-                                    }
-                                }
-                                
-                                if (devices.isNotEmpty()) {
-                                    Log.d(TAG, "Scan complete. Found ${devices.size} devices (root helper)")
-                                    return devices
-                                }
-                            }
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Root helper scan failed: ${e.message}")
                         }
-                    }
-                    
-                    // Fallback to shell-based discovery if native didn't work
-                    Log.d(TAG, "Native scan failed or returned no devices, using shell fallback...")
-                    try {
-                        val discoveryProcess = Runtime.getRuntime().exec("su")
-                        val discoveryOutput = DataOutputStream(discoveryProcess.outputStream)
+                        helperReader.close()
                         
-                        // Method 1: Try nmap first (most comprehensive)
-                        discoveryOutput.writeBytes("nmap -sn $subnet.0/24 > /dev/null 2>&1 || true\n")
-                        
-                        // Method 2: Try arp-scan (comprehensive ARP scanning)
-                        discoveryOutput.writeBytes("arp-scan -l 2>/dev/null || true\n")
-                        
-                        // Method 3: Parallel TCP connections to common ports (triggers ARP from firewalled devices)
-                        // This is more reliable than ping for devices that block ICMP
-                        discoveryOutput.writeBytes("for i in {1..254}; do (timeout 0.1 bash -c \"</dev/tcp/$subnet.\$i/22\" || timeout 0.1 bash -c \"</dev/tcp/$subnet.\$i/80\" || timeout 0.1 bash -c \"</dev/tcp/$subnet.\$i/443\") > /dev/null 2>&1 & done\n")
-                        discoveryOutput.writeBytes("wait\n")
-                        
-                        // Method 4: Use ip route get to trigger ARP lookups (forces kernel to do ARP)
-                        discoveryOutput.writeBytes("for i in {1..254}; do ip route get $subnet.\$i > /dev/null 2>&1 & done\n")
-                        discoveryOutput.writeBytes("wait\n")
-                        
-                        // Method 5: Broadcast ping
-                        discoveryOutput.writeBytes("ping -b -c 1 -W 1 $subnet.255 > /dev/null 2>&1 || true\n")
-                        
-                        discoveryOutput.writeBytes("sleep 2\n")
-                        discoveryOutput.writeBytes("exit\n")
-                        discoveryOutput.flush()
-                        discoveryOutput.close()
-                        
-                        val completed = discoveryProcess.waitFor(25, java.util.concurrent.TimeUnit.SECONDS)
+                        // Increase waitFor to 15 seconds to allow for the 10-second scan + overhead
+                        val completed = helperProcess.waitFor(15, java.util.concurrent.TimeUnit.SECONDS)
                         if (!completed) {
-                            discoveryProcess.destroyForcibly()
+                            Log.w(TAG, "Root helper scan timed out, killing process")
+                            helperProcess.destroyForcibly()
                         }
-                        Log.d(TAG, "Network discovery completed")
-                    } catch (e: Exception) {
-                        Log.d(TAG, "Network discovery failed: ${e.message}")
-                    }
-
-                    // Now read ARP table after discovery - try multiple methods
-                    Log.d(TAG, "Reading ARP table...")
-                    val seenMacs = mutableSetOf<String>()  // Track seen MACs to avoid duplicates
-                    
-                    // Method 1: Try 'ip neigh show' first (more comprehensive)
-                    try {
-                        val arpProcess = Runtime.getRuntime().exec("su")
-                        val arpOutput = DataOutputStream(arpProcess.outputStream)
                         
-                        arpOutput.writeBytes("ip neigh show\n")
-                        arpOutput.writeBytes("exit\n")
-                        arpOutput.flush()
-                        arpOutput.close()
-                        
-                        val arpReader = BufferedReader(InputStreamReader(arpProcess.inputStream))
-                        var line: String?
-                        
-                        while (arpReader.readLine().also { line = it } != null) {
-                            Log.d(TAG, "ARP entry (ip neigh): $line")
-                            
-                            // Parse 'ip neigh' output format: "192.168.29.1 dev wlan0 lladdr b4:8c:9d:8c:ef:09 REACHABLE"
-                            val parts = line?.trim()?.split(Regex("\\s+"))
-                            
-                            if (parts != null && parts.size >= 5) {
-                                val ip = parts[0]
-                                val mac = parts.getOrNull(4)  // lladdr value
-                                val state = parts.getOrNull(5)  // State (REACHABLE, STALE, etc.)
-                                val deviceInterface = parts.getOrNull(2)  // dev value
-                                
-                                Log.d(TAG, "Parsed (ip neigh): IP=$ip, MAC=$mac, State=$state, Device=$deviceInterface")
-                                
-                                // Only accept IPv4 addresses (skip IPv6 like fe80:: or 2405:)
-                                val isIPv4 = ip.matches(Regex("^\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}$"))
-                                
-                                // Accept devices with valid MAC addresses, IPv4 only, and not already seen
-                                if (isIPv4 && mac != null && mac.matches(Regex("^([0-9A-Fa-f]{2}:){5}([0-9A-Fa-f]{2})$")) && 
-                                    mac != "00:00:00:00:00:00" && mac != "<incomplete>" && !seenMacs.contains(mac)) {
-                                    
-                                    seenMacs.add(mac)
-                                    addDeviceToList(devices, ip, mac, deviceInterface, null, ourIp, gatewayIp)
-                                    Log.d(TAG, "Found device: $ip ($mac) (state=$state)")
+                        if (helperFoundDevices.isNotEmpty()) {
+                            Log.d(TAG, "Root helper found ${helperFoundDevices.size} devices")
+                            for (deviceStr in helperFoundDevices) {
+                                val parts = deviceStr.split("|")
+                                if (parts.size == 2) {
+                                    val ip = parts[0]
+                                    val mac = parts[1]
+                                    addDeviceToList(devices, ip, mac, "wlan0", null, ourIp, gatewayIp)
+                                    Log.d(TAG, "Root helper found: $ip ($mac)")
                                 }
                             }
-                        }
-                        
-                        arpReader.close()
-                        val completed = arpProcess.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)
-                        if (!completed) {
-                            arpProcess.destroyForcibly()
+                            
+                            if (devices.isNotEmpty()) {
+                                Log.d(TAG, "Scan complete. Found ${devices.size} devices (root helper)")
+                                return devices
+                            }
                         }
                     } catch (e: Exception) {
-                        Log.d(TAG, "ip neigh show failed: ${e.message}")
+                        Log.e(TAG, "Root helper scan failed: ${e.message}")
                     }
-                    
-                    // Method 2: Fallback to /proc/net/arp (catches devices ip neigh might miss)
-                    try {
-                        Log.d(TAG, "Reading /proc/net/arp as fallback...")
-                        val procProcess = Runtime.getRuntime().exec("su")
-                        val procOutput = DataOutputStream(procProcess.outputStream)
-                        
-                        procOutput.writeBytes("cat /proc/net/arp\n")
-                        procOutput.writeBytes("exit\n")
-                        procOutput.flush()
-                        procOutput.close()
-                        
-                        val procReader = BufferedReader(InputStreamReader(procProcess.inputStream))
-                        var line: String?
-                        
-                        while (procReader.readLine().also { line = it } != null) {
-                            if (line == null) continue
-                            
-                            Log.d(TAG, "ARP line (/proc): $line")
-                            
-                            // Skip header line
-                            if (line!!.startsWith("IP address")) continue
-                            
-                            // Parse /proc/net/arp format: "192.168.29.1 0x1 0x2 b4:8c:9d:8c:ef:09 * wlan0"
-                            // When split: [IP, HWtype, Flags, MAC, Mask, Device]
-                            val parts = line!!.trim().split(Regex("\\s+"))
-                            
-                            if (parts.size >= 6) {
-                                val ip = parts[0]
-                                val mac = parts[3]  // MAC is at index 3, not 4
-                                val deviceInterface = parts.getOrNull(5) ?: "unknown"
-                                
-                                Log.d(TAG, "Parsed (/proc): IP=$ip, MAC=$mac, Device=$deviceInterface")
-                                
-                                // Only accept IPv4 addresses
-                                val isIPv4 = ip.matches(Regex("^\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}$"))
-                                
-                                // Accept devices with valid MAC addresses, IPv4 only, and not already seen
-                                if (isIPv4 && mac.matches(Regex("^([0-9A-Fa-f]{2}:){5}([0-9A-Fa-f]{2})$")) && 
-                                    mac != "00:00:00:00:00:00" && !seenMacs.contains(mac)) {
-                                    
-                                    seenMacs.add(mac)
-                                    addDeviceToList(devices, ip, mac, deviceInterface, null, ourIp, gatewayIp)
-                                    Log.d(TAG, "Found device (from /proc): $ip ($mac)")
-                                }
-                            }
-                        }
-                        
-                        procReader.close()
-                        val completed = procProcess.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)
-                        if (!completed) {
-                            procProcess.destroyForcibly()
-                        }
-                    } catch (e: Exception) {
-                        Log.d(TAG, "/proc/net/arp read failed: ${e.message}")
-                    }
-                    
-                    Log.d(TAG, "Scan complete. Found ${devices.size} devices")
                 }
+                
+                // Fallback to shell-based discovery if native didn't work
+                Log.d(TAG, "Native scan failed or returned no devices, using shell fallback...")
+                try {
+                    val discoveryProcess = Runtime.getRuntime().exec("su")
+                    val discoveryOutput = DataOutputStream(discoveryProcess.outputStream)
+                    
+                    // Method 1: Try nmap first (most comprehensive)
+                    discoveryOutput.writeBytes("nmap -sn $subnet.0/24 > /dev/null 2>&1 || true\n")
+                    
+                    // Method 2: Try arp-scan (comprehensive ARP scanning)
+                    discoveryOutput.writeBytes("arp-scan -l 2>/dev/null || true\n")
+                    
+                    // Method 3: Parallel TCP connections to common ports (triggers ARP from firewalled devices)
+                    // This is more reliable than ping for devices that block ICMP
+                    discoveryOutput.writeBytes("for i in {1..254}; do (timeout 0.1 bash -c \"</dev/tcp/$subnet.\$i/22\" || timeout 0.1 bash -c \"</dev/tcp/$subnet.\$i/80\" || timeout 0.1 bash -c \"</dev/tcp/$subnet.\$i/443\") > /dev/null 2>&1 & done\n")
+                    discoveryOutput.writeBytes("wait\n")
+                    
+                    // Method 4: Use ip route get to trigger ARP lookups (forces kernel to do ARP)
+                    discoveryOutput.writeBytes("for i in {1..254}; do ip route get $subnet.\$i > /dev/null 2>&1 & done\n")
+                    discoveryOutput.writeBytes("wait\n")
+                    
+                    // Method 5: Broadcast ping
+                    discoveryOutput.writeBytes("ping -b -c 1 -W 1 $subnet.255 > /dev/null 2>&1 || true\n")
+                    
+                    discoveryOutput.writeBytes("sleep 2\n")
+                    discoveryOutput.writeBytes("exit\n")
+                    discoveryOutput.flush()
+                    discoveryOutput.close()
+                    
+                    val completed = discoveryProcess.waitFor(25, java.util.concurrent.TimeUnit.SECONDS)
+                    if (!completed) {
+                        discoveryProcess.destroyForcibly()
+                    }
+                    Log.d(TAG, "Network discovery completed")
+                } catch (e: Exception) {
+                    Log.d(TAG, "Network discovery failed: ${e.message}")
+                }
+
+                // Now read ARP table after discovery - try multiple methods
+                Log.d(TAG, "Reading ARP table...")
+                val seenMacs = mutableSetOf<String>()  // Track seen MACs to avoid duplicates
+                
+                // Method 1: Try 'ip neigh show' first (more comprehensive)
+                try {
+                    val arpProcess = Runtime.getRuntime().exec("su")
+                    val arpOutput = DataOutputStream(arpProcess.outputStream)
+                    
+                    arpOutput.writeBytes("ip neigh show\n")
+                    arpOutput.writeBytes("exit\n")
+                    arpOutput.flush()
+                    arpOutput.close()
+                    
+                    val arpReader = BufferedReader(InputStreamReader(arpProcess.inputStream))
+                    var line: String?
+                    
+                    while (arpReader.readLine().also { line = it } != null) {
+                        Log.d(TAG, "ARP entry (ip neigh): $line")
+                        
+                        // Parse 'ip neigh' output format: "192.168.29.1 dev wlan0 lladdr b4:8c:9d:8c:ef:09 REACHABLE"
+                        val parts = line?.trim()?.split(Regex("\\s+"))
+                        
+                        if (parts != null && parts.size >= 5) {
+                            val ip = parts[0]
+                            val mac = parts.getOrNull(4)  // lladdr value
+                            val state = parts.getOrNull(5)  // State (REACHABLE, STALE, etc.)
+                            val deviceInterface = parts.getOrNull(2)  // dev value
+                            
+                            Log.d(TAG, "Parsed (ip neigh): IP=$ip, MAC=$mac, State=$state, Device=$deviceInterface")
+                            
+                            // Only accept IPv4 addresses (skip IPv6 like fe80:: or 2405:)
+                            val isIPv4 = ip.matches(Regex("^\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}$"))
+                            
+                            // Accept devices with valid MAC addresses, IPv4 only, and not already seen
+                            if (isIPv4 && mac != null && mac.matches(Regex("^([0-9A-Fa-f]{2}:){5}([0-9A-Fa-f]{2})$")) && 
+                                mac != "00:00:00:00:00:00" && mac != "<incomplete>" && !seenMacs.contains(mac)) {
+                                
+                                seenMacs.add(mac)
+                                addDeviceToList(devices, ip, mac, deviceInterface, null, ourIp, gatewayIp)
+                                Log.d(TAG, "Found device: $ip ($mac) (state=$state)")
+                            }
+                        }
+                    }
+                    
+                    arpReader.close()
+                    val completed = arpProcess.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)
+                    if (!completed) {
+                        arpProcess.destroyForcibly()
+                    }
+                } catch (e: Exception) {
+                    Log.d(TAG, "ip neigh show failed: ${e.message}")
+                }
+                
+                // Method 2: Fallback to /proc/net/arp (catches devices ip neigh might miss)
+                try {
+                    Log.d(TAG, "Reading /proc/net/arp as fallback...")
+                    val procProcess = Runtime.getRuntime().exec("su")
+                    val procOutput = DataOutputStream(procProcess.outputStream)
+                    
+                    procOutput.writeBytes("cat /proc/net/arp\n")
+                    procOutput.writeBytes("exit\n")
+                    procOutput.flush()
+                    procOutput.close()
+                    
+                    val procReader = BufferedReader(InputStreamReader(procProcess.inputStream))
+                    var line: String?
+                    
+                    while (procReader.readLine().also { line = it } != null) {
+                        if (line == null) continue
+                        
+                        Log.d(TAG, "ARP line (/proc): $line")
+                        
+                        // Skip header line
+                        if (line!!.startsWith("IP address")) continue
+                        
+                        // Parse /proc/net/arp format: "192.168.29.1 0x1 0x2 b4:8c:9d:8c:ef:09 * wlan0"
+                        // When split: [IP, HWtype, Flags, MAC, Mask, Device]
+                        val parts = line!!.trim().split(Regex("\\s+"))
+                        
+                        if (parts.size >= 6) {
+                            val ip = parts[0]
+                            val mac = parts[3]  // MAC is at index 3, not 4
+                            val deviceInterface = parts.getOrNull(5) ?: "unknown"
+                            
+                            Log.d(TAG, "Parsed (/proc): IP=$ip, MAC=$mac, Device=$deviceInterface")
+                            
+                            // Only accept IPv4 addresses
+                            val isIPv4 = ip.matches(Regex("^\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}$"))
+                            
+                            // Accept devices with valid MAC addresses, IPv4 only, and not already seen
+                            if (isIPv4 && mac.matches(Regex("^([0-9A-Fa-f]{2}:){5}([0-9A-Fa-f]{2})$")) && 
+                                mac != "00:00:00:00:00:00" && !seenMacs.contains(mac)) {
+                                
+                                seenMacs.add(mac)
+                                addDeviceToList(devices, ip, mac, deviceInterface, null, ourIp, gatewayIp)
+                                Log.d(TAG, "Found device (from /proc): $ip ($mac)")
+                            }
+                        }
+                    }
+                    
+                    procReader.close()
+                    val completed = procProcess.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)
+                    if (!completed) {
+                        procProcess.destroyForcibly()
+                    }
+                } catch (e: Exception) {
+                    Log.d(TAG, "/proc/net/arp read failed: ${e.message}")
+                }
+                
+                Log.d(TAG, "Scan complete. Found ${devices.size} devices")
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error scanning network: ${e.message}", e)
