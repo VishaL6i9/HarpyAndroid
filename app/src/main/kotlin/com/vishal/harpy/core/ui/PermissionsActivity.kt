@@ -146,9 +146,8 @@ class PermissionsActivity : AppCompatActivity() {
         }
     }
 
-    
     private fun navigateToMain() {
-        val intent = Intent(this, com.vishal.harpy.main.MainActivity::class.java)
+        val intent = Intent(this, com.vishal.harpy.main.MainActivityCompose::class.java)
         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         startActivity(intent)
         finish()

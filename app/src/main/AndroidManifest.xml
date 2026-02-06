@@ -36,8 +36,9 @@
             android:name=".core.ui.PermissionsActivity"
             android:exported="false" />
         <activity
-            android:name=".main.MainActivity"
-            android:exported="true">
+            android:name=".main.MainActivityCompose"
+            android:exported="true"
+            android:theme="@style/Theme.HarpyAndroid">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
