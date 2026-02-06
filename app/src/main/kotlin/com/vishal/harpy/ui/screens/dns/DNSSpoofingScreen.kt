@@ -73,50 +73,95 @@ fun DNSSpoofingScreen(
 
             Button(
                 onClick = { showStartDialog = true },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(16.dp)
             ) {
-                Icon(Icons.Default.PlayArrow, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text("Start DNS Spoofing")
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    Icon(
+                        imageVector = Icons.Default.PlayArrow,
+                        contentDescription = null,
+                        modifier = Modifier.align(Alignment.CenterStart)
+                    )
+                    Text(
+                        text = "Start DNS Spoofing",
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                }
             }
 
             Button(
                 onClick = { showStopDialog = true },
                 modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(16.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.error
                 )
             ) {
-                Icon(Icons.Default.Stop, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text("Stop DNS Spoofing")
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    Icon(
+                        imageVector = Icons.Default.Stop,
+                        contentDescription = null,
+                        modifier = Modifier.align(Alignment.CenterStart)
+                    )
+                    Text(
+                        text = "Stop DNS Spoofing",
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                }
             }
 
             OutlinedButton(
                 onClick = { showAddRuleDialog = true },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(16.dp)
             ) {
-                Icon(Icons.Default.Add, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text("Add DNS Rule")
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = null,
+                        modifier = Modifier.align(Alignment.CenterStart)
+                    )
+                    Text(
+                        text = "Add DNS Rule",
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                }
             }
 
             OutlinedButton(
                 onClick = { showRemoveRuleDialog = true },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(16.dp)
             ) {
-                Icon(Icons.Default.Remove, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text("Remove DNS Rule")
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    Icon(
+                        imageVector = Icons.Default.Remove,
+                        contentDescription = null,
+                        modifier = Modifier.align(Alignment.CenterStart)
+                    )
+                    Text(
+                        text = "Remove DNS Rule",
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                }
             }
 
             OutlinedButton(
                 onClick = { showStatusDialog = true },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(16.dp)
             ) {
-                Icon(Icons.Default.Info, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text("Check DNS Status")
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = null,
+                        modifier = Modifier.align(Alignment.CenterStart)
+                    )
+                    Text(
+                        text = "Check DNS Status",
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                }
             }
         }
     }
