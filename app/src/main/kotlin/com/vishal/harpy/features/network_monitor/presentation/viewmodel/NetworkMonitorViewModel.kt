@@ -18,11 +18,15 @@ import com.vishal.harpy.core.utils.NetworkErrorMapper
 import com.vishal.harpy.core.utils.DevicePreferenceRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import com.vishal.harpy.core.utils.SettingsRepository
+import com.vishal.harpy.core.utils.AppSettings
 
 enum class LoadingState {
     None, Scanning, Blocking, Unblocking, MappingTopology, TestingPing, DNSSpoofing, DHCPSpoofing
@@ -37,6 +41,7 @@ class NetworkMonitorViewModel @Inject constructor(
     private val unblockAllDevicesUseCase: UnblockAllDevicesUseCase,
     private val mapNetworkTopologyUseCase: MapNetworkTopologyUseCase,
     private val testPingUseCase: TestPingUseCase,
+    private val settingsRepository: SettingsRepository,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -75,8 +80,19 @@ class NetworkMonitorViewModel @Inject constructor(
     private val _filteredDevices = MutableStateFlow<List<NetworkDevice>>(emptyList())
     val filteredDevices: StateFlow<List<NetworkDevice>> = _filteredDevices.asStateFlow()
 
+    val appSettings: StateFlow<AppSettings> = settingsRepository.settings
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = settingsRepository.loadSettings()
+        )
+
+    private val _logCount = MutableStateFlow(0)
+    val logCount: StateFlow<Int> = _logCount.asStateFlow()
+
     init {
         checkRootAccessInternal()
+        refreshLogCount()
     }
 
     private fun checkRootAccessInternal() {
@@ -115,6 +131,7 @@ class NetworkMonitorViewModel @Inject constructor(
             _loadingState.value = LoadingState.Scanning
             _error.value = null
             try {
+                val settings = appSettings.value
                 val result = scanNetworkUseCase()
                 when (result) {
                     is NetworkResult.Success -> {
@@ -776,6 +793,68 @@ class NetworkMonitorViewModel @Inject constructor(
             } finally {
                 _loadingState.value = LoadingState.None
             }
+        }
+    }
+
+    private fun refreshLogCount() {
+        _logCount.value = com.vishal.harpy.core.utils.LogUtils.getLogCount(context)
+    }
+
+    /**
+     * Delete all log files
+     */
+    fun cleanLogs() {
+        viewModelScope.launch {
+            if (com.vishal.harpy.core.utils.LogUtils.cleanAllLogs(context)) {
+                refreshLogCount()
+            }
+        }
+    }
+
+    /**
+     * Clear current log file content
+     */
+    fun clearCurrentLog() {
+        viewModelScope.launch {
+            if (com.vishal.harpy.core.utils.LogUtils.clearCurrentLog(context)) {
+                refreshLogCount()
+            }
+        }
+    }
+
+    /**
+     * Update scan timeout setting
+     */
+    fun updateScanTimeout(timeout: Int) {
+        viewModelScope.launch {
+            settingsRepository.updateScanTimeout(timeout)
+        }
+    }
+
+    /**
+     * Update network interface setting
+     */
+    fun updateNetworkInterface(interfaceName: String) {
+        viewModelScope.launch {
+            settingsRepository.updateNetworkInterface(interfaceName)
+        }
+    }
+
+    /**
+     * Update debug mode setting
+     */
+    fun updateDebugMode(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.updateDebugMode(enabled)
+        }
+    }
+
+    /**
+     * Update verbose logging setting
+     */
+    fun updateVerboseLogging(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.updateVerboseLogging(enabled)
         }
     }
 }
