@@ -314,4 +314,68 @@ object LogUtils {
             logWriter = null
         }
     }
+
+    /**
+     * Get the count of log files in the logs directory
+     */
+    fun getLogCount(context: Context): Int {
+        val logDir = getLogsDirectory(context) ?: return 0
+        return if (logDir.exists() && logDir.isDirectory) {
+            logDir.listFiles { _, name -> name.startsWith("logs_") && name.endsWith(".txt") }?.size ?: 0
+        } else {
+            0
+        }
+    }
+
+    /**
+     * Delete all log files in the logs directory
+     */
+    fun cleanAllLogs(context: Context): Boolean {
+        val logDir = getLogsDirectory(context) ?: return false
+        if (!logDir.exists() || !logDir.isDirectory) return false
+        
+        var allDeleted = true
+        synchronized(logLock) {
+            // Close current writer first
+            val wasLoggingActive = isLoggingActive
+            stopFileLogging()
+            
+            logDir.listFiles { _, name -> name.startsWith("logs_") && name.endsWith(".txt") }?.forEach { file ->
+                if (!file.delete()) {
+                    allDeleted = false
+                    Log.e(TAG, "Failed to delete log file: ${file.absolutePath}")
+                }
+            }
+            
+            // Restart logging if it was active
+            if (wasLoggingActive) {
+                startFileLogging(context)
+            }
+        }
+        return allDeleted
+    }
+
+    /**
+     * Clear the content of the current log file
+     */
+    fun clearCurrentLog(context: Context): Boolean {
+        synchronized(logLock) {
+            try {
+                // If not active, there's nothing to clear (or we just delete files)
+                if (!isLoggingActive || logFile == null) return false
+                
+                // Close current writer
+                logWriter?.flush()
+                logWriter?.close()
+                
+                // Overwrite with empty content
+                logWriter = PrintWriter(FileWriter(logFile!!, false), true)
+                Log.i(TAG, "Current log file cleared: ${logFile?.absolutePath}")
+                return true
+            } catch (e: Exception) {
+                Log.e(TAG, "Error clearing current log", e)
+                return false
+            }
+        }
+    }
 }
