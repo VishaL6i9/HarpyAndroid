@@ -71,41 +71,77 @@ fun DHCPSpoofingScreen(
 
             Button(
                 onClick = { showStartDialog = true },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(16.dp)
             ) {
-                Icon(Icons.Default.PlayArrow, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text("Start DHCP Spoofing")
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    Icon(
+                        imageVector = Icons.Default.PlayArrow,
+                        contentDescription = null,
+                        modifier = Modifier.align(Alignment.CenterStart)
+                    )
+                    Text(
+                        text = "Start DHCP Spoofing",
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                }
             }
 
             Button(
                 onClick = { viewModel.stopDHCPSpoofing() },
                 modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(16.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.error
                 )
             ) {
-                Icon(Icons.Default.Stop, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text("Stop DHCP Spoofing")
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    Icon(
+                        imageVector = Icons.Default.Stop,
+                        contentDescription = null,
+                        modifier = Modifier.align(Alignment.CenterStart)
+                    )
+                    Text(
+                        text = "Stop DHCP Spoofing",
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                }
             }
 
             OutlinedButton(
                 onClick = { showAddRuleDialog = true },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(16.dp)
             ) {
-                Icon(Icons.Default.Add, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text("Add DHCP Rule")
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = null,
+                        modifier = Modifier.align(Alignment.CenterStart)
+                    )
+                    Text(
+                        text = "Add DHCP Rule",
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                }
             }
 
             OutlinedButton(
                 onClick = { showRemoveRuleDialog = true },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(16.dp)
             ) {
-                Icon(Icons.Default.Remove, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text("Remove DHCP Rule")
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    Icon(
+                        imageVector = Icons.Default.Remove,
+                        contentDescription = null,
+                        modifier = Modifier.align(Alignment.CenterStart)
+                    )
+                    Text(
+                        text = "Remove DHCP Rule",
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                }
             }
 
             OutlinedButton(
@@ -113,11 +149,20 @@ fun DHCPSpoofingScreen(
                     val isActive = viewModel.isDHCPSpoofingActive()
                     // Show status
                 },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(16.dp)
             ) {
-                Icon(Icons.Default.Info, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text("Check DHCP Status")
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = null,
+                        modifier = Modifier.align(Alignment.CenterStart)
+                    )
+                    Text(
+                        text = "Check DHCP Status",
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                }
             }
         }
     }
