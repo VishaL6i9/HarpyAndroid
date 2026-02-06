@@ -186,7 +186,7 @@ app/src/main/kotlin/com/vishal/harpy/
 - Kotlin Coroutines for async operations
 
 **Data Layer:**
-- SharedPreferences for device preferences
+- SharedPreferences with `SettingsRepository` for application and device preferences
 - Native C++ for low-level network operations
 - Root helper binary for privileged operations
 
@@ -291,7 +291,8 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 - [x] DNS and DHCP spoofing
 - [x] Persistent device preferences
 - [x] Root helper binary architecture
-- [x] Real-time logging system
+- [x] Real-time logging system with log management utilities
+- [x] Comprehensive application settings (Scan timeout, interface selection, debug mode)
 
 ### In Progress 🚧
 - [ ] Comprehensive unit testing
@@ -317,7 +318,8 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ### Network scan finds no devices
 - Verify you're connected to Wi-Fi
 - Check that root access is granted
-- Try increasing scan timeout in settings
+- Try increasing scan timeout in **Settings > Scan Settings**
+- Ensure the correct network interface is selected in **Settings > Interface Selection** (usually `wlan0`)
 
 ### Device blocking doesn't work
 - Ensure the device is on the same network
