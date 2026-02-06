@@ -250,7 +250,7 @@ fun DeviceActionsBottomSheet(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             
-            Divider(modifier = Modifier.padding(vertical = 8.dp))
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
             
             Surface(
                 modifier = Modifier.fillMaxWidth(),
