@@ -10,22 +10,22 @@ import androidx.compose.ui.graphics.Color
 private val DarkColorScheme = darkColorScheme(
     primary = HarpyPrimary,
     onPrimary = HarpyOnPrimary,
-    primaryContainer = Color(0xFF003D5C),
-    onPrimaryContainer = Color(0xFFB3E5FC),
+    primaryContainer = Color(0xFF2D005B), // Deep Violet
+    onPrimaryContainer = Color(0xFFEADBFF), // Light Violet
     
     secondary = HarpySecondary,
     onSecondary = HarpyOnSecondary,
-    secondaryContainer = Color(0xFF004D5C),
-    onSecondaryContainer = Color(0xFFB2EBF2),
+    secondaryContainer = Color(0xFF005333), // Deep Green
+    onSecondaryContainer = Color(0xFF88F6C1), // Light Green
     
     tertiary = HarpyTertiary,
-    onTertiary = Color(0xFF000000),
-    tertiaryContainer = Color(0xFF005662),
-    onTertiaryContainer = Color(0xFFB2DFDB),
+    onTertiary = HarpyOnPrimary,
+    tertiaryContainer = Color(0xFF6E002B), // Deep Pink
+    onTertiaryContainer = Color(0xFFFFD9E2), // Light Pink
     
     error = HarpyError,
-    onError = Color(0xFF000000),
-    errorContainer = Color(0xFF93000A),
+    onError = HarpyOnPrimary,
+    errorContainer = Color(0xFF700B22),
     onErrorContainer = Color(0xFFFFDAD6),
     
     background = HarpyBackground,
@@ -37,7 +37,7 @@ private val DarkColorScheme = darkColorScheme(
     onSurfaceVariant = HarpyOnSurfaceVariant,
     
     surfaceTint = HarpyPrimary,
-    inverseSurface = Color(0xFFE1E1E1),
+    inverseSurface = Color(0xFFFFFFFE),
     inverseOnSurface = Color(0xFF000000),
     
     outline = HarpyOutline,
@@ -45,11 +45,11 @@ private val DarkColorScheme = darkColorScheme(
     
     scrim = Color(0xFF000000),
     
-    surfaceBright = Color(0xFF2A2A2A),
+    surfaceBright = Color(0xFF242629),
     surfaceDim = Color(0xFF000000),
-    surfaceContainer = Color(0xFF0D0D0D),
-    surfaceContainerHigh = Color(0xFF1A1A1A),
-    surfaceContainerHighest = Color(0xFF262626),
+    surfaceContainer = Color(0xFF0D0D0F),      // Very dark subtle background
+    surfaceContainerHigh = Color(0xFF16161A),  // Card background
+    surfaceContainerHighest = Color(0xFF242629),
     surfaceContainerLow = Color(0xFF050505),
     surfaceContainerLowest = Color(0xFF000000)
 )
