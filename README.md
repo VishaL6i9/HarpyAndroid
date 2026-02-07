@@ -160,7 +160,13 @@ app/src/main/kotlin/com/vishal/harpy/
 │   │   └── presentation/          # ViewModels
 │   ├── network_monitor/
 │   ├── dns/
+│   │   ├── data/
+│   │   ├── domain/
+│   │   └── di/
 │   └── dhcp/
+│       ├── data/
+│       ├── domain/
+│       └── di/
 ├── ui/                            # Compose UI layer
 │   ├── screens/                   # Screen composables
 │   │   ├── network/
