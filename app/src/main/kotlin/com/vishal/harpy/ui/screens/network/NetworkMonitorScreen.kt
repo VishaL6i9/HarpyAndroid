@@ -33,6 +33,9 @@ fun NetworkMonitorScreen(
     val filterIPv4 by viewModel.filterIPv4.collectAsStateWithLifecycle()
     val filterIPv6 by viewModel.filterIPv6.collectAsStateWithLifecycle()
     val scanSuccess by viewModel.scanSuccess.collectAsStateWithLifecycle()
+    val testPingResult by viewModel.testPingResult.collectAsStateWithLifecycle()
+
+    val context = androidx.compose.ui.platform.LocalContext.current
     
     var showUnblockDialog by remember { mutableStateOf(false) }
     var selectedDevice by remember { mutableStateOf<NetworkDevice?>(null) }
@@ -41,6 +44,14 @@ fun NetworkMonitorScreen(
     LaunchedEffect(scanSuccess) {
         if (scanSuccess) {
             viewModel.resetScanSuccess()
+        }
+    }
+
+    LaunchedEffect(testPingResult) {
+        testPingResult?.let { (ip, success) ->
+            val message = if (success) "Ping to $ip successful" else "Ping to $ip failed"
+            android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_SHORT).show()
+            viewModel.resetPingResult()
         }
     }
 
