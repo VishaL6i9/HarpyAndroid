@@ -6,7 +6,7 @@ import com.vishal.harpy.core.utils.NetworkResult
 import javax.inject.Inject
 
 class ScanNetworkUseCase @Inject constructor(
-    val repository: NetworkMonitorRepository  // Changed from private to public
+    private val repository: NetworkMonitorRepository
 ) {
     suspend operator fun invoke(): NetworkResult<List<NetworkDevice>> {
         return repository.scanNetwork()
