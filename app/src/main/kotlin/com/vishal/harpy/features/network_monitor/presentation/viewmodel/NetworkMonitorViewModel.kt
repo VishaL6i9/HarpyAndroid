@@ -10,6 +10,14 @@ import com.vishal.harpy.features.network_monitor.domain.usecases.UnblockDeviceUs
 import com.vishal.harpy.features.network_monitor.domain.usecases.UnblockAllDevicesUseCase
 import com.vishal.harpy.features.network_monitor.domain.usecases.MapNetworkTopologyUseCase
 import com.vishal.harpy.features.network_monitor.domain.usecases.TestPingUseCase
+import com.vishal.harpy.features.network_monitor.domain.usecases.IsDeviceBlockedUseCase
+import com.vishal.harpy.features.network_monitor.domain.usecases.RestoreBlockedDevicesUseCase
+import com.vishal.harpy.features.dns.domain.usecases.StartDnsSpoofingUseCase
+import com.vishal.harpy.features.dns.domain.usecases.StopDnsSpoofingUseCase
+import com.vishal.harpy.features.dns.domain.usecases.IsDnsSpoofingActiveUseCase
+import com.vishal.harpy.features.dhcp.domain.usecases.StartDhcpSpoofingUseCase
+import com.vishal.harpy.features.dhcp.domain.usecases.StopDhcpSpoofingUseCase
+import com.vishal.harpy.features.dhcp.domain.usecases.IsDhcpSpoofingActiveUseCase
 import com.vishal.harpy.core.utils.NetworkDevice
 import com.vishal.harpy.core.utils.NetworkTopology
 import com.vishal.harpy.core.utils.NetworkResult
@@ -41,6 +49,14 @@ class NetworkMonitorViewModel @Inject constructor(
     private val unblockAllDevicesUseCase: UnblockAllDevicesUseCase,
     private val mapNetworkTopologyUseCase: MapNetworkTopologyUseCase,
     private val testPingUseCase: TestPingUseCase,
+    private val isDeviceBlockedUseCase: IsDeviceBlockedUseCase,
+    private val restoreBlockedDevicesUseCase: RestoreBlockedDevicesUseCase,
+    private val startDnsSpoofingUseCase: StartDnsSpoofingUseCase,
+    private val stopDnsSpoofingUseCase: StopDnsSpoofingUseCase,
+    private val isDnsSpoofingActiveUseCase: IsDnsSpoofingActiveUseCase,
+    private val startDhcpSpoofingUseCase: StartDhcpSpoofingUseCase,
+    private val stopDhcpSpoofingUseCase: StopDhcpSpoofingUseCase,
+    private val isDhcpSpoofingActiveUseCase: IsDhcpSpoofingActiveUseCase,
     private val settingsRepository: SettingsRepository,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
@@ -203,7 +219,7 @@ class NetworkMonitorViewModel @Inject constructor(
                 
                 // Verify each device's block status
                 val devicesNeedingRestore = devicesToVerify.filter { device ->
-                    !scanNetworkUseCase.repository.isDeviceBlocked(device.ipAddress)
+                    !isDeviceBlockedUseCase(device.ipAddress)
                 }
                 
                 if (devicesNeedingRestore.isNotEmpty()) {
@@ -213,7 +229,7 @@ class NetworkMonitorViewModel @Inject constructor(
                     )
                     
                     // Restore blocks for devices that should be blocked
-                    val restoreResult = scanNetworkUseCase.repository.restoreBlockedDevices(devicesNeedingRestore)
+                    val restoreResult = restoreBlockedDevicesUseCase(devicesNeedingRestore)
                     
                     when (restoreResult) {
                         is NetworkResult.Success -> {
@@ -572,7 +588,7 @@ class NetworkMonitorViewModel @Inject constructor(
             _loadingState.value = LoadingState.DNSSpoofing
             _error.value = null
             try {
-                val result = scanNetworkUseCase.repository.startDNSSpoofing(domain, spoofedIP, interfaceName)
+                val result = startDnsSpoofingUseCase(domain, spoofedIP, interfaceName)
                 when (result) {
                     is NetworkResult.Success -> {
                         if (result.data) {
@@ -611,7 +627,7 @@ class NetworkMonitorViewModel @Inject constructor(
             _loadingState.value = LoadingState.DNSSpoofing
             _error.value = null
             try {
-                val result = scanNetworkUseCase.repository.stopDNSSpoofing(domain)
+                val result = stopDnsSpoofingUseCase(domain)
                 when (result) {
                     is NetworkResult.Success -> {
                         if (result.data) {
@@ -650,7 +666,7 @@ class NetworkMonitorViewModel @Inject constructor(
      * Check if DNS spoofing is active for a domain
      */
     fun isDNSSpoofingActive(domain: String): Boolean {
-        return scanNetworkUseCase.repository.isDNSSpoofingActive(domain)
+        return isDnsSpoofingActiveUseCase(domain)
     }
 
 
@@ -658,7 +674,7 @@ class NetworkMonitorViewModel @Inject constructor(
      * Check if DHCP spoofing is active
      */
     fun isDHCPSpoofingActive(): Boolean {
-        return scanNetworkUseCase.repository.isDHCPSpoofingActive()
+        return isDhcpSpoofingActiveUseCase()
     }
 
     /**
@@ -681,7 +697,7 @@ class NetworkMonitorViewModel @Inject constructor(
             _loadingState.value = LoadingState.DHCPSpoofing
             _error.value = null
             try {
-                val result = scanNetworkUseCase.repository.startDHCPSpoofing(
+                val result = startDhcpSpoofingUseCase(
                     interfaceName,
                     targetMacs,
                     spoofedIPs,
@@ -728,7 +744,7 @@ class NetworkMonitorViewModel @Inject constructor(
             _loadingState.value = LoadingState.DHCPSpoofing
             _error.value = null
             try {
-                val result = scanNetworkUseCase.repository.stopDHCPSpoofing()
+                val result = stopDhcpSpoofingUseCase()
                 when (result) {
                     is NetworkResult.Success -> {
                         if (result.data) {
