@@ -1,4 +1,4 @@
-# Harpy
+# HarpyAndroid
 
 A powerful network monitoring and management tool for Android, built with modern Jetpack Compose.
 
