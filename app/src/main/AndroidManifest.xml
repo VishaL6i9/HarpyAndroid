@@ -20,6 +20,15 @@
     <!-- Vibration permission for haptic feedback -->
     <uses-permission android:name="android.permission.VIBRATE" />
 
+    <!-- Notification permission for Android 13+ -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Foreground service permission for Android 12+ -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+
+    <!-- Specific foreground service type permissions for Android 12+ -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+
     <application
         android:name=".HarpyApplication"
         android:allowBackup="true"
@@ -54,6 +63,20 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+
+        <service
+            android:name=".core.service.NotificationService"
+            android:exported="false"
+            tools:targetApi="29"
+            android:foregroundServiceType="dataSync" />
+
+        <receiver
+            android:name=".core.service.ServiceKillReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.vishal.harpy.KILL_SERVICE" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

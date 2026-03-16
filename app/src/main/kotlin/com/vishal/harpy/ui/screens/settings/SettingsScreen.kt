@@ -18,6 +18,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vishal.harpy.features.network_monitor.presentation.viewmodel.NetworkMonitorViewModel
 import com.vishal.harpy.core.utils.LogUtils
+import com.vishal.harpy.core.service.ServiceController
+import com.vishal.harpy.core.di.ServiceEntryPoint
+import dagger.hilt.android.EntryPointAccessors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -34,6 +37,11 @@ fun SettingsScreen(
     var showUnblockAllDialog by remember { mutableStateOf(false) }
 
     val settings by viewModel.appSettings.collectAsStateWithLifecycle()
+    
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val serviceController = remember {
+        EntryPointAccessors.fromApplication(context, ServiceEntryPoint::class.java).getServiceController()
+    }
 
     BackHandler {
         if (showAboutScreen) {
@@ -58,12 +66,12 @@ fun SettingsScreen(
             onShowRootHelper = { showRootHelperDialog = true },
             onShowUnblockAll = { showUnblockAllDialog = true },
             settings = settings,
-            viewModel = viewModel
+            viewModel = viewModel,
+            serviceController = serviceController
         )
     }
 
     // Success feedback
-    val context = androidx.compose.ui.platform.LocalContext.current
     val error by viewModel.error.collectAsStateWithLifecycle()
     LaunchedEffect(error) {
         error?.let {
@@ -157,7 +165,8 @@ private fun SettingsContent(
     onShowRootHelper: () -> Unit,
     onShowUnblockAll: () -> Unit,
     settings: com.vishal.harpy.core.utils.AppSettings,
-    viewModel: NetworkMonitorViewModel
+    viewModel: NetworkMonitorViewModel,
+    serviceController: ServiceController
 ) {
 
     Scaffold(
@@ -278,6 +287,17 @@ private fun SettingsContent(
                         }
                     )
                 }
+            }
+
+            // Service Control Section
+            item {
+                SettingsSectionHeader(title = "Service")
+            }
+
+            item {
+                com.vishal.harpy.ui.components.ServiceControlCard(
+                    serviceController = serviceController
+                )
             }
 
             // About Section

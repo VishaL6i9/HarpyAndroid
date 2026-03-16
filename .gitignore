@@ -41,6 +41,10 @@ captures/
 .idea/assetWizardSettings.xml
 .idea/deploymentTargetSelector.xml
 
+### Gradle auto-generated files ###
+settings.gradle
+gradle/gradle-daemon-jvm.properties
+
 ### Android App Generated ###
 app/build/
 

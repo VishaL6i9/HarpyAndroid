@@ -74,6 +74,39 @@ object PermissionChecker {
             )
         }
 
+        // Add foreground service permission for Android 12+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            REQUIRED_PERMISSIONS.add(
+                PermissionInfo(
+                    permission = Manifest.permission.FOREGROUND_SERVICE,
+                    name = "Foreground Service",
+                    description = "Required to display persistent service notification",
+                    isGranted = false
+                )
+            )
+            // Add specific foreground service type permission for data sync
+            REQUIRED_PERMISSIONS.add(
+                PermissionInfo(
+                    permission = "android.permission.FOREGROUND_SERVICE_DATA_SYNC",
+                    name = "Foreground Service (Data Sync)",
+                    description = "Required for persistent network monitoring notification",
+                    isGranted = false
+                )
+            )
+        }
+
+        // Add POST_NOTIFICATIONS permission for Android 13+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            REQUIRED_PERMISSIONS.add(
+                PermissionInfo(
+                    permission = Manifest.permission.POST_NOTIFICATIONS,
+                    name = "Post Notifications",
+                    description = "Required to display service notifications",
+                    isGranted = false
+                )
+            )
+        }
+
         // Add DNS property access warning (varies by SDK)
         val dnsWarning = when {
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q -> {
