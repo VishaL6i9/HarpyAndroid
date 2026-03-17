@@ -26,6 +26,7 @@ import dagger.hilt.android.EntryPointAccessors
 @Composable
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
+    onNavigateToDeviceManagement: () -> Unit = {},
     viewModel: NetworkMonitorViewModel = hiltViewModel()
 ) {
     var showAboutScreen by remember { mutableStateOf(false) }
@@ -35,6 +36,10 @@ fun SettingsScreen(
     var showLoggingDialog by remember { mutableStateOf(false) }
     var showRootHelperDialog by remember { mutableStateOf(false) }
     var showUnblockAllDialog by remember { mutableStateOf(false) }
+    var showDnsSettingsDialog by remember { mutableStateOf(false) }
+    var showDhcpSettingsDialog by remember { mutableStateOf(false) }
+    var showWhitelistDialog by remember { mutableStateOf(false) }
+    var showThemeDialog by remember { mutableStateOf(false) }
 
     val settings by viewModel.appSettings.collectAsStateWithLifecycle()
     
@@ -42,6 +47,9 @@ fun SettingsScreen(
     val serviceController = remember {
         EntryPointAccessors.fromApplication(context, ServiceEntryPoint::class.java).getServiceController()
     }
+    
+    val themeManager = hiltViewModel<com.vishal.harpy.core.utils.ThemeManager>()
+    val themeMode by themeManager.themeMode.collectAsStateWithLifecycle()
 
     BackHandler {
         if (showAboutScreen) {
@@ -58,6 +66,7 @@ fun SettingsScreen(
         // Show normal settings screen
         SettingsContent(
             onNavigateBack = onNavigateBack,
+            onNavigateToDeviceManagement = onNavigateToDeviceManagement,
             onShowAbout = { showAboutScreen = true },
             onShowClearNamesDialog = { showClearNamesDialog = true },
             onShowScanSettings = { showScanSettingsDialog = true },
@@ -65,9 +74,15 @@ fun SettingsScreen(
             onShowLogging = { showLoggingDialog = true },
             onShowRootHelper = { showRootHelperDialog = true },
             onShowUnblockAll = { showUnblockAllDialog = true },
+            onShowDnsSettings = { showDnsSettingsDialog = true },
+            onShowDhcpSettings = { showDhcpSettingsDialog = true },
+            onShowWhitelist = { showWhitelistDialog = true },
+            onShowTheme = { showThemeDialog = true },
             settings = settings,
             viewModel = viewModel,
-            serviceController = serviceController
+            serviceController = serviceController,
+            themeMode = themeMode,
+            themeManager = themeManager
         )
     }
 
@@ -151,12 +166,60 @@ fun SettingsScreen(
             }
         )
     }
+
+    if (showDnsSettingsDialog) {
+        DnsSettingsDialog(
+            currentDns = settings.customDnsServer,
+            currentFallback = settings.fallbackDnsServer,
+            onConfirm = { dns, fallback ->
+                viewModel.updateDnsSettings(dns, fallback)
+                showDnsSettingsDialog = false
+            },
+            onDismiss = { showDnsSettingsDialog = false }
+        )
+    }
+
+    if (showDhcpSettingsDialog) {
+        DhcpSettingsDialog(
+            currentLeaseTime = settings.dhcpLeaseTimeSeconds,
+            onConfirm = { leaseTime ->
+                viewModel.updateDhcpLeaseTime(leaseTime)
+                showDhcpSettingsDialog = false
+            },
+            onDismiss = { showDhcpSettingsDialog = false }
+        )
+    }
+
+    if (showWhitelistDialog) {
+        WhitelistDialog(
+            enableWhitelist = settings.enableWhitelist,
+            onConfirm = { enabled ->
+                viewModel.updateWhitelistEnabled(enabled)
+                showWhitelistDialog = false
+            },
+            onDismiss = { showWhitelistDialog = false }
+        )
+    }
+
+    if (showThemeDialog) {
+        ThemeDialog(
+            currentTheme = themeMode,
+            onConfirm = { theme ->
+                viewModel.viewModelScope.launch {
+                    themeManager.setThemeMode(theme)
+                }
+                showThemeDialog = false
+            },
+            onDismiss = { showThemeDialog = false }
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SettingsContent(
     onNavigateBack: () -> Unit,
+    onNavigateToDeviceManagement: () -> Unit,
     onShowAbout: () -> Unit,
     onShowClearNamesDialog: () -> Unit,
     onShowScanSettings: () -> Unit,
@@ -164,9 +227,15 @@ private fun SettingsContent(
     onShowLogging: () -> Unit,
     onShowRootHelper: () -> Unit,
     onShowUnblockAll: () -> Unit,
+    onShowDnsSettings: () -> Unit,
+    onShowDhcpSettings: () -> Unit,
+    onShowWhitelist: () -> Unit,
+    onShowTheme: () -> Unit,
     settings: com.vishal.harpy.core.utils.AppSettings,
     viewModel: NetworkMonitorViewModel,
-    serviceController: ServiceController
+    serviceController: ServiceController,
+    themeMode: com.vishal.harpy.core.utils.ThemeMode,
+    themeManager: com.vishal.harpy.core.utils.ThemeManager
 ) {
 
     Scaffold(
@@ -199,6 +268,22 @@ private fun SettingsContent(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // Appearance Section
+            item {
+                SettingsSectionHeader(title = "Appearance")
+            }
+
+            item {
+                SettingsCard {
+                    SettingsItem(
+                        title = "Theme",
+                        summary = "Current: ${themeMode.name.lowercase().replaceFirstChar { it.uppercase() }}",
+                        icon = Icons.Outlined.Palette,
+                        onClick = onShowTheme
+                    )
+                }
+            }
+
             // Network Section
             item {
                 SettingsSectionHeader(title = "Network")
@@ -224,6 +309,31 @@ private fun SettingsContent(
                 }
             }
 
+            // Spoofing Configuration Section
+            item {
+                SettingsSectionHeader(title = "Spoofing Configuration")
+            }
+
+            item {
+                SettingsCard {
+                    SettingsItem(
+                        title = "DNS Settings",
+                        summary = "Configure custom DNS server (Current: ${settings.customDnsServer})",
+                        icon = Icons.Outlined.Dns,
+                        onClick = onShowDnsSettings
+                    )
+                    
+                    SettingsDivider()
+                    
+                    SettingsItem(
+                        title = "DHCP Settings",
+                        summary = "Configure DHCP lease time (Current: ${settings.dhcpLeaseTimeSeconds}s)",
+                        icon = Icons.Outlined.Settings,
+                        onClick = onShowDhcpSettings
+                    )
+                }
+            }
+
             // Device Management Section
             item {
                 SettingsSectionHeader(title = "Device Management")
@@ -231,6 +341,30 @@ private fun SettingsContent(
 
             item {
                 SettingsCard {
+                    SettingsItem(
+                        title = "Manage Devices",
+                        summary = "View and manage blocked/whitelisted devices",
+                        icon = Icons.Outlined.Devices,
+                        onClick = onNavigateToDeviceManagement
+                    )
+                    
+                    SettingsDivider()
+                    
+                    SettingsItem(
+                        title = "Whitelist Mode",
+                        summary = "Enable whitelist to only spoof whitelisted devices",
+                        icon = Icons.Outlined.CheckCircle,
+                        onClick = onShowWhitelist,
+                        trailingContent = {
+                            Switch(
+                                checked = settings.enableWhitelist,
+                                onCheckedChange = { onShowWhitelist() }
+                            )
+                        }
+                    )
+                    
+                    SettingsDivider()
+                    
                     SettingsItem(
                         title = "Clear All Device Names",
                         summary = "Remove all custom device names",
@@ -619,6 +753,239 @@ fun RootHelperDialog(
         confirmButton = {
             TextButton(onClick = onDismiss) {
                 Text("Close")
+            }
+        }
+    )
+}
+
+
+@Composable
+fun DnsSettingsDialog(
+    currentDns: String,
+    currentFallback: String,
+    onConfirm: (String, String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var dnsServer by remember { mutableStateOf(currentDns) }
+    var fallbackServer by remember { mutableStateOf(currentFallback) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("DNS Settings") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    text = "Configure custom DNS servers for spoofing",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                
+                OutlinedTextField(
+                    value = dnsServer,
+                    onValueChange = { dnsServer = it },
+                    label = { Text("Primary DNS") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                
+                OutlinedTextField(
+                    value = fallbackServer,
+                    onValueChange = { fallbackServer = it },
+                    label = { Text("Fallback DNS") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                
+                Text(
+                    text = "Fallback DNS is used if primary server is unavailable",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(dnsServer, fallbackServer) }) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+@Composable
+fun DhcpSettingsDialog(
+    currentLeaseTime: Int,
+    onConfirm: (Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var leaseTime by remember { mutableStateOf(currentLeaseTime.toFloat()) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("DHCP Settings") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    text = "Configure DHCP lease time for spoofed devices",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                
+                Text(
+                    text = "Lease Time: ${leaseTime.toInt()} seconds (${leaseTime.toInt() / 60} minutes)",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                
+                Slider(
+                    value = leaseTime,
+                    onValueChange = { leaseTime = it },
+                    valueRange = 300f..86400f, // 5 minutes to 24 hours
+                    steps = 100
+                )
+                
+                Text(
+                    text = "Longer lease times mean devices stay spoofed longer",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(leaseTime.toInt()) }) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+@Composable
+fun WhitelistDialog(
+    enableWhitelist: Boolean,
+    onConfirm: (Boolean) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var whitelistEnabled by remember { mutableStateOf(enableWhitelist) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Whitelist Mode") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    text = "When enabled, only whitelisted devices will be spoofed. All other devices are ignored.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { whitelistEnabled = !whitelistEnabled }
+                        .padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = whitelistEnabled,
+                        onCheckedChange = { whitelistEnabled = it }
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Enable Whitelist Mode")
+                }
+                
+                if (whitelistEnabled) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                        )
+                    ) {
+                        Text(
+                            text = "Whitelist mode is active. Add devices to whitelist in Device Management.",
+                            modifier = Modifier.padding(12.dp),
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(whitelistEnabled) }) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+
+@Composable
+fun ThemeDialog(
+    currentTheme: com.vishal.harpy.core.utils.ThemeMode,
+    onConfirm: (com.vishal.harpy.core.utils.ThemeMode) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var selectedTheme by remember { mutableStateOf(currentTheme) }
+    val themes = listOf(
+        com.vishal.harpy.core.utils.ThemeMode.LIGHT,
+        com.vishal.harpy.core.utils.ThemeMode.DARK,
+        com.vishal.harpy.core.utils.ThemeMode.SYSTEM
+    )
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Theme") },
+        text = {
+            Column {
+                themes.forEach { theme ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { selectedTheme = theme }
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = (theme == selectedTheme),
+                            onClick = { selectedTheme = theme }
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(theme.name.lowercase().replaceFirstChar { it.uppercase() })
+                            Text(
+                                text = when (theme) {
+                                    com.vishal.harpy.core.utils.ThemeMode.LIGHT -> "Always use light theme"
+                                    com.vishal.harpy.core.utils.ThemeMode.DARK -> "Always use dark theme"
+                                    com.vishal.harpy.core.utils.ThemeMode.SYSTEM -> "Follow system settings"
+                                },
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(selectedTheme) }) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
             }
         }
     )
