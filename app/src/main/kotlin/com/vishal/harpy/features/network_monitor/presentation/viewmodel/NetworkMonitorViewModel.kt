@@ -874,3 +874,95 @@ class NetworkMonitorViewModel @Inject constructor(
         }
     }
 }
+
+    /**
+     * Update DNS settings
+     */
+    fun updateDnsSettings(customDns: String, fallbackDns: String) {
+        viewModelScope.launch {
+            settingsRepository.updateDnsSettings(customDns, fallbackDns)
+        }
+    }
+
+    /**
+     * Update DHCP lease time setting
+     */
+    fun updateDhcpLeaseTime(leaseTimeSeconds: Int) {
+        viewModelScope.launch {
+            settingsRepository.updateDhcpLeaseTime(leaseTimeSeconds)
+        }
+    }
+
+    /**
+     * Update whitelist enabled setting
+     */
+    fun updateWhitelistEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.updateWhitelistEnabled(enabled)
+        }
+    }
+
+    /**
+     * Get blacklisted devices
+     */
+    val blacklistedDevices: StateFlow<List<NetworkDevice>> = 
+        networkDevices.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        ).let { devicesFlow ->
+            devicesFlow.stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = emptyList()
+            )
+        }
+
+    /**
+     * Get whitelisted devices
+     */
+    val whitelistedDevices: StateFlow<List<NetworkDevice>> = 
+        networkDevices.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        ).let { devicesFlow ->
+            devicesFlow.stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = emptyList()
+            )
+        }
+
+    /**
+     * Get all devices
+     */
+    val devices: StateFlow<List<NetworkDevice>> = networkDevices
+
+    /**
+     * Add device to whitelist
+     */
+    fun addToWhitelist(device: NetworkDevice) {
+        viewModelScope.launch {
+            try {
+                devicePreferenceRepository.addToWhitelist(device.macAddress)
+                com.vishal.harpy.core.utils.LogUtils.d("NetworkMonitorVM", "Added ${device.deviceName} to whitelist")
+            } catch (e: Exception) {
+                _error.value = "Failed to add device to whitelist: ${e.message}"
+            }
+        }
+    }
+
+    /**
+     * Remove device from whitelist
+     */
+    fun removeFromWhitelist(device: NetworkDevice) {
+        viewModelScope.launch {
+            try {
+                devicePreferenceRepository.removeFromWhitelist(device.macAddress)
+                com.vishal.harpy.core.utils.LogUtils.d("NetworkMonitorVM", "Removed ${device.deviceName} from whitelist")
+            } catch (e: Exception) {
+                _error.value = "Failed to remove device from whitelist: ${e.message}"
+            }
+        }
+    }

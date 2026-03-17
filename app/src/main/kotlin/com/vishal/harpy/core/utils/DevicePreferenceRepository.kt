@@ -43,6 +43,7 @@ class DevicePreferenceRepository(context: Context) {
                     put("deviceName", preference.deviceName)
                     put("isPinned", preference.isPinned)
                     put("isBlocked", preference.isBlocked)
+                    put("isWhitelisted", preference.isWhitelisted)
                     put("lastSeen", preference.lastSeen)
                 }.toString()
                 
@@ -217,6 +218,7 @@ class DevicePreferenceRepository(context: Context) {
                 deviceName = obj.optString("deviceName", "").takeIf { it.isNotEmpty() },
                 isPinned = obj.optBoolean("isPinned", false),
                 isBlocked = obj.optBoolean("isBlocked", false),
+                isWhitelisted = obj.optBoolean("isWhitelisted", false),
                 lastSeen = obj.optLong("lastSeen", System.currentTimeMillis())
             )
         } catch (e: Exception) {
@@ -225,3 +227,42 @@ class DevicePreferenceRepository(context: Context) {
         }
     }
 }
+
+    /**
+     * Add device to whitelist
+     */
+    suspend fun addToWhitelist(macAddress: String) {
+        val preference = getDevicePreference(macAddress) ?: DevicePreference(macAddress)
+        saveDevicePreference(preference.copy(isWhitelisted = true))
+        Log.d(TAG, "Added $macAddress to whitelist")
+    }
+    
+    /**
+     * Remove device from whitelist
+     */
+    suspend fun removeFromWhitelist(macAddress: String) {
+        val preference = getDevicePreference(macAddress) ?: DevicePreference(macAddress)
+        saveDevicePreference(preference.copy(isWhitelisted = false))
+        Log.d(TAG, "Removed $macAddress from whitelist")
+    }
+    
+    /**
+     * Get all whitelisted devices
+     */
+    fun getWhitelistedDevices(): List<String> {
+        return try {
+            val whitelistedDevices = mutableListOf<String>()
+            sharedPreferences.all.forEach { (key, value) ->
+                if (key.startsWith(KEY_PREFIX) && value is String) {
+                    val preference = parseDevicePreference(value, "")
+                    if (preference?.isWhitelisted == true) {
+                        preference.macAddress.let { whitelistedDevices.add(it) }
+                    }
+                }
+            }
+            whitelistedDevices
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting whitelisted devices: ${e.message}")
+            emptyList()
+        }
+    }
