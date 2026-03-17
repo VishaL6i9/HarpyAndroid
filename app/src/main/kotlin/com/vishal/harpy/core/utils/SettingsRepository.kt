@@ -23,6 +23,10 @@ class SettingsRepository @Inject constructor(
         private const val KEY_NETWORK_INTERFACE = "network_interface"
         private const val KEY_DEBUG_MODE = "debug_mode"
         private const val KEY_VERBOSE_LOGGING = "verbose_logging"
+        private const val KEY_CUSTOM_DNS = "custom_dns"
+        private const val KEY_FALLBACK_DNS = "fallback_dns"
+        private const val KEY_DHCP_LEASE_TIME = "dhcp_lease_time"
+        private const val KEY_ENABLE_WHITELIST = "enable_whitelist"
     }
 
     private val sharedPreferences: SharedPreferences =
@@ -36,7 +40,11 @@ class SettingsRepository @Inject constructor(
             scanTimeoutSeconds = sharedPreferences.getInt(KEY_SCAN_TIMEOUT, 10),
             networkInterface = sharedPreferences.getString(KEY_NETWORK_INTERFACE, "wlan0") ?: "wlan0",
             isDebugMode = sharedPreferences.getBoolean(KEY_DEBUG_MODE, false),
-            isVerboseLogging = sharedPreferences.getBoolean(KEY_VERBOSE_LOGGING, false)
+            isVerboseLogging = sharedPreferences.getBoolean(KEY_VERBOSE_LOGGING, false),
+            customDnsServer = sharedPreferences.getString(KEY_CUSTOM_DNS, "8.8.8.8") ?: "8.8.8.8",
+            fallbackDnsServer = sharedPreferences.getString(KEY_FALLBACK_DNS, "8.8.4.4") ?: "8.8.4.4",
+            dhcpLeaseTimeSeconds = sharedPreferences.getInt(KEY_DHCP_LEASE_TIME, 3600),
+            enableWhitelist = sharedPreferences.getBoolean(KEY_ENABLE_WHITELIST, false)
         )
     }
 
@@ -67,3 +75,27 @@ class SettingsRepository @Inject constructor(
         Log.d(TAG, "Verbose logging updated to: $enabled")
     }
 }
+
+    suspend fun updateDnsSettings(customDns: String, fallbackDns: String) = withContext(Dispatchers.IO) {
+        sharedPreferences.edit()
+            .putString(KEY_CUSTOM_DNS, customDns)
+            .putString(KEY_FALLBACK_DNS, fallbackDns)
+            .apply()
+        _settings.value = _settings.value.copy(
+            customDnsServer = customDns,
+            fallbackDnsServer = fallbackDns
+        )
+        Log.d(TAG, "DNS settings updated - Primary: $customDns, Fallback: $fallbackDns")
+    }
+
+    suspend fun updateDhcpLeaseTime(leaseTimeSeconds: Int) = withContext(Dispatchers.IO) {
+        sharedPreferences.edit().putInt(KEY_DHCP_LEASE_TIME, leaseTimeSeconds).apply()
+        _settings.value = _settings.value.copy(dhcpLeaseTimeSeconds = leaseTimeSeconds)
+        Log.d(TAG, "DHCP lease time updated to: $leaseTimeSeconds seconds")
+    }
+
+    suspend fun updateWhitelistEnabled(enabled: Boolean) = withContext(Dispatchers.IO) {
+        sharedPreferences.edit().putBoolean(KEY_ENABLE_WHITELIST, enabled).apply()
+        _settings.value = _settings.value.copy(enableWhitelist = enabled)
+        Log.d(TAG, "Whitelist mode updated to: $enabled")
+    }
