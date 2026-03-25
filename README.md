@@ -33,6 +33,7 @@ Harpy is a network monitoring application that gives you complete visibility and
 ### Advanced Features
 - **DNS spoofing** for domain redirection
 - **DHCP spoofing** for custom IP assignment
+- **Performance monitoring** with real-time CPU/memory charts and process management
 - **Network topology mapping**
 - **Real-time logging** with export functionality
 - **Root helper binary** for secure privileged operations
@@ -43,6 +44,7 @@ Harpy is a network monitoring application that gives you complete visibility and
 - **Smooth animations** and transitions
 - **Bottom navigation** for easy feature access
 - **Responsive design** that adapts to different screen sizes
+- **Stack-based navigation** with scroll state preservation
 
 ## Screenshots
 
@@ -140,6 +142,15 @@ Or build and install in one step:
 4. Configure the spoofed IP, gateway, and DNS settings
 5. Tap **Start**
 
+### Performance Monitoring
+
+1. Navigate to **Settings > Performance Monitor**
+2. View real-time CPU usage, memory consumption, and thermal stats
+3. Tap on any metric to see detailed graphs
+4. Access the process list to view all running processes
+5. Sort processes by memory, CPU, name, or UID
+6. Kill misbehaving processes or adjust OOM scores (requires root)
+
 ## Architecture
 
 Harpy follows modern Android development best practices with a clean architecture approach.
@@ -152,6 +163,9 @@ app/src/main/kotlin/com/vishal/harpy/
 │   ├── native/                    # JNI bindings for C++ code
 │   ├── network/                   # Network utilities
 │   ├── ui/                        # Common UI components
+│   ├── di/                        # Dependency injection modules
+│   ├── service/                   # Background services
+│   ├── state/                     # State management
 │   └── utils/                     # Helper classes
 ├── features/                      # Feature modules
 │   ├── device_manager/
@@ -171,8 +185,14 @@ app/src/main/kotlin/com/vishal/harpy/
 │   ├── screens/                   # Screen composables
 │   │   ├── network/
 │   │   ├── dns/
-│   │   └── dhcp/
+│   │   ├── dhcp/
+│   │   ├── settings/
+│   │   ├── status/
+│   │   ├── device_management/
+│   │   └── performance/           # Performance monitoring screens
+│   ├── components/                # Reusable UI components
 │   ├── theme/                     # Material 3 theme
+│   ├── viewmodel/                 # Shared ViewModels
 │   └── HarpyApp.kt               # Main app composable
 └── main/
     └── MainActivityCompose.kt     # Entry point
@@ -183,8 +203,9 @@ app/src/main/kotlin/com/vishal/harpy/
 **UI Layer:**
 - Jetpack Compose for declarative UI
 - Material 3 components
-- Compose Navigation
+- Compose Navigation with stack-based back navigation
 - Lifecycle-aware state management
+- Scroll state preservation across navigation
 
 **Domain Layer:**
 - Use cases for business logic
@@ -197,7 +218,7 @@ app/src/main/kotlin/com/vishal/harpy/
 - Root helper binary for privileged operations
 
 **Dependency Injection:**
-- Hilt for compile-time DI
+- Hilt for compile-time DI with custom ServiceEntryPoint
 
 **Native Code:**
 - C++ for raw socket operations
@@ -299,6 +320,10 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 - [x] Root helper binary architecture
 - [x] Real-time logging system with log management utilities
 - [x] Comprehensive application settings (Scan timeout, interface selection, debug mode)
+- [x] Performance monitoring with root-based CPU/memory tracking
+- [x] Process list with kill and OOM score adjustment
+- [x] Stack-based navigation with scroll state preservation
+- [x] Dark mode theme with system theme support
 
 ### In Progress 🚧
 - [ ] Comprehensive unit testing
