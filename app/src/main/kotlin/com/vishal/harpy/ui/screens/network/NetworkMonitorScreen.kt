@@ -25,7 +25,8 @@ import com.vishal.harpy.ui.screens.network.components.LoadingOverlay
 @Composable
 fun NetworkMonitorScreen(
     viewModel: NetworkMonitorViewModel = hiltViewModel(),
-    onSettingsClick: () -> Unit = {}
+    onSettingsClick: () -> Unit = {},
+    onStatusClick: () -> Unit = {}
 ) {
     val filteredDevices by viewModel.filteredDevices.collectAsStateWithLifecycle()
     val loadingState by viewModel.loadingState.collectAsStateWithLifecycle()

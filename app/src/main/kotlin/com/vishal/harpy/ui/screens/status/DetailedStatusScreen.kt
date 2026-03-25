@@ -1,8 +1,10 @@
 package com.vishal.harpy.ui.screens.status
 
+import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -11,21 +13,31 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.vishal.harpy.core.di.ServiceEntryPoint
 import com.vishal.harpy.core.state.SpoofingStateManager
 import com.vishal.harpy.core.utils.SpoofingStatsTracker
 import com.vishal.harpy.features.network_monitor.presentation.viewmodel.NetworkMonitorViewModel
+import dagger.hilt.android.EntryPointAccessors
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DetailedStatusScreen(
     onNavigateBack: () -> Unit,
-    viewModel: NetworkMonitorViewModel = hiltViewModel(),
-    spoofingStateManager: SpoofingStateManager = hiltViewModel()
+    savedScrollOffset: Int = 0,
+    onScrollOffsetChanged: (Int) -> Unit = {},
+    viewModel: NetworkMonitorViewModel = hiltViewModel()
 ) {
+    val context = LocalContext.current
+    val spoofingStateManager = remember {
+        EntryPointAccessors.fromApplication(context, ServiceEntryPoint::class.java).getSpoofingStateManager()
+    }
     val devices by viewModel.devices.collectAsStateWithLifecycle()
     val spoofingState by spoofingStateManager.spoofingState.collectAsStateWithLifecycle()
     val settings by viewModel.appSettings.collectAsStateWithLifecycle()
@@ -56,10 +68,25 @@ fun DetailedStatusScreen(
             )
         }
     ) { padding ->
+        val scrollState = rememberLazyListState(
+            initialFirstVisibleItemIndex = savedScrollOffset shr 16,
+            initialFirstVisibleItemScrollOffset = savedScrollOffset and 0xFFFF
+        )
+        
+        LaunchedEffect(scrollState) {
+            snapshotFlow { 
+                (scrollState.firstVisibleItemIndex shl 16) or (scrollState.firstVisibleItemScrollOffset and 0xFFFF)
+            }
+                .collect { offset ->
+                    onScrollOffsetChanged(offset)
+                }
+        }
+        
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
+            state = scrollState,
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
@@ -170,7 +197,7 @@ private fun ActiveSpoofingCard(spoofingState: com.vishal.harpy.core.state.Spoofi
             
             if (spoofingState.isAnySpoofingActive) {
                 Spacer(modifier = Modifier.height(12.dp))
-                Divider()
+                HorizontalDivider()
                 Spacer(modifier = Modifier.height(12.dp))
                 
                 Row(
@@ -233,15 +260,15 @@ private fun NetworkInfoCard(
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             InfoRow("Network Interface", settings.networkInterface)
-            Divider()
+            HorizontalDivider()
             InfoRow("Primary DNS", settings.customDnsServer)
-            Divider()
+            HorizontalDivider()
             InfoRow("Fallback DNS", settings.fallbackDnsServer)
-            Divider()
+            HorizontalDivider()
             InfoRow("DHCP Lease Time", "${settings.dhcpLeaseTimeSeconds}s (${settings.dhcpLeaseTimeSeconds / 60}m)")
-            Divider()
+            HorizontalDivider()
             InfoRow("Devices on Network", deviceCount.toString())
-            Divider()
+            HorizontalDivider()
             InfoRow("Whitelist Mode", if (settings.enableWhitelist) "Enabled" else "Disabled")
         }
     }
@@ -277,15 +304,15 @@ private fun StatisticsCard(stats: SpoofingStatsTracker.SpoofingStats) {
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             StatRow("Total DNS Events", stats.totalDnsEvents.toString(), Icons.Outlined.Dns)
-            Divider()
+            HorizontalDivider()
             StatRow("Total DHCP Events", stats.totalDhcpEvents.toString(), Icons.Outlined.Router)
-            Divider()
+            HorizontalDivider()
             StatRow("Unique Devices Spoofed", stats.totalDevicesSpoofed.toString(), Icons.Outlined.Devices)
-            Divider()
+            HorizontalDivider()
             StatRow("Successful Events", stats.successfulEvents.toString(), Icons.Outlined.CheckCircle)
-            Divider()
+            HorizontalDivider()
             StatRow("Failed Events", stats.failedEvents.toString(), Icons.Outlined.Error)
-            Divider()
+            HorizontalDivider()
             StatRow("Avg Session Duration", "${stats.averageSessionDuration / 1000}s", Icons.Outlined.Timer)
         }
     }
@@ -362,7 +389,7 @@ private fun AffectedDevicesCard(devices: List<com.vishal.harpy.core.utils.Networ
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = device.deviceName,
+                                text = device.deviceName ?: device.ipAddress,
                                 style = MaterialTheme.typography.bodySmall,
                                 fontWeight = FontWeight.Bold
                             )
@@ -412,7 +439,7 @@ private fun RecentEventsCard(events: List<SpoofingStatsTracker.SpoofingEvent>) {
                 events.forEach { event ->
                     EventItem(event)
                     if (event != events.last()) {
-                        Divider(modifier = Modifier.padding(vertical = 8.dp))
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                     }
                 }
             }

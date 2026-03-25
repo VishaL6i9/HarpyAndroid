@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -21,12 +22,17 @@ import com.vishal.harpy.core.utils.LogUtils
 import com.vishal.harpy.core.service.ServiceController
 import com.vishal.harpy.core.di.ServiceEntryPoint
 import dagger.hilt.android.EntryPointAccessors
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.snapshotFlow
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
     onNavigateToDeviceManagement: () -> Unit = {},
+    onNavigateToPerformanceMonitor: () -> Unit = {},
+    savedScrollOffset: Int = 0,
+    onScrollOffsetChanged: (Int) -> Unit = {},
     viewModel: NetworkMonitorViewModel = hiltViewModel()
 ) {
     var showAboutScreen by remember { mutableStateOf(false) }
@@ -42,14 +48,18 @@ fun SettingsScreen(
     var showThemeDialog by remember { mutableStateOf(false) }
 
     val settings by viewModel.appSettings.collectAsStateWithLifecycle()
-    
+
     val context = androidx.compose.ui.platform.LocalContext.current
     val serviceController = remember {
         EntryPointAccessors.fromApplication(context, ServiceEntryPoint::class.java).getServiceController()
     }
-    
-    val themeManager = hiltViewModel<com.vishal.harpy.core.utils.ThemeManager>()
+
+    val themeManager = remember {
+        EntryPointAccessors.fromApplication(context, ServiceEntryPoint::class.java).getThemeManager()
+    }
     val themeMode by themeManager.themeMode.collectAsStateWithLifecycle()
+
+    val scope = rememberCoroutineScope()
 
     BackHandler {
         if (showAboutScreen) {
@@ -67,6 +77,7 @@ fun SettingsScreen(
         SettingsContent(
             onNavigateBack = onNavigateBack,
             onNavigateToDeviceManagement = onNavigateToDeviceManagement,
+            onNavigateToPerformanceMonitor = onNavigateToPerformanceMonitor,
             onShowAbout = { showAboutScreen = true },
             onShowClearNamesDialog = { showClearNamesDialog = true },
             onShowScanSettings = { showScanSettingsDialog = true },
@@ -205,7 +216,7 @@ fun SettingsScreen(
         ThemeDialog(
             currentTheme = themeMode,
             onConfirm = { theme ->
-                viewModel.viewModelScope.launch {
+                scope.launch {
                     themeManager.setThemeMode(theme)
                 }
                 showThemeDialog = false
@@ -220,6 +231,7 @@ fun SettingsScreen(
 private fun SettingsContent(
     onNavigateBack: () -> Unit,
     onNavigateToDeviceManagement: () -> Unit,
+    onNavigateToPerformanceMonitor: () -> Unit,
     onShowAbout: () -> Unit,
     onShowClearNamesDialog: () -> Unit,
     onShowScanSettings: () -> Unit,
@@ -235,7 +247,9 @@ private fun SettingsContent(
     viewModel: NetworkMonitorViewModel,
     serviceController: ServiceController,
     themeMode: com.vishal.harpy.core.utils.ThemeMode,
-    themeManager: com.vishal.harpy.core.utils.ThemeManager
+    themeManager: com.vishal.harpy.core.utils.ThemeManager,
+    savedScrollOffset: Int = 0,
+    onScrollOffsetChanged: (Int) -> Unit = {}
 ) {
 
     Scaffold(
@@ -261,10 +275,25 @@ private fun SettingsContent(
             )
         }
     ) { padding ->
+        val scrollState = rememberLazyListState(
+            initialFirstVisibleItemIndex = savedScrollOffset shr 16,
+            initialFirstVisibleItemScrollOffset = savedScrollOffset and 0xFFFF
+        )
+
+        LaunchedEffect(scrollState) {
+            snapshotFlow { 
+                (scrollState.firstVisibleItemIndex shl 16) or (scrollState.firstVisibleItemScrollOffset and 0xFFFF)
+            }
+                .collect { offset ->
+                    onScrollOffsetChanged(offset)
+                }
+        }
+
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
+            state = scrollState,
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
@@ -407,7 +436,7 @@ private fun SettingsContent(
                     )
                     
                     SettingsDivider()
-                    
+
                     SettingsItem(
                         title = "Debug Mode",
                         summary = "Disable log rotation to maintain a continuous file for easier troubleshooting",
@@ -420,6 +449,15 @@ private fun SettingsContent(
                             )
                         }
                     )
+
+                    SettingsDivider()
+
+                    SettingsItem(
+                        title = "Performance Monitor",
+                        summary = "Track CPU and memory usage in real-time",
+                        icon = Icons.Outlined.Analytics,
+                        onClick = onNavigateToPerformanceMonitor
+                    )
                 }
             }
 
@@ -429,9 +467,12 @@ private fun SettingsContent(
             }
 
             item {
-                com.vishal.harpy.ui.components.ServiceControlCard(
-                    serviceController = serviceController
-                )
+                SettingsCard {
+                    com.vishal.harpy.ui.components.ServiceControlCard(
+                        serviceController = serviceController,
+                        modifier = Modifier.padding(16.dp)
+                    )
+                }
             }
 
             // About Section

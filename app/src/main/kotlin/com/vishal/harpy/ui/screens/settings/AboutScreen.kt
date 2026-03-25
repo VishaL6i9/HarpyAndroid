@@ -12,6 +12,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.launch
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CurrencyRupee
@@ -40,7 +43,9 @@ import com.vishal.harpy.BuildConfig
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AboutScreen(
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    savedScrollOffset: Int = 0,
+    onScrollOffsetChanged: (Int) -> Unit = {}
 ) {
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
@@ -77,6 +82,15 @@ fun AboutScreen(
             )
         }
     ) { paddingValues ->
+        val scrollState = rememberScrollState(initial = savedScrollOffset)
+        
+        LaunchedEffect(scrollState) {
+            snapshotFlow { scrollState.value }
+                .collect { offset ->
+                    onScrollOffsetChanged(offset)
+                }
+        }
+        
         val cs = MaterialTheme.colorScheme
         val colorPrimary = cs.primaryContainer
         val colorTertiary = cs.tertiaryContainer
@@ -95,7 +109,7 @@ fun AboutScreen(
         Column(
             modifier = Modifier
                 .padding(paddingValues)
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scrollState)
         ) {
             // Main App Info Card with Animated Gradient
             Card(
