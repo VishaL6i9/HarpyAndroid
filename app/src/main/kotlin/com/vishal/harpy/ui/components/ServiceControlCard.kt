@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -33,64 +32,58 @@ fun ServiceControlCard(
         isServiceRunning.value = serviceController.isServiceRunning()
     }
 
-    Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(16.dp)
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Circle,
-                    contentDescription = null,
-                    tint = if (isServiceRunning.value) Color.Green else Color.Gray,
-                    modifier = Modifier.padding(4.dp)
+            Icon(
+                imageVector = Icons.Filled.Circle,
+                contentDescription = null,
+                tint = if (isServiceRunning.value) Color.Green else Color.Gray,
+                modifier = Modifier.padding(4.dp)
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Service Status",
+                    style = MaterialTheme.typography.titleMedium
                 )
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Service Status",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    Text(
-                        text = if (isServiceRunning.value) "Active" else "Inactive",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                Text(
+                    text = if (isServiceRunning.value) "Active" else "Inactive",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Button(
+                onClick = {
+                    serviceController.startNotificationService()
+                    isServiceRunning.value = true
+                },
+                enabled = !isServiceRunning.value,
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("Start")
             }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            Button(
+                onClick = {
+                    serviceController.stopNotificationService()
+                    isServiceRunning.value = false
+                },
+                enabled = isServiceRunning.value,
+                modifier = Modifier.weight(1f)
             ) {
-                Button(
-                    onClick = {
-                        serviceController.startNotificationService()
-                        isServiceRunning.value = true
-                    },
-                    enabled = !isServiceRunning.value,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text("Start")
-                }
-
-                Button(
-                    onClick = {
-                        serviceController.stopNotificationService()
-                        isServiceRunning.value = false
-                    },
-                    enabled = isServiceRunning.value,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text("Stop")
-                }
+                Text("Stop")
             }
         }
     }
