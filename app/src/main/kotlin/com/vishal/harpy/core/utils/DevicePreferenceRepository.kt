@@ -226,7 +226,6 @@ class DevicePreferenceRepository(context: Context) {
             null
         }
     }
-}
 
     /**
      * Add device to whitelist
@@ -266,3 +265,4 @@ class DevicePreferenceRepository(context: Context) {
             emptyList()
         }
     }
+}

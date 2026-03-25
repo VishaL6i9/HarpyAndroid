@@ -4,13 +4,28 @@ import android.content.Context
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
+import android.os.VibratorManager
 import android.util.Log
+import androidx.core.content.ContextCompat
 
 /**
  * Utility class for handling device vibration across different SDK levels
  */
 object VibrationUtils {
     private const val TAG = "VibrationUtils"
+
+    /**
+     * Get Vibrator instance compatible with all SDK versions
+     */
+    @Suppress("DEPRECATION")
+    private fun getVibrator(context: Context): Vibrator? {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+            vibratorManager?.defaultVibrator
+        } else {
+            context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+        }
+    }
 
     /**
      * Vibrate the device for a specified duration
@@ -21,7 +36,7 @@ object VibrationUtils {
      */
     fun vibrate(context: Context, durationMs: Long) {
         try {
-            val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+            val vibrator = getVibrator(context)
             if (vibrator?.hasVibrator() == true) {
                 when {
                     Build.VERSION.SDK_INT >= Build.VERSION_CODES.O -> {
@@ -78,7 +93,7 @@ object VibrationUtils {
      */
     fun vibratePattern(context: Context, pattern: LongArray) {
         try {
-            val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+            val vibrator = getVibrator(context)
             if (vibrator?.hasVibrator() == true) {
                 when {
                     Build.VERSION.SDK_INT >= Build.VERSION_CODES.O -> {
@@ -110,8 +125,7 @@ object VibrationUtils {
      */
     fun hasVibrator(context: Context): Boolean {
         return try {
-            val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
-            vibrator?.hasVibrator() == true
+            getVibrator(context)?.hasVibrator() == true
         } catch (e: Exception) {
             false
         }

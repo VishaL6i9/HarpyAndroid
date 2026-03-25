@@ -8,13 +8,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
-import javax.inject.Singleton
 
 enum class ThemeMode {
     LIGHT, DARK, SYSTEM
 }
 
-@Singleton
 class ThemeManager @Inject constructor(
     private val context: Context
 ) {

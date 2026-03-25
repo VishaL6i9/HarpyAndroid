@@ -74,7 +74,6 @@ class SettingsRepository @Inject constructor(
         _settings.value = _settings.value.copy(isVerboseLogging = enabled)
         Log.d(TAG, "Verbose logging updated to: $enabled")
     }
-}
 
     suspend fun updateDnsSettings(customDns: String, fallbackDns: String) = withContext(Dispatchers.IO) {
         sharedPreferences.edit()
@@ -99,3 +98,4 @@ class SettingsRepository @Inject constructor(
         _settings.value = _settings.value.copy(enableWhitelist = enabled)
         Log.d(TAG, "Whitelist mode updated to: $enabled")
     }
+}
