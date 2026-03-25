@@ -32,6 +32,7 @@ class ServiceController @Inject constructor(
         }
     }
 
+    @Suppress("DEPRECATION")
     fun isServiceRunning(): Boolean {
         val manager = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
         return manager.getRunningServices(Integer.MAX_VALUE).any {
