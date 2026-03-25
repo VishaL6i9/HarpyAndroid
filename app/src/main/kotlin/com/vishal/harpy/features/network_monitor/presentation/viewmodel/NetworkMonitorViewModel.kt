@@ -31,6 +31,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import com.vishal.harpy.core.utils.SettingsRepository
@@ -106,6 +107,36 @@ class NetworkMonitorViewModel @Inject constructor(
     private val _logCount = MutableStateFlow(0)
     val logCount: StateFlow<Int> = _logCount.asStateFlow()
 
+    /**
+     * Get blacklisted (blocked) devices
+     */
+    val blacklistedDevices: StateFlow<List<NetworkDevice>> = _networkDevices
+        .map { devices -> devices.filter { it.isBlocked } }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+    /**
+     * Get whitelisted devices
+     */
+    val whitelistedDevices: StateFlow<List<NetworkDevice>> = _networkDevices
+        .map { devices -> 
+            val whitelistedMacs = devicePreferenceRepository.getWhitelistedDevices()
+            devices.filter { whitelistedMacs.contains(it.macAddress) }
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+    /**
+     * Get all devices
+     */
+    val devices: StateFlow<List<NetworkDevice>> = networkDevices
+
     init {
         checkRootAccessInternal()
         refreshLogCount()
@@ -147,7 +178,6 @@ class NetworkMonitorViewModel @Inject constructor(
             _loadingState.value = LoadingState.Scanning
             _error.value = null
             try {
-                val settings = appSettings.value
                 val result = scanNetworkUseCase()
                 when (result) {
                     is NetworkResult.Success -> {
@@ -873,7 +903,6 @@ class NetworkMonitorViewModel @Inject constructor(
             settingsRepository.updateVerboseLogging(enabled)
         }
     }
-}
 
     /**
      * Update DNS settings
@@ -903,43 +932,6 @@ class NetworkMonitorViewModel @Inject constructor(
     }
 
     /**
-     * Get blacklisted devices
-     */
-    val blacklistedDevices: StateFlow<List<NetworkDevice>> = 
-        networkDevices.stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        ).let { devicesFlow ->
-            devicesFlow.stateIn(
-                scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(5000),
-                initialValue = emptyList()
-            )
-        }
-
-    /**
-     * Get whitelisted devices
-     */
-    val whitelistedDevices: StateFlow<List<NetworkDevice>> = 
-        networkDevices.stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        ).let { devicesFlow ->
-            devicesFlow.stateIn(
-                scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(5000),
-                initialValue = emptyList()
-            )
-        }
-
-    /**
-     * Get all devices
-     */
-    val devices: StateFlow<List<NetworkDevice>> = networkDevices
-
-    /**
      * Add device to whitelist
      */
     fun addToWhitelist(device: NetworkDevice) {
@@ -966,3 +958,4 @@ class NetworkMonitorViewModel @Inject constructor(
             }
         }
     }
+}
