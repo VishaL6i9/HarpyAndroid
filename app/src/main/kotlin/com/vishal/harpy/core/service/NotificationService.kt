@@ -4,6 +4,8 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
+import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import com.vishal.harpy.core.state.SpoofingStateManager
@@ -33,46 +35,52 @@ class NotificationService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        Log.d(TAG, "NotificationService started")
+        Log.d(TAG, "NotificationService started with action: ${intent?.action}")
+        
+        // Start foreground as early as possible to avoid ForegroundServiceDidNotStartInTimeException
+        try {
+            val notification = notificationManager.buildServiceNotification()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
+            Log.d(TAG, "NotificationService moved to foreground")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error starting foreground service", e)
+            // If we failed to start foreground, we must stop the service to avoid the crash
+            // though the crash might happen anyway if startForegroundService was called.
+            stopSelf()
+            return START_NOT_STICKY
+        }
         
         // Handle notification cleared action
         if (intent?.action == ACTION_NOTIFICATION_CLEARED) {
-            Log.d(TAG, "Notification was cleared, reposting")
-            repostNotification()
+            Log.d(TAG, "Notification was cleared, updating notification")
+            updateNotification()
             return START_STICKY
         }
         
-        try {
-            val notification = notificationManager.buildServiceNotification()
-            
-            // Post notification without using foreground service
-            // This keeps it out of the status bar but visible in drawer
-            notifManager.notify(NOTIFICATION_ID, notification)
-            Log.d(TAG, "Notification posted (non-foreground)")
-            
-            // Observe spoofing state changes and update notification
+        // Start observing state changes
+        if (serviceJob == null || serviceJob?.isActive == false) {
             observeSpoofingStateChanges()
-            
-        } catch (e: Exception) {
-            Log.e(TAG, "Error posting notification", e)
-            stopSelf()
-            return START_NOT_STICKY
         }
         
         return START_STICKY
     }
 
-    private fun repostNotification() {
+    private fun updateNotification() {
         try {
             val notification = notificationManager.buildServiceNotification(spoofingStateManager.getCurrentState())
             notifManager.notify(NOTIFICATION_ID, notification)
-            Log.d(TAG, "Notification reposted after being cleared")
+            Log.d(TAG, "Notification updated")
         } catch (e: Exception) {
-            Log.e(TAG, "Error reposting notification", e)
+            Log.e(TAG, "Error updating notification", e)
         }
     }
 
     private fun observeSpoofingStateChanges() {
+        serviceJob?.cancel()
         serviceJob = CoroutineScope(Dispatchers.Main).launch {
             spoofingStateManager.spoofingState.collect { state ->
                 Log.d(TAG, "Spoofing state changed: DNS=${state.isDnsSpoofingActive}, DHCP=${state.isDhcpSpoofingActive}")
