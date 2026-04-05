@@ -41,6 +41,7 @@ fun NetworkMonitorScreen(
     var showUnblockDialog by remember { mutableStateOf(false) }
     var selectedDevice by remember { mutableStateOf<NetworkDevice?>(null) }
     var showDeviceActionsSheet by remember { mutableStateOf(false) }
+    var showEditNameDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(scanSuccess) {
         if (scanSuccess) {
@@ -176,7 +177,22 @@ fun NetworkMonitorScreen(
         DeviceActionsBottomSheet(
             device = selectedDevice!!,
             onDismiss = { showDeviceActionsSheet = false },
+            onEditNameClick = {
+                showEditNameDialog = true
+                showDeviceActionsSheet = false
+            },
             viewModel = viewModel
+        )
+    }
+
+    if (showEditNameDialog && selectedDevice != null) {
+        EditDeviceNameDialog(
+            device = selectedDevice!!,
+            onConfirm = { newName ->
+                viewModel.setDeviceName(selectedDevice!!, newName)
+                showEditNameDialog = false
+            },
+            onDismiss = { showEditNameDialog = false }
         )
     }
 }
@@ -240,9 +256,9 @@ fun UnblockAllDialog(
 fun DeviceActionsBottomSheet(
     device: NetworkDevice,
     onDismiss: () -> Unit,
+    onEditNameClick: () -> Unit,
     viewModel: NetworkMonitorViewModel
 ) {
-    var showEditNameDialog by remember { mutableStateOf(false) }
     var showNuclearWarning by remember { mutableStateOf(false) }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
@@ -266,10 +282,7 @@ fun DeviceActionsBottomSheet(
             
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                onClick = {
-                    showEditNameDialog = true
-                    onDismiss()
-                }
+                onClick = onEditNameClick
             ) {
                 ListItem(
                     headlineContent = { Text("Edit Name") },
@@ -321,16 +334,6 @@ fun DeviceActionsBottomSheet(
         }
     }
 
-    if (showEditNameDialog) {
-        EditDeviceNameDialog(
-            device = device,
-            onConfirm = { newName ->
-                viewModel.setDeviceName(device, newName)
-                showEditNameDialog = false
-            },
-            onDismiss = { showEditNameDialog = false }
-        )
-    }
 
     if (showNuclearWarning) {
         NuclearWarningDialog(
