@@ -42,7 +42,7 @@ class DnsRepositoryImpl @Inject constructor(
 
             // Kill any existing DNS spoofing process for this domain
             val processKey = "dns_$domain"
-            dnsSpoofingProcesses[processKey]?.destroyForcibly()
+            dnsSpoofingProcesses[processKey]?.let { com.vishal.harpy.core.utils.ProcessUtils.destroyForcibly(it) }
 
             // Build the command to execute the root helper with DNS spoofing
             val command = arrayOf("su", "-c", "$helperPath dns_spoof $interfaceName $domain $spoofedIP")
@@ -60,7 +60,7 @@ class DnsRepositoryImpl @Inject constructor(
             kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
                 val reader = java.io.BufferedReader(java.io.InputStreamReader(inputStream))
                 try {
-                    while (process.isAlive) {
+                    while (com.vishal.harpy.core.utils.ProcessUtils.isAlive(process)) {
                         val line = reader.readLine()
                         if (line != null) {
                             LogUtils.d(TAG, "DNS Spoofing Output: $line")
@@ -84,7 +84,7 @@ class DnsRepositoryImpl @Inject constructor(
             kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
                 val errorReader = java.io.BufferedReader(java.io.InputStreamReader(errorStream))
                 try {
-                    while (process.isAlive) {
+                    while (com.vishal.harpy.core.utils.ProcessUtils.isAlive(process)) {
                         val errorLine = errorReader.readLine()
                         if (errorLine != null) {
                             LogUtils.e(TAG, "DNS Spoofing Error: $errorLine")
@@ -102,7 +102,7 @@ class DnsRepositoryImpl @Inject constructor(
             // Wait a bit to see if the process started successfully
             kotlinx.coroutines.delay(1000)
 
-            if (process.isAlive) {
+            if (com.vishal.harpy.core.utils.ProcessUtils.isAlive(process)) {
                 LogUtils.i(TAG, "DNS spoofing process started successfully for $domain -> $spoofedIP")
                 NetworkResult.success(true)
             } else {
@@ -122,8 +122,8 @@ class DnsRepositoryImpl @Inject constructor(
             val processKey = "dns_$domain"
             val process = dnsSpoofingProcesses[processKey]
 
-            if (process != null && process.isAlive) {
-                process.destroyForcibly()
+            if (process != null && com.vishal.harpy.core.utils.ProcessUtils.isAlive(process)) {
+                com.vishal.harpy.core.utils.ProcessUtils.destroyForcibly(process)
                 dnsSpoofingProcesses.remove(processKey)
                 LogUtils.i(TAG, "DNS spoofing stopped for domain: $domain")
                 NetworkResult.success(true)
@@ -140,6 +140,6 @@ class DnsRepositoryImpl @Inject constructor(
     override fun isDNSSpoofingActive(domain: String): Boolean {
         val processKey = "dns_$domain"
         val process = dnsSpoofingProcesses[processKey]
-        return process != null && process.isAlive
+        return process != null && com.vishal.harpy.core.utils.ProcessUtils.isAlive(process)
     }
 }
