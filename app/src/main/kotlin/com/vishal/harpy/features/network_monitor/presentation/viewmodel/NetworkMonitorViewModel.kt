@@ -12,6 +12,7 @@ import com.vishal.harpy.features.network_monitor.domain.usecases.MapNetworkTopol
 import com.vishal.harpy.features.network_monitor.domain.usecases.TestPingUseCase
 import com.vishal.harpy.features.network_monitor.domain.usecases.IsDeviceBlockedUseCase
 import com.vishal.harpy.features.network_monitor.domain.usecases.RestoreBlockedDevicesUseCase
+import com.vishal.harpy.features.network_monitor.domain.usecases.GetActiveInterfaceUseCase
 import com.vishal.harpy.features.dns.domain.usecases.StartDnsSpoofingUseCase
 import com.vishal.harpy.features.dns.domain.usecases.StopDnsSpoofingUseCase
 import com.vishal.harpy.features.dns.domain.usecases.IsDnsSpoofingActiveUseCase
@@ -58,6 +59,7 @@ class NetworkMonitorViewModel @Inject constructor(
     private val startDhcpSpoofingUseCase: StartDhcpSpoofingUseCase,
     private val stopDhcpSpoofingUseCase: StopDhcpSpoofingUseCase,
     private val isDhcpSpoofingActiveUseCase: IsDhcpSpoofingActiveUseCase,
+    private val getActiveInterfaceUseCase: GetActiveInterfaceUseCase,
     private val settingsRepository: SettingsRepository,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
@@ -96,6 +98,9 @@ class NetworkMonitorViewModel @Inject constructor(
 
     private val _filteredDevices = MutableStateFlow<List<NetworkDevice>>(emptyList())
     val filteredDevices: StateFlow<List<NetworkDevice>> = _filteredDevices.asStateFlow()
+
+    private val _detectedInterface = MutableStateFlow<String?>(null)
+    val detectedInterface: StateFlow<String?> = _detectedInterface.asStateFlow()
 
     val appSettings: StateFlow<AppSettings> = settingsRepository.settings
         .stateIn(
@@ -140,6 +145,18 @@ class NetworkMonitorViewModel @Inject constructor(
     init {
         checkRootAccessInternal()
         refreshLogCount()
+        refreshDetectedInterface()
+    }
+
+    private fun refreshDetectedInterface() {
+        _detectedInterface.value = getActiveInterfaceUseCase()
+    }
+
+    fun updateInterface(interfaceName: String) {
+        viewModelScope.launch {
+            settingsRepository.updateNetworkInterface(interfaceName)
+            _detectedInterface.value = getActiveInterfaceUseCase()
+        }
     }
 
     private fun checkRootAccessInternal() {
@@ -177,8 +194,9 @@ class NetworkMonitorViewModel @Inject constructor(
         viewModelScope.launch {
             _loadingState.value = LoadingState.Scanning
             _error.value = null
+            refreshDetectedInterface()
             try {
-                val result = scanNetworkUseCase()
+                val result = scanNetworkUseCase(appSettings.value.networkInterface)
                 when (result) {
                     is NetworkResult.Success -> {
                         // Load preferences for each device
@@ -259,7 +277,7 @@ class NetworkMonitorViewModel @Inject constructor(
                     )
                     
                     // Restore blocks for devices that should be blocked
-                    val restoreResult = restoreBlockedDevicesUseCase(devicesNeedingRestore)
+                    val restoreResult = restoreBlockedDevicesUseCase(devicesNeedingRestore, appSettings.value.networkInterface)
                     
                     when (restoreResult) {
                         is NetworkResult.Success -> {
@@ -300,7 +318,7 @@ class NetworkMonitorViewModel @Inject constructor(
             _loadingState.value = LoadingState.Blocking
             _error.value = null
             try {
-                val result = blockDeviceUseCase(device)
+                val result = blockDeviceUseCase(device, appSettings.value.networkInterface)
                 when (result) {
                     is NetworkResult.Success -> {
                         if (result.data) {
@@ -340,7 +358,7 @@ class NetworkMonitorViewModel @Inject constructor(
             _loadingState.value = LoadingState.Unblocking
             _error.value = null
             try {
-                val result = unblockDeviceUseCase(device)
+                val result = unblockDeviceUseCase(device, appSettings.value.networkInterface)
                 when (result) {
                     is NetworkResult.Success -> {
                         if (result.data) {
@@ -380,7 +398,7 @@ class NetworkMonitorViewModel @Inject constructor(
             _loadingState.value = LoadingState.Unblocking
             _error.value = null
             try {
-                val result = unblockAllDevicesUseCase()
+                val result = unblockAllDevicesUseCase(appSettings.value.networkInterface)
                 when (result) {
                     is NetworkResult.Success -> {
                         val unblockCount = result.data
@@ -420,7 +438,7 @@ class NetworkMonitorViewModel @Inject constructor(
             _loadingState.value = LoadingState.MappingTopology
             _error.value = null
             try {
-                val result = mapNetworkTopologyUseCase()
+                val result = mapNetworkTopologyUseCase(appSettings.value.networkInterface)
                 when (result) {
                     is NetworkResult.Success -> {
                         _networkTopology.value = result.data
@@ -608,17 +626,19 @@ class NetworkMonitorViewModel @Inject constructor(
     /**
      * Start DNS spoofing for a domain
      */
-    fun startDNSSpoofing(domain: String, spoofedIP: String, interfaceName: String = "wlan0") {
+    fun startDNSSpoofing(domain: String, spoofedIP: String, interfaceName: String? = null) {
         if (!_isRooted.value) {
             _error.value = "Root access is required for DNS spoofing"
             return
         }
 
+        val activeIface = interfaceName ?: appSettings.value.networkInterface
+
         viewModelScope.launch {
             _loadingState.value = LoadingState.DNSSpoofing
             _error.value = null
             try {
-                val result = startDnsSpoofingUseCase(domain, spoofedIP, interfaceName)
+                val result = startDnsSpoofingUseCase(domain, spoofedIP, activeIface)
                 when (result) {
                     is NetworkResult.Success -> {
                         if (result.data) {
@@ -711,7 +731,7 @@ class NetworkMonitorViewModel @Inject constructor(
      * Start DHCP spoofing for specific devices
      */
     fun startDHCPSpoofing(
-        interfaceName: String = "wlan0",
+        interfaceName: String? = null,
         targetMacs: Array<String>,
         spoofedIPs: Array<String>,
         gatewayIPs: Array<String>,
@@ -723,12 +743,14 @@ class NetworkMonitorViewModel @Inject constructor(
             return
         }
 
+        val activeIface = interfaceName ?: appSettings.value.networkInterface
+
         viewModelScope.launch {
             _loadingState.value = LoadingState.DHCPSpoofing
             _error.value = null
             try {
                 val result = startDhcpSpoofingUseCase(
-                    interfaceName,
+                    activeIface,
                     targetMacs,
                     spoofedIPs,
                     gatewayIPs,
