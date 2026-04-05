@@ -22,6 +22,8 @@ Harpy is a network monitoring application that gives you complete visibility and
 - **Custom device naming** with persistent storage
 - **Device pinning** to keep important devices at the top
 - **IPv4/IPv6 filtering** for better organization
+- **Real-time Interface Selection**: Dynamic detection of active network interfaces (e.g., `wlan0`, `ap0`, `eth0`) for all scanning operations.
+- **Interface Mismatch Protection**: Visual warning banner with instant "Switch Interface" logic when the system network changes.
 
 ### Network Control
 - **Block/unblock devices** using ARP spoofing
@@ -45,6 +47,8 @@ Harpy is a network monitoring application that gives you complete visibility and
 - **Bottom navigation** for easy feature access
 - **Responsive design** that adapts to different screen sizes
 - **Stack-based navigation** with scroll state preservation
+- **Enhanced Stability**: Multi-layered MAC deduplication to prevent UI crashes on complex networks (Fixes #2).
+- **Full API 24/25 Support**: Robust backward-compatible process management using custom `ProcessUtils` for Android 7.x devices.
 
 ## Screenshots
 
@@ -101,7 +105,7 @@ Or build and install in one step:
 ### Scanning Your Network
 
 1. Open the app and navigate to the **Network Monitor** tab
-2. Tap the **Scan Network** button
+2. Tap the **Scan Network** button. The app will **automatically detect** the correct interface and alert you if the selection is mismatched.
 3. Wait for the scan to complete (typically 5-10 seconds)
 4. View all discovered devices in the list
 
@@ -324,6 +328,8 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 - [x] Process list with kill and OOM score adjustment
 - [x] Stack-based navigation with scroll state preservation
 - [x] Dark mode theme with system theme support
+- [x] **Real-time Interface Selection and Mismatch Warning System**
+- [x] **Comprehensive API 24/25 (Android 7.0/7.1) Stability Pack**
 
 ### In Progress 🚧
 - [ ] Comprehensive unit testing
@@ -350,7 +356,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 - Verify you're connected to Wi-Fi
 - Check that root access is granted
 - Try increasing scan timeout in **Settings > Scan Settings**
-- Ensure the correct network interface is selected in **Settings > Interface Selection** (usually `wlan0`)
+- Ensure the correct network interface is selected in **Settings > Interface Selection** (The app will now show a **Real-time Warning** if there is a mismatch)
 
 ### Device blocking doesn't work
 - Ensure the device is on the same network
