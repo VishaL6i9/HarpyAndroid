@@ -69,6 +69,8 @@ oui.txt
 
 /mpvEx-master
 
+COMMIT_STYLE.txt
+
 /libpcap-1.10.6/ChmodBPF/ChmodBPF
 /libpcap-1.10.6/ChmodBPF/StartupParameters.plist
 /libpcap-1.10.6/cmake/Modules/FindAirPcap.cmake
