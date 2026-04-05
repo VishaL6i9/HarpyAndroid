@@ -68,7 +68,7 @@ class DhcpRepositoryImpl @Inject constructor(
             kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
                 val reader = java.io.BufferedReader(java.io.InputStreamReader(inputStream))
                 try {
-                    while (process.isAlive) {
+                    while (com.vishal.harpy.core.utils.ProcessUtils.isAlive(process)) {
                         val line = reader.readLine()
                         if (line != null) {
                             LogUtils.d(TAG, "DHCP Spoofing Output: $line")
@@ -92,7 +92,7 @@ class DhcpRepositoryImpl @Inject constructor(
             kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
                 val errorReader = java.io.BufferedReader(java.io.InputStreamReader(errorStream))
                 try {
-                    while (process.isAlive) {
+                    while (com.vishal.harpy.core.utils.ProcessUtils.isAlive(process)) {
                         val errorLine = errorReader.readLine()
                         if (errorLine != null) {
                             LogUtils.e(TAG, "DHCP Spoofing Error: $errorLine")
@@ -110,7 +110,7 @@ class DhcpRepositoryImpl @Inject constructor(
             // Wait a bit to see if the process started successfully
             kotlinx.coroutines.delay(1000)
 
-            if (process.isAlive) {
+            if (com.vishal.harpy.core.utils.ProcessUtils.isAlive(process)) {
                 LogUtils.i(TAG, "DHCP spoofing process started successfully")
                 NetworkResult.success(true)
             } else {
