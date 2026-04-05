@@ -61,6 +61,7 @@ object VibrationUtils {
     /**
      * Vibrate using VibrationEffect (Android 8.0+)
      */
+    @androidx.annotation.RequiresApi(Build.VERSION_CODES.O)
     private fun vibrateWithEffect(vibrator: Vibrator, durationMs: Long) {
         try {
             val effect = VibrationEffect.createOneShot(durationMs, VibrationEffect.DEFAULT_AMPLITUDE)
@@ -97,8 +98,12 @@ object VibrationUtils {
             if (vibrator?.hasVibrator() == true) {
                 when {
                     Build.VERSION.SDK_INT >= Build.VERSION_CODES.O -> {
-                        val effect = VibrationEffect.createWaveform(pattern, -1)
-                        vibrator.vibrate(effect)
+                        @androidx.annotation.RequiresApi(Build.VERSION_CODES.O)
+                        fun vibrateWaveform() {
+                             val effect = VibrationEffect.createWaveform(pattern, -1)
+                             vibrator.vibrate(effect)
+                        }
+                        vibrateWaveform()
                         Log.d(TAG, "Vibrated with pattern")
                     }
                     Build.VERSION.SDK_INT >= Build.VERSION_CODES.N -> {
