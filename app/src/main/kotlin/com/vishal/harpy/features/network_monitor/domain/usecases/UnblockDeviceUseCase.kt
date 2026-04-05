@@ -8,7 +8,7 @@ import javax.inject.Inject
 class UnblockDeviceUseCase @Inject constructor(
     private val repository: NetworkMonitorRepository
 ) {
-    suspend operator fun invoke(device: NetworkDevice): NetworkResult<Boolean> {
-        return repository.unblockDevice(device)
+    suspend operator fun invoke(device: NetworkDevice, interfaceName: String? = null): NetworkResult<Boolean> {
+        return repository.unblockDevice(device, interfaceName)
     }
 }
