@@ -8,7 +8,7 @@ import javax.inject.Inject
 class MapNetworkTopologyUseCase @Inject constructor(
     private val repository: NetworkMonitorRepository
 ) {
-    suspend operator fun invoke(): NetworkResult<NetworkTopology> {
-        return repository.mapNetworkTopology()
+    suspend operator fun invoke(interfaceName: String? = null): NetworkResult<NetworkTopology> {
+        return repository.mapNetworkTopology(interfaceName)
     }
 }
