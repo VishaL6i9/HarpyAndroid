@@ -219,7 +219,10 @@ class NetworkMonitorViewModel @Inject constructor(
                             )
                         )
 
-                        _networkDevices.value = sortedDevices
+                        // Final fail-safe: Ensure unique MAC addresses to prevent UI crashes
+                        val distinctDevices = sortedDevices.distinctBy { it.macAddress }
+                        
+                        _networkDevices.value = distinctDevices
                         applyFilters()
                         _scanSuccess.value = true
                         
