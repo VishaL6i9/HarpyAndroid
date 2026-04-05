@@ -8,7 +8,7 @@ import javax.inject.Inject
 class ScanNetworkUseCase @Inject constructor(
     private val repository: NetworkMonitorRepository
 ) {
-    suspend operator fun invoke(): NetworkResult<List<NetworkDevice>> {
-        return repository.scanNetwork()
+    suspend operator fun invoke(interfaceName: String? = null): NetworkResult<List<NetworkDevice>> {
+        return repository.scanNetwork(interfaceName)
     }
 }
