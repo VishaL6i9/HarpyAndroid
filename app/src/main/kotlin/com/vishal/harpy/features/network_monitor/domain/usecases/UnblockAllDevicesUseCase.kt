@@ -7,7 +7,7 @@ import javax.inject.Inject
 class UnblockAllDevicesUseCase @Inject constructor(
     private val repository: NetworkMonitorRepository
 ) {
-    suspend operator fun invoke(): NetworkResult<Int> {
-        return repository.unblockAllDevices()
+    suspend operator fun invoke(interfaceName: String? = null): NetworkResult<Int> {
+        return repository.unblockAllDevices(interfaceName)
     }
 }
