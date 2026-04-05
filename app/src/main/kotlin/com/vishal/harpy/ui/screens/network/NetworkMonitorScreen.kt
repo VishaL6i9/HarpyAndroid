@@ -20,6 +20,7 @@ import com.vishal.harpy.features.network_monitor.presentation.viewmodel.NetworkM
 import com.vishal.harpy.ui.screens.network.components.DeviceCard
 import com.vishal.harpy.ui.screens.network.components.FilterChips
 import com.vishal.harpy.ui.screens.network.components.LoadingOverlay
+import com.vishal.harpy.ui.screens.network.components.InterfaceWarningBanner
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -35,6 +36,8 @@ fun NetworkMonitorScreen(
     val filterIPv6 by viewModel.filterIPv6.collectAsStateWithLifecycle()
     val scanSuccess by viewModel.scanSuccess.collectAsStateWithLifecycle()
     val testPingResult by viewModel.testPingResult.collectAsStateWithLifecycle()
+    val detectedInterface by viewModel.detectedInterface.collectAsStateWithLifecycle()
+    val appSettings by viewModel.appSettings.collectAsStateWithLifecycle()
 
     val context = androidx.compose.ui.platform.LocalContext.current
     
@@ -94,6 +97,14 @@ fun NetworkMonitorScreen(
                         deviceCount = filteredDevices.size
                     )
                 }
+
+                // Interface Mismatch Warning
+                InterfaceWarningBanner(
+                    selectedInterface = appSettings.networkInterface,
+                    detectedInterface = detectedInterface,
+                    onSwitchClick = { viewModel.updateInterface(it) },
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
 
                 // Unblock all button
                 AnimatedVisibility(
