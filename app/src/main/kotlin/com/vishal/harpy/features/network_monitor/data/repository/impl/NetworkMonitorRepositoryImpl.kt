@@ -144,6 +144,7 @@ class NetworkMonitorRepositoryImpl(private val context: android.content.Context)
         val ourIp = getOurIp(activeIface) // Cache our IP once at the start of scan
         val gatewayIp = getGatewayIp(activeIface) // Cache gateway IP once at the start of scan
         Log.d(TAG, "Starting root scan on $activeIface. Our IP: $ourIp, Gateway IP: $gatewayIp")
+        val seenMacs = mutableSetOf<String>() // Global MAC deduplication for this scan session
 
         try {
             Log.d(TAG, "Getting network route information...")
@@ -170,9 +171,9 @@ class NetworkMonitorRepositoryImpl(private val context: android.content.Context)
                 }
                 suReader.close()
                 
-                val completed = suProcess.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)
+                val completed = com.vishal.harpy.core.utils.ProcessUtils.waitFor(suProcess, 5, java.util.concurrent.TimeUnit.SECONDS)
                 if (!completed) {
-                    suProcess.destroyForcibly()
+                    com.vishal.harpy.core.utils.ProcessUtils.destroyForcibly(suProcess)
                 }
             } catch (e: Exception) {
                 Log.d(TAG, "su route command failed: ${e.message}, trying direct command")
@@ -188,9 +189,9 @@ class NetworkMonitorRepositoryImpl(private val context: android.content.Context)
                     }
                     ipReader.close()
                     
-                    val completed = ipProcess.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)
+                    val completed = com.vishal.harpy.core.utils.ProcessUtils.waitFor(ipProcess, 5, java.util.concurrent.TimeUnit.SECONDS)
                     if (!completed) {
-                        ipProcess.destroyForcibly()
+                        com.vishal.harpy.core.utils.ProcessUtils.destroyForcibly(ipProcess)
                     }
                 } catch (e2: Exception) {
                     Log.e(TAG, "Direct route command also failed: ${e2.message}")
@@ -265,10 +266,10 @@ class NetworkMonitorRepositoryImpl(private val context: android.content.Context)
                         helperReader.close()
                         
                         // Increase waitFor to 15 seconds to allow for the 10-second scan + overhead
-                        val completed = helperProcess.waitFor(15, java.util.concurrent.TimeUnit.SECONDS)
+                        val completed = com.vishal.harpy.core.utils.ProcessUtils.waitFor(helperProcess, 15, java.util.concurrent.TimeUnit.SECONDS)
                         if (!completed) {
                             Log.w(TAG, "Root helper scan timed out, killing process")
-                            helperProcess.destroyForcibly()
+                            com.vishal.harpy.core.utils.ProcessUtils.destroyForcibly(helperProcess)
                         }
                         
                         if (helperFoundDevices.isNotEmpty()) {
@@ -278,8 +279,11 @@ class NetworkMonitorRepositoryImpl(private val context: android.content.Context)
                                 if (parts.size == 2) {
                                     val ip = parts[0]
                                     val mac = parts[1]
-                                    addDeviceToList(devices, ip, mac, activeIface, null, ourIp, gatewayIp)
-                                    Log.d(TAG, "Root helper found: $ip ($mac)")
+                                    if (!seenMacs.contains(mac) && mac != "00:00:00:00:00:00") {
+                                        seenMacs.add(mac)
+                                        addDeviceToList(devices, ip, mac, activeIface, null, ourIp, gatewayIp)
+                                        Log.d(TAG, "Root helper found: $ip ($mac)")
+                                    }
                                 }
                             }
                             
@@ -322,9 +326,9 @@ class NetworkMonitorRepositoryImpl(private val context: android.content.Context)
                     discoveryOutput.flush()
                     discoveryOutput.close()
                     
-                    val completed = discoveryProcess.waitFor(25, java.util.concurrent.TimeUnit.SECONDS)
+                    val completed = com.vishal.harpy.core.utils.ProcessUtils.waitFor(discoveryProcess, 25, java.util.concurrent.TimeUnit.SECONDS)
                     if (!completed) {
-                        discoveryProcess.destroyForcibly()
+                        com.vishal.harpy.core.utils.ProcessUtils.destroyForcibly(discoveryProcess)
                     }
                     Log.d(TAG, "Network discovery completed")
                 } catch (e: Exception) {
@@ -333,7 +337,6 @@ class NetworkMonitorRepositoryImpl(private val context: android.content.Context)
 
                 // Now read ARP table after discovery - try multiple methods
                 Log.d(TAG, "Reading ARP table...")
-                val seenMacs = mutableSetOf<String>()  // Track seen MACs to avoid duplicates
                 
                 // Method 1: Try 'ip neigh show' first (more comprehensive)
                 try {
@@ -377,9 +380,9 @@ class NetworkMonitorRepositoryImpl(private val context: android.content.Context)
                     }
                     
                     arpReader.close()
-                    val completed = arpProcess.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)
+                    val completed = com.vishal.harpy.core.utils.ProcessUtils.waitFor(arpProcess, 5, java.util.concurrent.TimeUnit.SECONDS)
                     if (!completed) {
-                        arpProcess.destroyForcibly()
+                        com.vishal.harpy.core.utils.ProcessUtils.destroyForcibly(arpProcess)
                     }
                 } catch (e: Exception) {
                     Log.d(TAG, "ip neigh show failed: ${e.message}")
@@ -433,9 +436,9 @@ class NetworkMonitorRepositoryImpl(private val context: android.content.Context)
                     }
                     
                     procReader.close()
-                    val completed = procProcess.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)
+                    val completed = com.vishal.harpy.core.utils.ProcessUtils.waitFor(procProcess, 5, java.util.concurrent.TimeUnit.SECONDS)
                     if (!completed) {
-                        procProcess.destroyForcibly()
+                        com.vishal.harpy.core.utils.ProcessUtils.destroyForcibly(procProcess)
                     }
                 } catch (e: Exception) {
                     Log.d(TAG, "/proc/net/arp read failed: ${e.message}")
@@ -478,8 +481,8 @@ class NetworkMonitorRepositoryImpl(private val context: android.content.Context)
                     val hostnameReader = BufferedReader(InputStreamReader(hostnameProcess.inputStream))
                     val result = hostnameReader.readLine()
                     hostnameReader.close()
-                    hostnameProcess.waitFor(2, java.util.concurrent.TimeUnit.SECONDS)
-                    hostnameProcess.destroyForcibly()
+                    com.vishal.harpy.core.utils.ProcessUtils.waitFor(hostnameProcess, 2, java.util.concurrent.TimeUnit.SECONDS)
+                    com.vishal.harpy.core.utils.ProcessUtils.destroyForcibly(hostnameProcess)
                     
                     if (!result.isNullOrBlank() && result != ip) {
                         resolvedHostname = result.trimEnd('.')
@@ -499,8 +502,8 @@ class NetworkMonitorRepositoryImpl(private val context: android.content.Context)
                         }
                     }
                     hostnameReader.close()
-                    hostnameProcess.waitFor(2, java.util.concurrent.TimeUnit.SECONDS)
-                    hostnameProcess.destroyForcibly()
+                    com.vishal.harpy.core.utils.ProcessUtils.waitFor(hostnameProcess, 2, java.util.concurrent.TimeUnit.SECONDS)
+                    com.vishal.harpy.core.utils.ProcessUtils.destroyForcibly(hostnameProcess)
                 }
             } catch (e: Exception) {
                 Log.d(TAG, "Could not resolve hostname for $ip: ${e.message}")
@@ -699,7 +702,7 @@ class NetworkMonitorRepositoryImpl(private val context: android.content.Context)
 
     override fun isDeviceBlocked(ipAddress: String): Boolean {
         val process = blockingProcesses[ipAddress]
-        return process != null && process.isAlive
+        return process != null && com.vishal.harpy.core.utils.ProcessUtils.isAlive(process)
     }
 
     override suspend fun restoreBlockedDevices(devices: List<NetworkDevice>, interfaceName: String?): NetworkResult<Int> = withContext(Dispatchers.IO) {
