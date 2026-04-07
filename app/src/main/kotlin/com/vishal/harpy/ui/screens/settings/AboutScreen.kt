@@ -208,12 +208,13 @@ fun AboutScreen(
 
                             Button(
                                 onClick = {
-                                    context.startActivity(
-                                        Intent(
-                                            Intent.ACTION_VIEW,
-                                            "https://github.com/VishaL6i9/HarpyAndroid".toUri()
-                                        )
-                                    )
+                                    val intent = Intent(
+                                        Intent.ACTION_VIEW,
+                                        "https://github.com/VishaL6i9/HarpyAndroid".toUri()
+                                    ).apply {
+                                        addCategory(Intent.CATEGORY_BROWSABLE)
+                                    }
+                                    context.startActivity(intent)
                                 },
                                 modifier = Modifier
                                     .weight(1f)
@@ -420,9 +421,10 @@ private fun LibraryItem(
         modifier = Modifier
             .fillMaxWidth()
             .clickable {
-                context.startActivity(
-                    Intent(Intent.ACTION_VIEW, url.toUri())
-                )
+                val intent = Intent(Intent.ACTION_VIEW, url.toUri()).apply {
+                    addCategory(Intent.CATEGORY_BROWSABLE)
+                }
+                context.startActivity(intent)
             }
     ) {
         Text(
