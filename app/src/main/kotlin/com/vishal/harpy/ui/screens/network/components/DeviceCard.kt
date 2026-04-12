@@ -106,6 +106,24 @@ fun DeviceCard(
                             }
                         )
                     }
+
+                    if (device.isCurrentDevice) {
+                        AssistChip(
+                            onClick = { },
+                            label = { Text("This Device") },
+                            leadingIcon = {
+                                Icon(
+                                    Icons.Default.Smartphone,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            },
+                            colors = AssistChipDefaults.assistChipColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                labelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        )
+                    }
                     
                     if (device.isBlocked) {
                         AssistChip(

@@ -444,8 +444,16 @@ class NetworkMonitorRepositoryImpl(private val context: android.content.Context)
                     Log.d(TAG, "/proc/net/arp read failed: ${e.message}")
                 }
                 
-                Log.d(TAG, "Scan complete. Found ${devices.size} devices")
+        // Final safety check: Ensure our own device is in the list
+        // Often we won't appear in our own ARP/neighbor tables
+        if (ourIp != null && devices.none { it.isCurrentDevice }) {
+            val ourMac = getOurMacAddress(activeIface)
+            if (ourMac != null && !seenMacs.contains(ourMac)) {
+                Log.d(TAG, "Manually injecting current device: $ourIp ($ourMac)")
+                addDeviceToList(devices, ourIp, ourMac, activeIface, "This Device", ourIp, gatewayIp)
             }
+        }
+        }
         } catch (e: Exception) {
             Log.e(TAG, "Error scanning network: ${e.message}", e)
         }

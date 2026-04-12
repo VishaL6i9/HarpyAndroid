@@ -210,9 +210,10 @@ class NetworkMonitorViewModel @Inject constructor(
                             )
                         }
 
-                        // Sort: devices with saved names first, then pinned devices, then by IP
+                        // Sort: current device first, then saved names, then pinned, then IP
                         val sortedDevices = devicesWithPreferences.sortedWith(
                             compareBy(
+                                { !it.isCurrentDevice },     // Current device first (false < true)
                                 { it.deviceName == null },  // Devices with names first (false < true)
                                 { !it.isPinned },            // Then pinned devices
                                 { it.ipAddress }             // Then by IP address
@@ -547,9 +548,10 @@ class NetworkMonitorViewModel @Inject constructor(
                     it
                 }
             }
-            // Re-sort: devices with saved names first, then pinned devices, then by IP
+            // Re-sort: current device first, then saved names, then pinned, then IP
             val sortedDevices = updatedDevices.sortedWith(
                 compareBy(
+                    { !it.isCurrentDevice },     // Current device first (false < true)
                     { it.deviceName == null },  // Devices with names first (false < true)
                     { !it.isPinned },            // Then pinned devices
                     { it.ipAddress }             // Then by IP address
