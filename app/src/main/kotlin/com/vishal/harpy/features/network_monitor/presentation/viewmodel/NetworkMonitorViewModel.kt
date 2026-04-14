@@ -961,13 +961,13 @@ class NetworkMonitorViewModel @Inject constructor(
                 when (result) {
                     is NetworkResult.Success -> {
                         if (result.data) {
-                            // Mark DHCP session as inactive
-                            val dhcpSession = sessionManager.sessions.value
+                            // Mark ALL active DHCP sessions as inactive
+                            val activeDhcpSessions = sessionManager.sessions.value
                                 .filterIsInstance<SpoofingSession.Dhcp>()
-                                .firstOrNull()
+                                .filter { it.isActive }
                             
-                            dhcpSession?.let { 
-                                sessionManager.updateSession(it.copy(isActive = false))
+                            activeDhcpSessions.forEach { session ->
+                                sessionManager.updateSession(session.copy(isActive = false))
                             }
                             
                             com.vishal.harpy.core.utils.LogUtils.i("NetworkMonitorVM", "DHCP spoofing stopped")
@@ -1147,6 +1147,35 @@ class NetworkMonitorViewModel @Inject constructor(
                 com.vishal.harpy.core.utils.LogUtils.d("NetworkMonitorVM", "Removed ${device.deviceName} from whitelist")
             } catch (e: Exception) {
                 _error.value = "Failed to remove device from whitelist: ${e.message}"
+            }
+        }
+    }
+
+    /**
+     * Remove all stopped DHCP rules
+     */
+    fun clearInactiveDHCPRules() {
+        val inactiveRules = sessionManager.sessions.value
+            .filterIsInstance<SpoofingSession.Dhcp>()
+            .filter { !it.isActive }
+        
+        inactiveRules.forEach { rule ->
+            sessionManager.removeSession(rule.id)
+        }
+    }
+
+    /**
+     * Remove a specific DHCP rule
+     */
+    fun removeDHCPRule(ruleId: String) {
+        val session = sessionManager.getSession(ruleId)
+        
+        session?.let { 
+            viewModelScope.launch {
+                if ((it as? SpoofingSession.Dhcp)?.isActive == true) {
+                    stopDHCPSpoofing()
+                }
+                sessionManager.removeSession(it.id)
             }
         }
     }

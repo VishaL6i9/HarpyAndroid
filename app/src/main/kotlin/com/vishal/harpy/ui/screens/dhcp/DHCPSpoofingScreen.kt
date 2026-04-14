@@ -31,12 +31,18 @@ fun DHCPSpoofingScreen(
 ) {
     val dhcpSessions by viewModel.dhcpSessions.collectAsStateWithLifecycle()
     var showStartDialog by remember { mutableStateOf(false) }
+    var showClearDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("DHCP Spoofing") },
                 actions = {
+                    if (dhcpSessions.any { !it.isActive }) {
+                        IconButton(onClick = { showClearDialog = true }) {
+                            Icon(Icons.Default.Delete, contentDescription = "Clear Inactive")
+                        }
+                    }
                     IconButton(onClick = onManageSessions) {
                         Icon(Icons.Default.List, contentDescription = "Manage Sessions")
                     }
@@ -111,6 +117,29 @@ fun DHCPSpoofingScreen(
             onDismiss = { showStartDialog = false }
         )
     }
+
+    if (showClearDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearDialog = false },
+            title = { Text("Clear Inactive Rules") },
+            text = { Text("Remove all stopped DHCP rules?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.clearInactiveDHCPRules()
+                        showClearDialog = false
+                    }
+                ) {
+                    Text("Clear")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -183,14 +212,16 @@ fun DhcpSessionCard(
                     )
                 }
                 
-                IconButton(
-                    onClick = onStop,
-                    colors = IconButtonDefaults.iconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
-                        contentColor = MaterialTheme.colorScheme.error
-                    )
-                ) {
-                    Icon(Icons.Default.Stop, contentDescription = "Stop")
+                if (session.isActive) {
+                    IconButton(
+                        onClick = onStop,
+                        colors = IconButtonDefaults.iconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
+                            contentColor = MaterialTheme.colorScheme.error
+                        )
+                    ) {
+                        Icon(Icons.Default.Stop, contentDescription = "Stop")
+                    }
                 }
             }
             
