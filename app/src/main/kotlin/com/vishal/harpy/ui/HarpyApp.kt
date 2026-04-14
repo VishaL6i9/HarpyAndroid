@@ -36,6 +36,7 @@ import com.vishal.harpy.ui.screens.dhcp.DHCPSpoofingScreen
 import com.vishal.harpy.ui.screens.dns.DNSSpoofingScreen
 import com.vishal.harpy.ui.screens.network.NetworkMonitorScreen
 import com.vishal.harpy.ui.screens.settings.SettingsScreen
+import com.vishal.harpy.ui.screens.spoofing.SpoofingManagementScreen
 import com.vishal.harpy.ui.theme.HarpyTheme
 import dagger.hilt.android.EntryPointAccessors
 
@@ -58,6 +59,7 @@ sealed class AppScreen {
     object PerformanceMonitor : AppScreen()
     object ProcessList : AppScreen()
     object About : AppScreen()
+    object SpoofingManagement : AppScreen()
 }
 
 /**
@@ -173,6 +175,11 @@ fun HarpyApp() {
                     onScrollOffsetChanged = { updateScrollOffset(it) }
                 )
             }
+            AppScreen.SpoofingManagement -> {
+                com.vishal.harpy.ui.screens.spoofing.SpoofingManagementScreen(
+                    onNavigateBack = { navigateBack() }
+                )
+            }
             null,
             AppScreen.NetworkMonitor, AppScreen.DnsSpoofing, AppScreen.DhcpSpoofing -> {
                 // Show main app with bottom navigation
@@ -214,10 +221,16 @@ fun HarpyApp() {
                             )
                         }
                         composable(Screen.DNSSpoofing.route) {
-                            DNSSpoofingScreen(onSettingsClick = { navigateTo(AppScreen.Settings) })
+                            DNSSpoofingScreen(
+                                onSettingsClick = { navigateTo(AppScreen.Settings) },
+                                onManageSessions = { navigateTo(AppScreen.SpoofingManagement) }
+                            )
                         }
                         composable(Screen.DHCPSpoofing.route) {
-                            DHCPSpoofingScreen(onSettingsClick = { navigateTo(AppScreen.Settings) })
+                            DHCPSpoofingScreen(
+                                onSettingsClick = { navigateTo(AppScreen.Settings) },
+                                onManageSessions = { navigateTo(AppScreen.SpoofingManagement) }
+                            )
                         }
                     }
                 }

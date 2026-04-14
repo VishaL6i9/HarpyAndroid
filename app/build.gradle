@@ -31,6 +31,20 @@ android {
         }
     }
 
+    flavorDimensions += "theme"
+    productFlavors {
+        standard {
+            dimension "theme"
+            applicationIdSuffix ".standard"
+            versionNameSuffix "-standard"
+        }
+        ctos {
+            dimension "theme"
+            applicationIdSuffix ".ctos"
+            versionNameSuffix "-ctos"
+        }
+    }
+
     buildTypes {
         debug {
             applicationIdSuffix ".debug"

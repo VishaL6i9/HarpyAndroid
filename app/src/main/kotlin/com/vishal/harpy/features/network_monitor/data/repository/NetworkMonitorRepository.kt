@@ -15,4 +15,5 @@ interface NetworkMonitorRepository {
     fun isDeviceBlocked(ipAddress: String): Boolean
     suspend fun restoreBlockedDevices(devices: List<NetworkDevice>, interfaceName: String? = null): NetworkResult<Int>
     fun getActiveInterface(): String?
+    fun getOurIp(interfaceName: String? = null): String?
 }

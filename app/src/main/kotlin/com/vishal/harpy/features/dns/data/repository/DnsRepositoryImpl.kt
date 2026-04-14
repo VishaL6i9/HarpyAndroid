@@ -4,6 +4,7 @@ import com.vishal.harpy.features.dns.domain.repository.DnsRepository
 import com.vishal.harpy.core.utils.NetworkResult
 import com.vishal.harpy.core.utils.NetworkError
 import com.vishal.harpy.core.utils.LogUtils
+import com.vishal.harpy.core.utils.ProcessUtils
 import com.vishal.harpy.core.native.NativeNetworkWrapper
 import com.vishal.harpy.features.network_monitor.domain.usecases.IsDeviceRootedUseCase
 import kotlinx.coroutines.Dispatchers
@@ -122,10 +123,12 @@ class DnsRepositoryImpl @Inject constructor(
             val processKey = "dns_$domain"
             val process = dnsSpoofingProcesses[processKey]
 
-            if (process != null && com.vishal.harpy.core.utils.ProcessUtils.isAlive(process)) {
-                com.vishal.harpy.core.utils.ProcessUtils.destroyForcibly(process)
+            if (process != null) {
+                if (com.vishal.harpy.core.utils.ProcessUtils.isAlive(process)) {
+                    com.vishal.harpy.core.utils.ProcessUtils.destroyForcibly(process)
+                    LogUtils.i(TAG, "DNS spoofing process terminated for domain: $domain")
+                }
                 dnsSpoofingProcesses.remove(processKey)
-                LogUtils.i(TAG, "DNS spoofing stopped for domain: $domain")
                 NetworkResult.success(true)
             } else {
                 LogUtils.w(TAG, "No active DNS spoofing process found for domain: $domain")

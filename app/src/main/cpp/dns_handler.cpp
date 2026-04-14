@@ -100,8 +100,14 @@ int craft_dns_response(char *query_packet, ssize_t query_size, char *response_pa
     
     // Copy the header and modify flags to indicate response
     memcpy(response_header, query_header, sizeof(struct dns_header));
-    response_header->flags |= htons(0x8000); // Set response flag
+    
+    // Set response flag (QR=1) and Recursion Available (RA=1)
+    // Keep Recursion Desired (RD) from query if present
+    response_header->flags |= htons(0x8080); 
+    
     response_header->ans_count = htons(1);    // One answer
+    response_header->auth_count = htons(0);   // No authority records
+    response_header->add_count = htons(0);    // No additional records
     
     // Copy the query section
     int pos = sizeof(struct dns_header);

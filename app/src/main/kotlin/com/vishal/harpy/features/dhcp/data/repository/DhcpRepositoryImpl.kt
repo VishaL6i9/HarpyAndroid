@@ -4,6 +4,7 @@ import com.vishal.harpy.features.dhcp.domain.repository.DhcpRepository
 import com.vishal.harpy.core.utils.NetworkResult
 import com.vishal.harpy.core.utils.NetworkError
 import com.vishal.harpy.core.utils.LogUtils
+import com.vishal.harpy.core.utils.ProcessUtils
 import com.vishal.harpy.core.native.NativeNetworkWrapper
 import com.vishal.harpy.features.network_monitor.domain.usecases.IsDeviceRootedUseCase
 import kotlinx.coroutines.Dispatchers
@@ -11,11 +12,14 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import android.content.Context
+import java.util.concurrent.ConcurrentHashMap
 
 class DhcpRepositoryImpl @Inject constructor(
     private val context: Context,
     private val isDeviceRootedUseCase: IsDeviceRootedUseCase
 ) : DhcpRepository {
+
+    private val dhcpSpoofingProcesses = ConcurrentHashMap<String, Process>()
 
     companion object {
         private const val TAG = "DhcpRepositoryImpl"
@@ -110,7 +114,9 @@ class DhcpRepositoryImpl @Inject constructor(
             // Wait a bit to see if the process started successfully
             kotlinx.coroutines.delay(1000)
 
-            if (com.vishal.harpy.core.utils.ProcessUtils.isAlive(process)) {
+            if (ProcessUtils.isAlive(process)) {
+                // Store process for later management
+                dhcpSpoofingProcesses["dhcp_main"] = process
                 LogUtils.i(TAG, "DHCP spoofing process started successfully")
                 NetworkResult.success(true)
             } else {
@@ -125,9 +131,19 @@ class DhcpRepositoryImpl @Inject constructor(
 
     override suspend fun stopDHCPSpoofing(): NetworkResult<Boolean> = withContext(Dispatchers.IO) {
         try {
-            LogUtils.d(TAG, "Stopping DHCP spoofing is not implemented as it requires process management")
-            // In a real implementation, we would need to track and kill the DHCP spoofing process
-            NetworkResult.success(false) 
+            LogUtils.d(TAG, "Stopping DHCP spoofing")
+
+            val process = dhcpSpoofingProcesses["dhcp_main"]
+
+            if (process != null && ProcessUtils.isAlive(process)) {
+                ProcessUtils.destroyForcibly(process)
+                dhcpSpoofingProcesses.remove("dhcp_main")
+                LogUtils.i(TAG, "DHCP spoofing stopped successfully")
+                NetworkResult.success(true)
+            } else {
+                LogUtils.w(TAG, "No active DHCP spoofing process found")
+                NetworkResult.success(false)
+            }
         } catch (e: Exception) {
             LogUtils.e(TAG, "Error stopping DHCP spoofing: ${e.message}", e)
             NetworkResult.error(NetworkError.CommandExecutionError(e))
@@ -135,7 +151,7 @@ class DhcpRepositoryImpl @Inject constructor(
     }
 
     override fun isDHCPSpoofingActive(): Boolean {
-        // In a real implementation, this would check if any DHCP spoofing processes are running
-        return false
+        val process = dhcpSpoofingProcesses["dhcp_main"]
+        return process != null && ProcessUtils.isAlive(process)
     }
 }

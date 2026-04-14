@@ -15,7 +15,8 @@ import com.vishal.harpy.features.network_monitor.presentation.viewmodel.NetworkM
 @Composable
 fun DNSSpoofingScreen(
     viewModel: NetworkMonitorViewModel = hiltViewModel(),
-    onSettingsClick: () -> Unit = {}
+    onSettingsClick: () -> Unit = {},
+    onManageSessions: () -> Unit = {}
 ) {
     var showStartDialog by remember { mutableStateOf(false) }
     var showStopDialog by remember { mutableStateOf(false) }
@@ -189,7 +190,6 @@ fun DNSSpoofingScreen(
     if (showAddRuleDialog) {
         AddDNSRuleDialog(
             onConfirm = { domain, ip ->
-                // Add rule logic
                 showAddRuleDialog = false
             },
             onDismiss = { showAddRuleDialog = false }
@@ -199,7 +199,6 @@ fun DNSSpoofingScreen(
     if (showRemoveRuleDialog) {
         RemoveDNSRuleDialog(
             onConfirm = { domain ->
-                // Remove rule logic
                 showRemoveRuleDialog = false
             },
             onDismiss = { showRemoveRuleDialog = false }
@@ -210,7 +209,6 @@ fun DNSSpoofingScreen(
         CheckDNSStatusDialog(
             onConfirm = { domain ->
                 val isActive = viewModel.isDNSSpoofingActive(domain)
-                // Show status
                 showStatusDialog = false
             },
             onDismiss = { showStatusDialog = false }

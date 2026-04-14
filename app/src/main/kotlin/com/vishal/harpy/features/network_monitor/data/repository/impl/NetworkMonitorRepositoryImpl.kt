@@ -980,7 +980,7 @@ class NetworkMonitorRepositoryImpl(private val context: android.content.Context)
         return null
     }
 
-    private fun getOurIp(interfaceName: String? = null): String? {
+    override fun getOurIp(interfaceName: String?): String? {
         val activeIface = interfaceName ?: getActiveInterface()
         Log.d(TAG, "Attempting to get our IP (interface: ${activeIface ?: "active"})...")
 

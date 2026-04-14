@@ -12,19 +12,23 @@ import com.vishal.harpy.features.network_monitor.domain.usecases.MapNetworkTopol
 import com.vishal.harpy.features.network_monitor.domain.usecases.TestPingUseCase
 import com.vishal.harpy.features.network_monitor.domain.usecases.IsDeviceBlockedUseCase
 import com.vishal.harpy.features.network_monitor.domain.usecases.RestoreBlockedDevicesUseCase
-import com.vishal.harpy.features.network_monitor.domain.usecases.GetActiveInterfaceUseCase
 import com.vishal.harpy.features.dns.domain.usecases.StartDnsSpoofingUseCase
 import com.vishal.harpy.features.dns.domain.usecases.StopDnsSpoofingUseCase
 import com.vishal.harpy.features.dns.domain.usecases.IsDnsSpoofingActiveUseCase
 import com.vishal.harpy.features.dhcp.domain.usecases.StartDhcpSpoofingUseCase
 import com.vishal.harpy.features.dhcp.domain.usecases.StopDhcpSpoofingUseCase
 import com.vishal.harpy.features.dhcp.domain.usecases.IsDhcpSpoofingActiveUseCase
+import com.vishal.harpy.features.network_monitor.domain.usecases.GetActiveInterfaceUseCase
+import com.vishal.harpy.features.network_monitor.domain.usecases.GetOurIpUseCase
 import com.vishal.harpy.core.utils.NetworkDevice
 import com.vishal.harpy.core.utils.NetworkTopology
 import com.vishal.harpy.core.utils.NetworkResult
 import com.vishal.harpy.core.utils.NetworkError
 import com.vishal.harpy.core.utils.NetworkErrorMapper
 import com.vishal.harpy.core.utils.DevicePreferenceRepository
+import com.vishal.harpy.core.utils.SpoofingSession
+import com.vishal.harpy.core.utils.DhcpSpoofingRule
+import com.vishal.harpy.core.state.SpoofingSessionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.SharingStarted
@@ -60,6 +64,8 @@ class NetworkMonitorViewModel @Inject constructor(
     private val stopDhcpSpoofingUseCase: StopDhcpSpoofingUseCase,
     private val isDhcpSpoofingActiveUseCase: IsDhcpSpoofingActiveUseCase,
     private val getActiveInterfaceUseCase: GetActiveInterfaceUseCase,
+    private val getOurIpUseCase: GetOurIpUseCase,
+    private val sessionManager: SpoofingSessionManager,
     private val settingsRepository: SettingsRepository,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
@@ -102,6 +108,9 @@ class NetworkMonitorViewModel @Inject constructor(
     private val _detectedInterface = MutableStateFlow<String?>(null)
     val detectedInterface: StateFlow<String?> = _detectedInterface.asStateFlow()
 
+    private val _detectedIp = MutableStateFlow<String?>(null)
+    val detectedIp: StateFlow<String?> = _detectedIp.asStateFlow()
+
     val appSettings: StateFlow<AppSettings> = settingsRepository.settings
         .stateIn(
             scope = viewModelScope,
@@ -142,6 +151,42 @@ class NetworkMonitorViewModel @Inject constructor(
      */
     val devices: StateFlow<List<NetworkDevice>> = networkDevices
 
+    private val _dnsSearchQuery = MutableStateFlow("")
+    val dnsSearchQuery: StateFlow<String> = _dnsSearchQuery.asStateFlow()
+
+    /**
+     * Get all active DNS spoofing sessions
+     */
+    val dnsSessions: StateFlow<List<SpoofingSession.Dns>> = sessionManager.sessions
+        .map { sessions -> 
+            val dnsOnly = sessions.filterIsInstance<SpoofingSession.Dns>()
+            val query = _dnsSearchQuery.value
+            if (query.isBlank()) {
+                dnsOnly
+            } else {
+                dnsOnly.filter { 
+                    it.domain.contains(query, ignoreCase = true) || 
+                    it.spoofedIP.contains(query, ignoreCase = true)
+                }
+            }
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+    /**
+     * Get all active DHCP spoofing sessions
+     */
+    val dhcpSessions: StateFlow<List<SpoofingSession.Dhcp>> = sessionManager.sessions
+        .map { sessions -> sessions.filterIsInstance<SpoofingSession.Dhcp>() }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
     init {
         checkRootAccessInternal()
         refreshLogCount()
@@ -149,7 +194,9 @@ class NetworkMonitorViewModel @Inject constructor(
     }
 
     private fun refreshDetectedInterface() {
-        _detectedInterface.value = getActiveInterfaceUseCase()
+        val iface = getActiveInterfaceUseCase()
+        _detectedInterface.value = iface
+        _detectedIp.value = getOurIpUseCase(iface)
     }
 
     fun updateInterface(interfaceName: String) {
@@ -642,13 +689,40 @@ class NetworkMonitorViewModel @Inject constructor(
         viewModelScope.launch {
             _loadingState.value = LoadingState.DNSSpoofing
             _error.value = null
+
             try {
+                // Check if session for this domain already exists
+                val existingSession = sessionManager.sessions.value
+                    .filterIsInstance<SpoofingSession.Dns>()
+                    .find { it.domain == domain }
+
+                if (existingSession == null) {
+                    val session = SpoofingSession.Dns(
+                        domain = domain,
+                        spoofedIP = spoofedIP,
+                        interfaceName = activeIface,
+                        isActive = false,
+                        startTime = null
+                    )
+                    sessionManager.addSession(session)
+                }
+
                 val result = startDnsSpoofingUseCase(domain, spoofedIP, activeIface)
                 when (result) {
                     is NetworkResult.Success -> {
                         if (result.data) {
+                            val sessionToUpdate = sessionManager.sessions.value
+                                .filterIsInstance<SpoofingSession.Dns>()
+                                .find { it.domain == domain }
+                            
+                            sessionToUpdate?.let {
+                                val activeSession = it.copy(
+                                    isActive = true,
+                                    startTime = java.time.LocalDateTime.now()
+                                )
+                                sessionManager.updateSession(activeSession)
+                            }
                             com.vishal.harpy.core.utils.LogUtils.i("NetworkMonitorVM", "DNS spoofing started for $domain -> $spoofedIP")
-                            // Show success message via Toast instead of error field
                             _error.value = null
                         } else {
                             _error.value = "Failed to start DNS spoofing"
@@ -657,6 +731,8 @@ class NetworkMonitorViewModel @Inject constructor(
                     is NetworkResult.Error -> {
                         _lastError.value = result.error
                         _error.value = "DNS spoofing failed: ${result.error.message}"
+                        // Only remove if it was just created and didn't exist before
+                        // (Usually we keep rules now, so we can just leave it inactive)
                     }
                 }
             } catch (e: Exception) {
@@ -682,14 +758,25 @@ class NetworkMonitorViewModel @Inject constructor(
             _loadingState.value = LoadingState.DNSSpoofing
             _error.value = null
             try {
+                // Find session first
+                val sessionToUpdate = sessionManager.sessions.value
+                    .filterIsInstance<SpoofingSession.Dns>()
+                    .find { it.domain == domain }
+
                 val result = stopDnsSpoofingUseCase(domain)
+                
+                // Mark as inactive instead of removing
+                sessionToUpdate?.let { 
+                    sessionManager.updateSession(it.copy(isActive = false))
+                }
+                
                 when (result) {
                     is NetworkResult.Success -> {
                         if (result.data) {
                             com.vishal.harpy.core.utils.LogUtils.i("NetworkMonitorVM", "DNS spoofing stopped for $domain")
                             _error.value = "DNS spoofing stopped for $domain"
                         } else {
-                            _error.value = "No active DNS spoofing found for $domain"
+                            _error.value = "DNS spoofing for $domain was already stopped"
                         }
                     }
                     is NetworkResult.Error -> {
@@ -708,13 +795,57 @@ class NetworkMonitorViewModel @Inject constructor(
     }
 
     /**
-     * Stop all DNS spoofing (parameterless version)
+     * Permanently remove a DNS spoofing rule
      */
-    fun stopDNSSpoofing() {
-        // This would stop all DNS spoofing processes
-        // For now, we'll just show a message
-        com.vishal.harpy.core.utils.LogUtils.i("NetworkMonitorVM", "Stopping all DNS spoofing processes")
-        _error.value = "Stopping all DNS spoofing processes is not implemented yet"
+    fun removeDNSRule(domain: String) {
+        val session = sessionManager.sessions.value
+            .filterIsInstance<SpoofingSession.Dns>()
+            .find { it.domain == domain }
+        
+        session?.let { 
+            viewModelScope.launch {
+                if (it.isActive) {
+                    stopDNSSpoofing(it.domain)
+                }
+                sessionManager.removeSession(it.id)
+            }
+        }
+    }
+
+    fun setDnsSearchQuery(query: String) {
+        _dnsSearchQuery.value = query
+    }
+
+    /**
+     * Stop all DNS spoofing processes
+     */
+    fun stopAllDNSSpoofing() {
+        viewModelScope.launch {
+            val activeDns = sessionManager.sessions.value
+                .filterIsInstance<SpoofingSession.Dns>()
+                .filter { it.isActive }
+            
+            activeDns.forEach { session ->
+                stopDNSSpoofing(session.domain)
+            }
+            
+            if (activeDns.isNotEmpty()) {
+                _error.value = "Stopped ${activeDns.size} DNS spoofing processes"
+            }
+        }
+    }
+
+    /**
+     * Remove all stopped DNS rules
+     */
+    fun clearInactiveDNSRules() {
+        val inactiveRules = sessionManager.sessions.value
+            .filterIsInstance<SpoofingSession.Dns>()
+            .filter { !it.isActive }
+        
+        inactiveRules.forEach { rule ->
+            sessionManager.removeSession(rule.id)
+        }
     }
 
     /**
@@ -753,6 +884,25 @@ class NetworkMonitorViewModel @Inject constructor(
         viewModelScope.launch {
             _loadingState.value = LoadingState.DHCPSpoofing
             _error.value = null
+
+            val dhcpRules = targetMacs.mapIndexed { index, mac ->
+                DhcpSpoofingRule(
+                    targetMac = mac,
+                    spoofedIP = spoofedIPs[index],
+                    gatewayIP = gatewayIPs[index],
+                    subnetMask = subnetMasks[index],
+                    dnsServer = dnsServers[index]
+                )
+            }
+
+            val session = SpoofingSession.Dhcp(
+                interfaceName = activeIface,
+                rules = dhcpRules,
+                isActive = false,
+                startTime = null
+            )
+            sessionManager.addSession(session)
+
             try {
                 val result = startDhcpSpoofingUseCase(
                     activeIface,
@@ -765,23 +915,29 @@ class NetworkMonitorViewModel @Inject constructor(
                 when (result) {
                     is NetworkResult.Success -> {
                         if (result.data) {
+                            val activeSession = session.copy(
+                                isActive = true,
+                                startTime = java.time.LocalDateTime.now()
+                            )
+                            sessionManager.updateSession(activeSession)
                             com.vishal.harpy.core.utils.LogUtils.i("NetworkMonitorVM", "DHCP spoofing started for ${targetMacs.size} devices")
-                            // Show success message via Toast instead of error field
                             _error.value = null
-                            // TODO: Add a success message state flow if needed
                         } else {
                             _error.value = "Failed to start DHCP spoofing"
+                            sessionManager.removeSession(session.id)
                         }
                     }
                     is NetworkResult.Error -> {
                         _lastError.value = result.error
                         _error.value = "DHCP spoofing failed: ${result.error.message}"
+                        sessionManager.removeSession(session.id)
                     }
                 }
             } catch (e: Exception) {
                 val error = NetworkError.UnknownError(e)
                 _lastError.value = error
                 _error.value = "DHCP spoofing error: ${e.message}"
+                sessionManager.removeSession(session.id)
             } finally {
                 _loadingState.value = LoadingState.None
             }
@@ -805,6 +961,15 @@ class NetworkMonitorViewModel @Inject constructor(
                 when (result) {
                     is NetworkResult.Success -> {
                         if (result.data) {
+                            // Mark DHCP session as inactive
+                            val dhcpSession = sessionManager.sessions.value
+                                .filterIsInstance<SpoofingSession.Dhcp>()
+                                .firstOrNull()
+                            
+                            dhcpSession?.let { 
+                                sessionManager.updateSession(it.copy(isActive = false))
+                            }
+                            
                             com.vishal.harpy.core.utils.LogUtils.i("NetworkMonitorVM", "DHCP spoofing stopped")
                             _error.value = "DHCP spoofing stopped"
                         } else {
