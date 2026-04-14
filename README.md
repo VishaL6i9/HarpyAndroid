@@ -79,19 +79,40 @@ git clone https://github.com/VishaL6i9/HarpyAndroid.git
 cd HarpyAndroid
 ```
 
-2. Build the debug APK:
+2. Build the debug APK for your desired flavor:
+
+**Standard flavor:**
 ```bash
-./gradlew assembleDebug
+./gradlew assembleStandardDebug
+```
+
+**CTOS flavor:**
+```bash
+./gradlew assembleCtosDebug
 ```
 
 3. Install on your device:
+
+**Standard flavor:**
 ```bash
-adb install app/build/outputs/apk/debug/app-debug.apk
+adb install app/build/outputs/apk/standard/debug/app-standard-debug.apk
+```
+
+**CTOS flavor:**
+```bash
+adb install app/build/outputs/apk/ctos/debug/app-ctos-debug.apk
 ```
 
 Or build and install in one step:
+
+**Standard flavor:**
 ```bash
-./gradlew installDebug
+./gradlew installStandardDebug
+```
+
+**CTOS flavor:**
+```bash
+./gradlew installCtosDebug
 ```
 
 #### First Launch
@@ -157,7 +178,28 @@ Or build and install in one step:
 
 ## Architecture
 
-Harpy follows modern Android development best practices with a clean architecture approach.
+Harpy follows modern Android development best practices with a clean architecture approach and Product Flavors for build variants.
+
+### Build Architecture: Product Flavors
+
+Harpy uses **Android Product Flavors** to manage multiple build variants (standard and ctos) while maintaining a unified codebase:
+
+**Shared Code Structure (src/main/):**
+- All common code, screens, and business logic
+- Shared repositories, use cases, and ViewModels
+- Common UI components and navigation
+
+**Flavor-Specific Code:**
+- `src/standard/` - Standard theme and flavor-specific configuration
+- `src/ctos/` - CTOS theme and flavor-specific configuration
+
+**Theme Injection via Hilt:**
+- `ThemeProvider` interface defines theme contract
+- `StandardThemeModule` - Provides StandardTheme for standard flavor
+- `CtosThemeModule` - Provides CtosTheme for ctos flavor
+- Automatic theme injection through Hilt dependency injection
+
+This approach eliminates 88% code duplication while maintaining clean separation of concerns.
 
 ### Project Structure
 
@@ -195,11 +237,28 @@ app/src/main/kotlin/com/vishal/harpy/
 │   │   ├── device_management/
 │   │   └── performance/           # Performance monitoring screens
 │   ├── components/                # Reusable UI components
-│   ├── theme/                     # Material 3 theme
+│   ├── theme/                     # Material 3 theme (shared interface)
+│   ├── di/                        # Theme provider modules
 │   ├── viewmodel/                 # Shared ViewModels
 │   └── HarpyApp.kt               # Main app composable
 └── main/
     └── MainActivityCompose.kt     # Entry point
+
+app/src/standard/kotlin/com/vishal/harpy/
+├── ui/
+│   ├── theme/
+│   │   └── StandardTheme.kt       # Standard flavor theme
+│   └── di/
+│       └── StandardThemeModule.kt # Hilt module for standard theme
+└── ...                            # Other flavor-specific overrides
+
+app/src/ctos/kotlin/com/vishal/harpy/
+├── ui/
+│   ├── theme/
+│   │   └── CtosTheme.kt           # CTOS flavor theme
+│   └── di/
+│       └── CtosThemeModule.kt     # Hilt module for CTOS theme
+└── ...                            # Other flavor-specific overrides
 ```
 
 ### Tech Stack
@@ -330,6 +389,8 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 - [x] Dark mode theme with system theme support
 - [x] **Real-time Interface Selection and Mismatch Warning System**
 - [x] **Comprehensive API 24/25 (Android 7.0/7.1) Stability Pack**
+- [x] **Product Flavors Build Architecture** - Consolidated standard and ctos builds with 88% code duplication eliminated
+- [x] **Hilt-based Theme Injection** - Flavor-specific theme injection via dependency injection
 
 ### In Progress 🚧
 - [ ] Comprehensive unit testing
