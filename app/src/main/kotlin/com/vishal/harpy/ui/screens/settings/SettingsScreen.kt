@@ -652,10 +652,14 @@ fun ScanSettingsDialog(
 fun InterfaceSettingsDialog(
     currentInterface: String,
     onConfirm: (String) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    viewModel: NetworkMonitorViewModel = hiltViewModel()
 ) {
     var selectedInterface by remember { mutableStateOf(currentInterface) }
-    val interfaces = listOf("wlan0", "eth0", "rmnet0", "auto")
+    val availableInterfaces = remember { viewModel.getAvailableNetworkInterfaces() }
+    val interfaces = remember(availableInterfaces) {
+        availableInterfaces + listOf("auto").filter { it !in availableInterfaces }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
