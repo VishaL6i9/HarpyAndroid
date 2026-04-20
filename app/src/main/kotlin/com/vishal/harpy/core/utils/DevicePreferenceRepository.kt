@@ -47,7 +47,7 @@ class DevicePreferenceRepository(context: Context) {
                     put("lastSeen", preference.lastSeen)
                 }.toString()
                 
-                sharedPreferences.edit().putString(key, json).apply()
+                sharedPreferences.edit().putString(key, json).commit()
                 Log.d(TAG, "Saved preference for ${preference.macAddress}")
             } catch (e: Exception) {
                 Log.e(TAG, "Error saving device preference: ${e.message}")
@@ -77,6 +77,27 @@ class DevicePreferenceRepository(context: Context) {
     suspend fun setBlockedStatus(macAddress: String, isBlocked: Boolean) {
         val preference = getDevicePreference(macAddress) ?: DevicePreference(macAddress)
         saveDevicePreference(preference.copy(isBlocked = isBlocked))
+    }
+    
+    /**
+     * Get all saved device preferences
+     */
+    fun getAllDevicePreferences(): List<DevicePreference> {
+        return try {
+            val allPreferences = mutableListOf<DevicePreference>()
+            sharedPreferences.all.forEach { (key, value) ->
+                if (key.startsWith(KEY_PREFIX) && value is String) {
+                    val preference = parseDevicePreference(value, "")
+                    if (preference != null) {
+                        allPreferences.add(preference)
+                    }
+                }
+            }
+            allPreferences
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting all device preferences: ${e.message}")
+            emptyList()
+        }
     }
     
     /**
@@ -188,7 +209,7 @@ class DevicePreferenceRepository(context: Context) {
         withContext(Dispatchers.IO) {
             try {
                 val key = KEY_PREFIX + macAddress.replace(":", "_")
-                sharedPreferences.edit().remove(key).apply()
+                sharedPreferences.edit().remove(key).commit()
                 Log.d(TAG, "Deleted preference for $macAddress")
             } catch (e: Exception) {
                 Log.e(TAG, "Error deleting device preference: ${e.message}")
@@ -202,7 +223,7 @@ class DevicePreferenceRepository(context: Context) {
     suspend fun clearAll() {
         withContext(Dispatchers.IO) {
             try {
-                sharedPreferences.edit().clear().apply()
+                sharedPreferences.edit().clear().commit()
                 Log.d(TAG, "Cleared all device preferences")
             } catch (e: Exception) {
                 Log.e(TAG, "Error clearing preferences: ${e.message}")

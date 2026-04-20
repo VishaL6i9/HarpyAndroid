@@ -191,6 +191,36 @@ class NetworkMonitorViewModel @Inject constructor(
         checkRootAccessInternal()
         refreshLogCount()
         refreshDetectedInterface()
+        loadCachedDevicePreferences()
+    }
+
+    /**
+     * Load all cached device preferences on app startup
+     * This ensures device names persist even before first scan after reboot
+     */
+    private fun loadCachedDevicePreferences() {
+        viewModelScope.launch {
+            try {
+                val allPreferences = devicePreferenceRepository.getAllDevicePreferences()
+                if (allPreferences.isNotEmpty()) {
+                    // Create NetworkDevice objects from cached preferences
+                    val cachedDevices = allPreferences.map { pref ->
+                        NetworkDevice(
+                            ipAddress = "Unknown",
+                            macAddress = pref.macAddress,
+                            deviceName = pref.deviceName,
+                            isPinned = pref.isPinned,
+                            isBlocked = pref.isBlocked
+                        )
+                    }
+                    _networkDevices.value = cachedDevices
+                    applyFilters()
+                    com.vishal.harpy.core.utils.LogUtils.d("NetworkMonitorVM", "Loaded ${cachedDevices.size} cached device preferences")
+                }
+            } catch (e: Exception) {
+                com.vishal.harpy.core.utils.LogUtils.e("NetworkMonitorVM", "Error loading cached preferences: ${e.message}")
+            }
+        }
     }
 
     private fun refreshDetectedInterface() {
@@ -257,8 +287,13 @@ class NetworkMonitorViewModel @Inject constructor(
                             )
                         }
 
+                        // Merge with cached devices not in current scan to preserve names
+                        val currentMacs = devicesWithPreferences.map { it.macAddress }.toSet()
+                        val cachedDevices = _networkDevices.value.filter { !currentMacs.contains(it.macAddress) }
+                        val mergedDevices = devicesWithPreferences + cachedDevices
+
                         // Sort: current device first, then saved names, then pinned, then IP
-                        val sortedDevices = devicesWithPreferences.sortedWith(
+                        val sortedDevices = mergedDevices.sortedWith(
                             compareBy(
                                 { !it.isCurrentDevice },     // Current device first (false < true)
                                 { it.deviceName == null },  // Devices with names first (false < true)
@@ -277,7 +312,7 @@ class NetworkMonitorViewModel @Inject constructor(
                         // Verify and restore blocked devices
                         verifyAndRestoreBlockedDevices(sortedDevices)
                         
-                        if (sortedDevices.isEmpty()) {
+                        if (result.data.isEmpty()) {
                             _error.value = "No devices found on the network"
                         }
                     }
@@ -558,7 +593,7 @@ class NetworkMonitorViewModel @Inject constructor(
     fun setDeviceName(device: NetworkDevice, deviceName: String?) {
         viewModelScope.launch {
             try {
-                // Save to repository first
+                // Save to repository first - MUST await completion before updating UI
                 devicePreferenceRepository.setDeviceName(device.macAddress, deviceName)
                 
                 // Update the device in the list
@@ -1120,6 +1155,43 @@ class NetworkMonitorViewModel @Inject constructor(
     fun updateWhitelistEnabled(enabled: Boolean) {
         viewModelScope.launch {
             settingsRepository.updateWhitelistEnabled(enabled)
+        }
+    }
+
+    /**
+     * Get available network interfaces on device
+     */
+    fun getAvailableNetworkInterfaces(): List<String> {
+        return try {
+            val interfaces = mutableListOf<String>()
+            val networkInterfaces = java.net.NetworkInterface.getNetworkInterfaces()
+            
+            while (networkInterfaces.hasMoreElements()) {
+                val iface = networkInterfaces.nextElement()
+                val name = iface.name
+                
+                // Filter out virtual/tunnel interfaces, keep real network interfaces
+                if (!name.startsWith("tun") && !name.startsWith("tap") && 
+                    !name.startsWith("ppp") && !name.startsWith("lo") &&
+                    iface.isUp) {
+                    interfaces.add(name)
+                }
+            }
+            
+            // Sort with common interfaces first
+            interfaces.sortedWith(compareBy { name ->
+                when {
+                    name == "wlan0" -> 0
+                    name == "eth0" -> 1
+                    name.startsWith("wlan") -> 2
+                    name.startsWith("eth") -> 3
+                    name.startsWith("rmnet") -> 4
+                    else -> 5
+                }
+            })
+        } catch (e: Exception) {
+            com.vishal.harpy.core.utils.LogUtils.e("NetworkMonitorVM", "Error getting network interfaces: ${e.message}")
+            listOf("wlan0", "eth0", "rmnet0")
         }
     }
 
