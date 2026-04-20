@@ -284,13 +284,30 @@ fun StartDNSSpoofingDialog(
     viewModel: NetworkMonitorViewModel = hiltViewModel()
 ) {
     val detectedInterface by viewModel.detectedInterface.collectAsStateWithLifecycle()
+    val networkDevices by viewModel.networkDevices.collectAsStateWithLifecycle()
+    val detectedIp by viewModel.detectedIp.collectAsStateWithLifecycle()
     
-    var domain by remember { mutableStateOf("") }
+    var domain by remember { mutableStateOf("example.com") }
     var ip by remember { mutableStateOf("") }
     var interface_ by remember { mutableStateOf("") }
+    var showIpDropdown by remember { mutableStateOf(false) }
+    var showInterfaceDropdown by remember { mutableStateOf(false) }
+    
+    val availableInterfaces = remember { viewModel.getAvailableNetworkInterfaces() }
+    val deviceIps = remember(networkDevices, detectedIp) {
+        val ips = mutableListOf<String>()
+        detectedIp?.let { ips.add(it) }
+        networkDevices.forEach { device ->
+            if (device.ipAddress != detectedIp && device.ipAddress != "Unknown") {
+                ips.add(device.ipAddress)
+            }
+        }
+        ips.distinct()
+    }
 
-    LaunchedEffect(detectedInterface) {
+    LaunchedEffect(detectedInterface, detectedIp) {
         if (interface_.isEmpty()) interface_ = detectedInterface ?: "wlan0"
+        if (ip.isEmpty()) ip = detectedIp ?: ""
     }
 
     AlertDialog(
@@ -306,21 +323,67 @@ fun StartDNSSpoofingDialog(
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
-                OutlinedTextField(
-                    value = ip,
-                    onValueChange = { ip = it },
-                    label = { Text("Spoofed IP") },
-                    placeholder = { Text("8.8.8.8") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-                OutlinedTextField(
-                    value = interface_,
-                    onValueChange = { interface_ = it },
-                    label = { Text("Network Interface") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
+                
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = ip,
+                        onValueChange = { ip = it },
+                        label = { Text("Spoofed IP") },
+                        placeholder = { Text("Select or enter IP") },
+                        modifier = Modifier.fillMaxWidth(),
+                        readOnly = true,
+                        trailingIcon = { Icon(Icons.Default.ArrowDropDown, null) }
+                    )
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .clickable { showIpDropdown = true }
+                    )
+                    DropdownMenu(
+                        expanded = showIpDropdown,
+                        onDismissRequest = { showIpDropdown = false }
+                    ) {
+                        deviceIps.forEach { deviceIp ->
+                            DropdownMenuItem(
+                                text = { Text(deviceIp) },
+                                onClick = {
+                                    ip = deviceIp
+                                    showIpDropdown = false
+                                }
+                            )
+                        }
+                    }
+                }
+                
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = interface_,
+                        onValueChange = { interface_ = it },
+                        label = { Text("Network Interface") },
+                        modifier = Modifier.fillMaxWidth(),
+                        readOnly = true,
+                        trailingIcon = { Icon(Icons.Default.ArrowDropDown, null) }
+                    )
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .clickable { showInterfaceDropdown = true }
+                    )
+                    DropdownMenu(
+                        expanded = showInterfaceDropdown,
+                        onDismissRequest = { showInterfaceDropdown = false }
+                    ) {
+                        availableInterfaces.forEach { iface ->
+                            DropdownMenuItem(
+                                text = { Text(iface) },
+                                onClick = {
+                                    interface_ = iface
+                                    showInterfaceDropdown = false
+                                }
+                            )
+                        }
+                    }
+                }
             }
         },
         confirmButton = {

@@ -304,6 +304,7 @@ fun StartDHCPSpoofingDialog(
     val detectedInterface by viewModel.detectedInterface.collectAsStateWithLifecycle()
     val networkDevices by viewModel.networkDevices.collectAsStateWithLifecycle()
     val networkTopology by viewModel.networkTopology.collectAsStateWithLifecycle()
+    val detectedIp by viewModel.detectedIp.collectAsStateWithLifecycle()
     
     var targetMac by remember { mutableStateOf("") }
     var spoofedIp by remember { mutableStateOf("") }
@@ -311,6 +312,20 @@ fun StartDHCPSpoofingDialog(
     var dnsServer by remember { mutableStateOf("") }
     var interface_ by remember { mutableStateOf("") }
     var showMacDropdown by remember { mutableStateOf(false) }
+    var showIpDropdown by remember { mutableStateOf(false) }
+    var showInterfaceDropdown by remember { mutableStateOf(false) }
+    
+    val availableInterfaces = remember { viewModel.getAvailableNetworkInterfaces() }
+    val deviceIps = remember(networkDevices, detectedIp) {
+        val ips = mutableListOf<String>()
+        detectedIp?.let { ips.add(it) }
+        networkDevices.forEach { device ->
+            if (device.ipAddress != detectedIp && device.ipAddress != "Unknown") {
+                ips.add(device.ipAddress)
+            }
+        }
+        ips.distinct()
+    }
 
     LaunchedEffect(Unit) {
         if (networkDevices.isEmpty()) {
@@ -318,10 +333,11 @@ fun StartDHCPSpoofingDialog(
         }
     }
 
-    LaunchedEffect(networkTopology, detectedInterface, viewModel.detectedIp) {
+    LaunchedEffect(networkTopology, detectedInterface, detectedIp) {
         if (interface_.isEmpty()) interface_ = detectedInterface ?: "wlan0"
         if (gatewayIp.isEmpty()) gatewayIp = networkTopology?.gatewayDevice?.ipAddress ?: ""
-        if (dnsServer.isEmpty()) dnsServer = viewModel.detectedIp.value ?: ""
+        if (dnsServer.isEmpty()) dnsServer = detectedIp ?: ""
+        if (spoofedIp.isEmpty()) spoofedIp = detectedIp ?: ""
     }
 
     AlertDialog(
@@ -329,20 +345,24 @@ fun StartDHCPSpoofingDialog(
         title = { Text("Start DHCP Spoofing") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Box {
+                Box(modifier = Modifier.fillMaxWidth()) {
                     OutlinedTextField(
                         value = targetMac,
                         onValueChange = { targetMac = it },
                         label = { Text("Target Device MAC") },
                         placeholder = { Text("Select from list") },
                         readOnly = true,
-                        modifier = Modifier.fillMaxWidth().clickable { showMacDropdown = true },
+                        modifier = Modifier.fillMaxWidth(),
                         trailingIcon = { Icon(Icons.Default.ArrowDropDown, null) }
+                    )
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .clickable { showMacDropdown = true }
                     )
                     DropdownMenu(
                         expanded = showMacDropdown,
-                        onDismissRequest = { showMacDropdown = false },
-                        modifier = Modifier.fillMaxWidth(0.8f)
+                        onDismissRequest = { showMacDropdown = false }
                     ) {
                         networkDevices.forEach { device ->
                             DropdownMenuItem(
@@ -356,13 +376,36 @@ fun StartDHCPSpoofingDialog(
                     }
                 }
                 
-                OutlinedTextField(
-                    value = spoofedIp,
-                    onValueChange = { spoofedIp = it },
-                    label = { Text("Spoofed IP") },
-                    placeholder = { Text("192.168.x.x") },
-                    modifier = Modifier.fillMaxWidth()
-                )
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = spoofedIp,
+                        onValueChange = { spoofedIp = it },
+                        label = { Text("Spoofed IP") },
+                        placeholder = { Text("Select or enter IP") },
+                        modifier = Modifier.fillMaxWidth(),
+                        readOnly = true,
+                        trailingIcon = { Icon(Icons.Default.ArrowDropDown, null) }
+                    )
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .clickable { showIpDropdown = true }
+                    )
+                    DropdownMenu(
+                        expanded = showIpDropdown,
+                        onDismissRequest = { showIpDropdown = false }
+                    ) {
+                        deviceIps.forEach { deviceIp ->
+                            DropdownMenuItem(
+                                text = { Text(deviceIp) },
+                                onClick = {
+                                    spoofedIp = deviceIp
+                                    showIpDropdown = false
+                                }
+                            )
+                        }
+                    }
+                }
                 
                 OutlinedTextField(
                     value = gatewayIp,
@@ -370,6 +413,36 @@ fun StartDHCPSpoofingDialog(
                     label = { Text("Gateway IP") },
                     modifier = Modifier.fillMaxWidth()
                 )
+                
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = interface_,
+                        onValueChange = { interface_ = it },
+                        label = { Text("Network Interface") },
+                        modifier = Modifier.fillMaxWidth(),
+                        readOnly = true,
+                        trailingIcon = { Icon(Icons.Default.ArrowDropDown, null) }
+                    )
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .clickable { showInterfaceDropdown = true }
+                    )
+                    DropdownMenu(
+                        expanded = showInterfaceDropdown,
+                        onDismissRequest = { showInterfaceDropdown = false }
+                    ) {
+                        availableInterfaces.forEach { iface ->
+                            DropdownMenuItem(
+                                text = { Text(iface) },
+                                onClick = {
+                                    interface_ = iface
+                                    showInterfaceDropdown = false
+                                }
+                            )
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
