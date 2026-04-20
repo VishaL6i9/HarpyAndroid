@@ -19,11 +19,12 @@ Harpy is a network monitoring application that gives you complete visibility and
 - **Real-time device scanning** using ARP protocol
 - **Detailed device information** including IP address, MAC address, and manufacturer
 - **Gateway detection** with visual indicators
-- **Custom device naming** with persistent storage
+- **Custom device naming** with persistent storage across app restarts
 - **Device pinning** to keep important devices at the top
 - **IPv4/IPv6 filtering** for better organization
-- **Real-time Interface Selection**: Dynamic detection of active network interfaces (e.g., `wlan0`, `ap0`, `eth0`) for all scanning operations.
-- **Interface Mismatch Protection**: Visual warning banner with instant "Switch Interface" logic when the system network changes.
+- **Real-time Interface Selection**: Dynamic detection of active network interfaces (e.g., `wlan0`, `ap0`, `eth0`) for all scanning operations
+- **Interface Mismatch Protection**: Visual warning banner with instant "Switch Interface" logic when the system network changes
+- **Smart Device Name Caching**: Device names persist even before first network scan after app restart
 
 ### Network Control
 - **Block/unblock devices** using ARP spoofing
@@ -33,12 +34,14 @@ Harpy is a network monitoring application that gives you complete visibility and
 - **Gateway blocking** (nuclear option) to disconnect all devices
 
 ### Advanced Features
-- **DNS spoofing** for domain redirection
-- **DHCP spoofing** for custom IP assignment
+- **DNS spoofing** with auto-fill domain and smart IP selection
+- **DHCP spoofing** with auto-detected gateway and interface
+- **Spoofing session management** with real-time stats and session history
 - **Performance monitoring** with real-time CPU/memory charts and process management
 - **Network topology mapping**
 - **Real-time logging** with export functionality
 - **Root helper binary** for secure privileged operations
+- **Dynamic network interface detection** across all screens
 
 ### Modern UI
 - Built entirely with **Jetpack Compose** and **Material 3**
@@ -47,8 +50,9 @@ Harpy is a network monitoring application that gives you complete visibility and
 - **Bottom navigation** for easy feature access
 - **Responsive design** that adapts to different screen sizes
 - **Stack-based navigation** with scroll state preservation
-- **Enhanced Stability**: Multi-layered MAC deduplication to prevent UI crashes on complex networks (Fixes #2).
-- **Full API 24/25 Support**: Robust backward-compatible process management using custom `ProcessUtils` for Android 7.x devices.
+- **Smart form auto-fill** in spoofing dialogs with dropdown selectors
+- **Enhanced Stability**: Multi-layered MAC deduplication to prevent UI crashes on complex networks
+- **Full API 24/25 Support**: Robust backward-compatible process management using custom `ProcessUtils` for Android 7.x devices
 
 ## Screenshots
 
@@ -379,7 +383,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 - [x] Network device discovery and management
 - [x] Device blocking/unblocking with ARP spoofing
 - [x] DNS and DHCP spoofing
-- [x] Persistent device preferences
+- [x] Persistent device preferences with cache loading on startup
 - [x] Root helper binary architecture
 - [x] Real-time logging system with log management utilities
 - [x] Comprehensive application settings (Scan timeout, interface selection, debug mode)
@@ -387,10 +391,13 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 - [x] Process list with kill and OOM score adjustment
 - [x] Stack-based navigation with scroll state preservation
 - [x] Dark mode theme with system theme support
-- [x] **Real-time Interface Selection and Mismatch Warning System**
-- [x] **Comprehensive API 24/25 (Android 7.0/7.1) Stability Pack**
-- [x] **Product Flavors Build Architecture** - Consolidated standard and ctos builds with 88% code duplication eliminated
-- [x] **Hilt-based Theme Injection** - Flavor-specific theme injection via dependency injection
+- [x] Real-time Interface Selection and Mismatch Warning System
+- [x] Comprehensive API 24/25 (Android 7.0/7.1) Stability Pack
+- [x] Product Flavors Build Architecture - Consolidated standard and ctos builds with 88% code duplication eliminated
+- [x] Hilt-based Theme Injection - Flavor-specific theme injection via dependency injection
+- [x] **Dynamic Network Interface Detection** - Auto-detect available interfaces across all screens
+- [x] **Smart Spoofing Dialog Auto-fill** - Domain, IP, gateway, and interface auto-population with dropdown selectors
+- [x] **Device Name Persistence Fix** - Synchronous SharedPreferences writes and cache loading on app startup
 
 ### In Progress 🚧
 - [ ] Comprehensive unit testing
