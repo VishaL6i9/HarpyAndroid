@@ -30,16 +30,8 @@ fun DHCPSpoofingScreen(
     onManageSessions: () -> Unit = {}
 ) {
     val dhcpSessions by viewModel.dhcpSessions.collectAsStateWithLifecycle()
-    val networkTopology by viewModel.networkTopology.collectAsStateWithLifecycle()
     var showStartDialog by remember { mutableStateOf(false) }
     var showClearDialog by remember { mutableStateOf(false) }
-    
-    // Map network topology on screen init to detect gateway (only if not already mapped)
-    LaunchedEffect(Unit) {
-        if (networkTopology == null) {
-            viewModel.mapNetworkTopology()
-        }
-    }
 
     Scaffold(
         topBar = {
@@ -346,9 +338,19 @@ fun StartDHCPSpoofingDialog(
     var showGatewayDropdown by remember { mutableStateOf(false) }
     var showInterfaceDropdown by remember { mutableStateOf(false) }
 
-    val gatewayIpValue = networkTopology?.gatewayDevice?.ipAddress ?: ""
+    // Get gateway from topology if available, otherwise find it from scanned devices using isGateway flag
+    val gatewayIpValue = remember(networkTopology, networkDevices) {
+        // First try topology
+        val topologyGateway = networkTopology?.gatewayDevice?.ipAddress
+        if (!topologyGateway.isNullOrEmpty()) {
+            topologyGateway
+        } else {
+            // Find gateway from scanned devices - it's marked with isGateway flag during scan
+            networkDevices.firstOrNull { it.isGateway }?.ipAddress ?: ""
+        }
+    }
     
-    android.util.Log.d("DHCPDialog", "gatewayIpValue computed: '$gatewayIpValue' from networkTopology: ${networkTopology != null}, gatewayDevice: ${networkTopology?.gatewayDevice != null}")
+    android.util.Log.d("DHCPDialog", "gatewayIpValue computed: '$gatewayIpValue' from networkTopology: ${networkTopology != null}, gatewayDevice: ${networkTopology?.gatewayDevice != null}, scanned gateway: ${networkDevices.firstOrNull { it.isGateway }?.ipAddress}")
 
     val deviceIps = remember(networkDevices, detectedIp) {
         val ips = mutableListOf<String>()
