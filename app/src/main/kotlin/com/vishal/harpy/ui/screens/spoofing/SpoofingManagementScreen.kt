@@ -34,6 +34,9 @@ fun SpoofingManagementScreen(
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
     val successMessage by viewModel.successMessage.collectAsStateWithLifecycle()
+    
+    var showEditDialog by remember { mutableStateOf(false) }
+    var editingSession by remember { mutableStateOf<SpoofingSession?>(null) }
 
     LaunchedEffect(error, successMessage) {
         if (error != null || successMessage != null) {
@@ -161,10 +164,54 @@ fun SpoofingManagementScreen(
                             onStop = { viewModel.stopDnsSpoofing(session.id) },
                             onRemove = { viewModel.removeSession(session.id) },
                             onResume = { viewModel.resumeSession(session.id) },
+                            onEdit = {
+                                editingSession = session
+                                showEditDialog = true
+                            },
                             isLoading = isLoading
                         )
                     }
                 }
+            }
+        }
+    }
+
+    // Edit Dialog
+    if (showEditDialog && editingSession != null) {
+        when (val session = editingSession) {
+            is SpoofingSession.Dns -> {
+                EditDNSSessionDialog(
+                    session = session,
+                    onConfirm = { domain, ip, interface_ ->
+                        val oldDomain = session.domain
+                        val oldIp = session.spoofedIP
+                        val oldInterface = session.interfaceName
+                        
+                        if (domain != oldDomain) {
+                            viewModel.stopDnsSpoofing(oldDomain)
+                            viewModel.startDnsSpoofing(domain, ip, interface_)
+                        } else if (ip != oldIp || interface_ != oldInterface) {
+                            viewModel.stopDnsSpoofing(oldDomain)
+                            viewModel.startDnsSpoofing(domain, ip, interface_)
+                        }
+                        
+                        showEditDialog = false
+                        editingSession = null
+                    },
+                    onDismiss = {
+                        showEditDialog = false
+                        editingSession = null
+                    }
+                )
+            }
+            is SpoofingSession.Dhcp -> {
+                // DHCP edit modal can be added here later
+                showEditDialog = false
+                editingSession = null
+            }
+            else -> {
+                showEditDialog = false
+                editingSession = null
             }
         }
     }
@@ -281,6 +328,7 @@ private fun SessionCard(
     onStop: () -> Unit,
     onRemove: () -> Unit,
     onResume: () -> Unit,
+    onEdit: () -> Unit = {},
     isLoading: Boolean
 ) {
     Card(
@@ -446,6 +494,25 @@ private fun SessionCard(
                     Spacer(modifier = Modifier.width(4.dp))
                     Text("Remove")
                 }
+
+                Button(
+                    onClick = onEdit,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(40.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                    ),
+                    enabled = !isLoading
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Edit")
+                }
             }
         }
     }
@@ -548,4 +615,60 @@ private fun EmptyState() {
             textAlign = androidx.compose.ui.text.style.TextAlign.Center
         )
     }
+}
+
+@Composable
+private fun EditDNSSessionDialog(
+    session: SpoofingSession.Dns,
+    onConfirm: (String, String, String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var domain by remember { mutableStateOf(session.domain) }
+    var ip by remember { mutableStateOf(session.spoofedIP) }
+    var interface_ by remember { mutableStateOf(session.interfaceName) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit DNS Rule") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                OutlinedTextField(
+                    value = domain,
+                    onValueChange = { domain = it },
+                    label = { Text("Domain") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                
+                OutlinedTextField(
+                    value = ip,
+                    onValueChange = { ip = it },
+                    label = { Text("Spoofed IP") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                
+                OutlinedTextField(
+                    value = interface_,
+                    onValueChange = { interface_ = it },
+                    label = { Text("Network Interface") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(domain, ip, interface_) },
+                enabled = domain.isNotBlank() && ip.isNotBlank()
+            ) {
+                Text("Update")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }

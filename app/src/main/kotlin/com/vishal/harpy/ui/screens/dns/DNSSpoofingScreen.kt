@@ -31,6 +31,8 @@ fun DNSSpoofingScreen(
 ) {
     val dnsSessions by viewModel.dnsSessions.collectAsStateWithLifecycle()
     var showStartDialog by remember { mutableStateOf(false) }
+    var showEditDialog by remember { mutableStateOf(false) }
+    var editingSession by remember { mutableStateOf<SpoofingSession.Dns?>(null) }
 
     var showClearDialog by remember { mutableStateOf(false) }
 
@@ -95,7 +97,11 @@ fun DNSSpoofingScreen(
                         DnsSessionCard(
                             session = session,
                             onStop = { viewModel.stopDNSSpoofing(session.domain) },
-                            onResume = { viewModel.startDNSSpoofing(session.domain, session.spoofedIP, session.interfaceName) }
+                            onResume = { viewModel.startDNSSpoofing(session.domain, session.spoofedIP, session.interfaceName) },
+                            onEdit = {
+                                editingSession = session
+                                showEditDialog = true
+                            }
                         )
                     }
                 }
@@ -110,6 +116,37 @@ fun DNSSpoofingScreen(
                 showStartDialog = false
             },
             onDismiss = { showStartDialog = false }
+        )
+    }
+
+    if (showEditDialog && editingSession != null) {
+        EditDNSSpoofingDialog(
+            session = editingSession!!,
+            onConfirm = { domain, ip, interface_ ->
+                val oldDomain = editingSession!!.domain
+                val oldIp = editingSession!!.spoofedIP
+                val oldInterface = editingSession!!.interfaceName
+                
+                // Only restart if domain changed (creates new rule)
+                // Otherwise just update IP/interface on same rule
+                if (domain != oldDomain) {
+                    // Domain changed: stop old, start new
+                    viewModel.stopDNSSpoofing(oldDomain)
+                    viewModel.startDNSSpoofing(domain, ip, interface_)
+                } else if (ip != oldIp || interface_ != oldInterface) {
+                    // Only IP or interface changed: stop and restart with same domain
+                    viewModel.stopDNSSpoofing(oldDomain)
+                    viewModel.startDNSSpoofing(domain, ip, interface_)
+                }
+                // If nothing changed, do nothing
+                
+                showEditDialog = false
+                editingSession = null
+            },
+            onDismiss = {
+                showEditDialog = false
+                editingSession = null
+            }
         )
     }
 
@@ -185,7 +222,8 @@ fun ActiveDnsHeader() {
 fun DnsSessionCard(
     session: SpoofingSession.Dns,
     onStop: () -> Unit,
-    onResume: () -> Unit
+    onResume: () -> Unit,
+    onEdit: () -> Unit = {}
 ) {
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
@@ -249,6 +287,26 @@ fun DnsSessionCard(
                     color = MaterialTheme.colorScheme.secondary,
                     fontWeight = FontWeight.Medium
                 )
+            }
+
+            Spacer(Modifier.height(12.dp))
+            
+            Button(
+                onClick = onEdit,
+                modifier = Modifier
+                    .align(Alignment.End)
+                    .height(36.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                )
+            ) {
+                Icon(
+                    Icons.Default.Edit,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.width(4.dp))
+                Text("Edit")
             }
         }
     }
@@ -405,6 +463,125 @@ fun StartDNSSpoofingDialog(
                 enabled = domain.isNotBlank() && ip.isNotBlank()
             ) {
                 Text("Start")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+
+@Composable
+fun EditDNSSpoofingDialog(
+    session: SpoofingSession.Dns,
+    onConfirm: (String, String, String) -> Unit,
+    onDismiss: () -> Unit,
+    viewModel: NetworkMonitorViewModel = hiltViewModel()
+) {
+    val networkDevices by viewModel.networkDevices.collectAsStateWithLifecycle()
+    val detectedIp by viewModel.detectedIp.collectAsStateWithLifecycle()
+    
+    var domain by remember { mutableStateOf(session.domain) }
+    var ip by remember { mutableStateOf(session.spoofedIP) }
+    var interface_ by remember { mutableStateOf(session.interfaceName) }
+    var showIpDropdown by remember { mutableStateOf(false) }
+    var showInterfaceDropdown by remember { mutableStateOf(false) }
+    
+    val availableInterfaces = remember { viewModel.getAvailableNetworkInterfaces() }
+    val deviceIps = remember(networkDevices, detectedIp) {
+        val ips = mutableListOf<String>()
+        detectedIp?.let { ips.add(it) }
+        networkDevices.forEach { device ->
+            if (device.ipAddress != "Unknown" && !ips.contains(device.ipAddress)) {
+                ips.add(device.ipAddress)
+            }
+        }
+        ips.distinct()
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit DNS Rule") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                OutlinedTextField(
+                    value = domain,
+                    onValueChange = { domain = it },
+                    label = { Text("Domain") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = ip,
+                        onValueChange = { ip = it },
+                        label = { Text("Spoofed IP") },
+                        modifier = Modifier.fillMaxWidth(),
+                        readOnly = true,
+                        trailingIcon = { Icon(Icons.Default.ArrowDropDown, null) }
+                    )
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .clickable { showIpDropdown = true }
+                    )
+                    DropdownMenu(
+                        expanded = showIpDropdown,
+                        onDismissRequest = { showIpDropdown = false }
+                    ) {
+                        deviceIps.forEach { deviceIp ->
+                            DropdownMenuItem(
+                                text = { Text(deviceIp) },
+                                onClick = {
+                                    ip = deviceIp
+                                    showIpDropdown = false
+                                }
+                            )
+                        }
+                    }
+                }
+                
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = interface_,
+                        onValueChange = { interface_ = it },
+                        label = { Text("Network Interface") },
+                        modifier = Modifier.fillMaxWidth(),
+                        readOnly = true,
+                        trailingIcon = { Icon(Icons.Default.ArrowDropDown, null) }
+                    )
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .clickable { showInterfaceDropdown = true }
+                    )
+                    DropdownMenu(
+                        expanded = showInterfaceDropdown,
+                        onDismissRequest = { showInterfaceDropdown = false }
+                    ) {
+                        availableInterfaces.forEach { iface ->
+                            DropdownMenuItem(
+                                text = { Text(iface) },
+                                onClick = {
+                                    interface_ = iface
+                                    showInterfaceDropdown = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(domain, ip, interface_) },
+                enabled = domain.isNotBlank() && ip.isNotBlank()
+            ) {
+                Text("Update")
             }
         },
         dismissButton = {
