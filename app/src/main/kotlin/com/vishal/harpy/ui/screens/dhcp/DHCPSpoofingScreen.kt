@@ -93,7 +93,7 @@ fun DHCPSpoofingScreen(
                     items(dhcpSessions, key = { it.id }) { session ->
                         DhcpSessionCard(
                             session = session,
-                            onStop = { viewModel.stopDHCPSpoofing() }
+                            onStop = { viewModel.stopDhcpSpoofing(session.id) }
                         )
                     }
                 }
