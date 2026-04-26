@@ -320,7 +320,7 @@ fun StartDHCPSpoofingDialog(
         val ips = mutableListOf<String>()
         detectedIp?.let { ips.add(it) }
         networkDevices.forEach { device ->
-            if (device.ipAddress != detectedIp && device.ipAddress != "Unknown") {
+            if (device.ipAddress != "Unknown" && !ips.contains(device.ipAddress)) {
                 ips.add(device.ipAddress)
             }
         }
@@ -335,9 +335,16 @@ fun StartDHCPSpoofingDialog(
 
     LaunchedEffect(networkTopology, detectedInterface, detectedIp) {
         if (interface_.isEmpty()) interface_ = detectedInterface ?: "wlan0"
-        if (gatewayIp.isEmpty()) gatewayIp = networkTopology?.gatewayDevice?.ipAddress ?: ""
         if (dnsServer.isEmpty()) dnsServer = detectedIp ?: ""
         if (spoofedIp.isEmpty()) spoofedIp = detectedIp ?: ""
+        // Gateway IP from topology (auto-populate after scan)
+        val topology = networkTopology
+        if (gatewayIp.isEmpty() && topology != null) {
+            val gateway = topology.gatewayDevice
+            if (gateway != null) {
+                gatewayIp = gateway.ipAddress
+            }
+        }
     }
 
     AlertDialog(
