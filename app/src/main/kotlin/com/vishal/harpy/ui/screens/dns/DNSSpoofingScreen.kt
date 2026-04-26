@@ -94,7 +94,8 @@ fun DNSSpoofingScreen(
                     items(dnsSessions, key = { it.id }) { session ->
                         DnsSessionCard(
                             session = session,
-                            onStop = { viewModel.stopDNSSpoofing(session.domain) }
+                            onStop = { viewModel.stopDNSSpoofing(session.domain) },
+                            onResume = { viewModel.startDNSSpoofing(session.domain, session.spoofedIP, session.interfaceName) }
                         )
                     }
                 }
@@ -183,7 +184,8 @@ fun ActiveDnsHeader() {
 @Composable
 fun DnsSessionCard(
     session: SpoofingSession.Dns,
-    onStop: () -> Unit
+    onStop: () -> Unit,
+    onResume: () -> Unit
 ) {
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
@@ -207,13 +209,24 @@ fun DnsSessionCard(
                 }
                 
                 IconButton(
-                    onClick = onStop,
+                    onClick = if (session.isActive) onStop else onResume,
                     colors = IconButtonDefaults.iconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
-                        contentColor = MaterialTheme.colorScheme.error
+                        containerColor = if (session.isActive) {
+                            MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f)
+                        } else {
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                        },
+                        contentColor = if (session.isActive) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.primary
+                        }
                     )
                 ) {
-                    Icon(Icons.Default.Stop, contentDescription = "Stop")
+                    Icon(
+                        if (session.isActive) Icons.Default.Stop else Icons.Default.PlayArrow,
+                        contentDescription = if (session.isActive) "Stop" else "Resume"
+                    )
                 }
             }
             
@@ -298,7 +311,7 @@ fun StartDNSSpoofingDialog(
         val ips = mutableListOf<String>()
         detectedIp?.let { ips.add(it) }
         networkDevices.forEach { device ->
-            if (device.ipAddress != detectedIp && device.ipAddress != "Unknown") {
+            if (device.ipAddress != "Unknown" && !ips.contains(device.ipAddress)) {
                 ips.add(device.ipAddress)
             }
         }
