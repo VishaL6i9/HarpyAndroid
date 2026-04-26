@@ -32,6 +32,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.vishal.harpy.core.di.ServiceEntryPoint
 import com.vishal.harpy.core.utils.ThemeManager
+import com.vishal.harpy.features.network_monitor.presentation.viewmodel.NetworkMonitorViewModel
 import com.vishal.harpy.ui.screens.dhcp.DHCPSpoofingScreen
 import com.vishal.harpy.ui.screens.dns.DNSSpoofingScreen
 import com.vishal.harpy.ui.screens.network.NetworkMonitorScreen
@@ -214,20 +215,38 @@ fun HarpyApp() {
                         startDestination = Screen.NetworkMonitor.route,
                         modifier = Modifier.padding(innerPadding)
                     ) {
-                        composable(Screen.NetworkMonitor.route) {
+                        composable(Screen.NetworkMonitor.route) { backStackEntry ->
+                            val sharedViewModel: NetworkMonitorViewModel = hiltViewModel(
+                                remember(backStackEntry) {
+                                    navController.getBackStackEntry(Screen.NetworkMonitor.route)
+                                }
+                            )
                             NetworkMonitorScreen(
+                                viewModel = sharedViewModel,
                                 onSettingsClick = { navigateTo(AppScreen.Settings) },
                                 onStatusClick = { navigateTo(AppScreen.DetailedStatus) }
                             )
                         }
-                        composable(Screen.DNSSpoofing.route) {
+                        composable(Screen.DNSSpoofing.route) { backStackEntry ->
+                            val sharedViewModel: NetworkMonitorViewModel = hiltViewModel(
+                                remember(backStackEntry) {
+                                    navController.getBackStackEntry(Screen.NetworkMonitor.route)
+                                }
+                            )
                             DNSSpoofingScreen(
+                                viewModel = sharedViewModel,
                                 onSettingsClick = { navigateTo(AppScreen.Settings) },
                                 onManageSessions = { navigateTo(AppScreen.SpoofingManagement) }
                             )
                         }
-                        composable(Screen.DHCPSpoofing.route) {
+                        composable(Screen.DHCPSpoofing.route) { backStackEntry ->
+                            val sharedViewModel: NetworkMonitorViewModel = hiltViewModel(
+                                remember(backStackEntry) {
+                                    navController.getBackStackEntry(Screen.NetworkMonitor.route)
+                                }
+                            )
                             DHCPSpoofingScreen(
+                                viewModel = sharedViewModel,
                                 onSettingsClick = { navigateTo(AppScreen.Settings) },
                                 onManageSessions = { navigateTo(AppScreen.SpoofingManagement) }
                             )

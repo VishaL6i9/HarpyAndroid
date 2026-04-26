@@ -201,6 +201,12 @@ class NetworkMonitorViewModel @Inject constructor(
     private fun loadCachedDevicePreferences() {
         viewModelScope.launch {
             try {
+                // Only load cached devices if we don't have any devices yet
+                if (_networkDevices.value.isNotEmpty()) {
+                    com.vishal.harpy.core.utils.LogUtils.d("NetworkMonitorVM", "Skipping cached load - devices already present")
+                    return@launch
+                }
+                
                 val allPreferences = devicePreferenceRepository.getAllDevicePreferences()
                 if (allPreferences.isNotEmpty()) {
                     // Create NetworkDevice objects from cached preferences

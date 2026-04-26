@@ -110,7 +110,15 @@ fun DNSSpoofingScreen(
     }
 
     if (showStartDialog) {
+        val networkDevices by viewModel.networkDevices.collectAsStateWithLifecycle()
+        val detectedIp by viewModel.detectedIp.collectAsStateWithLifecycle()
+        val detectedInterface by viewModel.detectedInterface.collectAsStateWithLifecycle()
+        
         StartDNSSpoofingDialog(
+            networkDevices = networkDevices,
+            detectedIp = detectedIp,
+            detectedInterface = detectedInterface,
+            availableInterfaces = viewModel.getAvailableNetworkInterfaces(),
             onConfirm = { domain, ip, interface_ ->
                 viewModel.startDNSSpoofing(domain, ip, interface_)
                 showStartDialog = false
@@ -120,8 +128,14 @@ fun DNSSpoofingScreen(
     }
 
     if (showEditDialog && editingSession != null) {
+        val networkDevices by viewModel.networkDevices.collectAsStateWithLifecycle()
+        val detectedIp by viewModel.detectedIp.collectAsStateWithLifecycle()
+        
         EditDNSSpoofingDialog(
             session = editingSession!!,
+            networkDevices = networkDevices,
+            detectedIp = detectedIp,
+            availableInterfaces = viewModel.getAvailableNetworkInterfaces(),
             onConfirm = { domain, ip, interface_ ->
                 val oldDomain = editingSession!!.domain
                 val oldIp = editingSession!!.spoofedIP
@@ -350,21 +364,31 @@ fun EmptySessionsState(
 
 @Composable
 fun StartDNSSpoofingDialog(
+    networkDevices: List<com.vishal.harpy.core.utils.NetworkDevice>,
+    detectedIp: String?,
+    detectedInterface: String?,
+    availableInterfaces: List<String>,
     onConfirm: (String, String, String) -> Unit,
-    onDismiss: () -> Unit,
-    viewModel: NetworkMonitorViewModel = hiltViewModel()
+    onDismiss: () -> Unit
 ) {
-    val detectedInterface by viewModel.detectedInterface.collectAsStateWithLifecycle()
-    val networkDevices by viewModel.networkDevices.collectAsStateWithLifecycle()
-    val detectedIp by viewModel.detectedIp.collectAsStateWithLifecycle()
-    
     var domain by remember { mutableStateOf("example.com") }
     var ip by remember { mutableStateOf("") }
     var interface_ by remember { mutableStateOf("") }
     var showIpDropdown by remember { mutableStateOf(false) }
     var showInterfaceDropdown by remember { mutableStateOf(false) }
     
-    val availableInterfaces = remember { viewModel.getAvailableNetworkInterfaces() }
+    android.util.Log.d("DNSStartDialog", "=== DNS Start Dialog Debug ===")
+    android.util.Log.d("DNSStartDialog", "networkDevices.size: ${networkDevices.size}")
+    android.util.Log.d("DNSStartDialog", "detectedIp: $detectedIp")
+    android.util.Log.d("DNSStartDialog", "Device IPs breakdown:")
+    val unknownCount = networkDevices.count { it.ipAddress == "Unknown" }
+    val validCount = networkDevices.count { it.ipAddress != "Unknown" }
+    android.util.Log.d("DNSStartDialog", "  - Valid IPs: $validCount")
+    android.util.Log.d("DNSStartDialog", "  - Unknown IPs: $unknownCount")
+    if (validCount > 0) {
+        android.util.Log.d("DNSStartDialog", "Valid device IPs: ${networkDevices.filter { it.ipAddress != "Unknown" }.map { it.ipAddress }}")
+    }
+    
     val deviceIps = remember(networkDevices, detectedIp) {
         val ips = mutableListOf<String>()
         detectedIp?.let { ips.add(it) }
@@ -373,7 +397,12 @@ fun StartDNSSpoofingDialog(
                 ips.add(device.ipAddress)
             }
         }
+        android.util.Log.d("DNSStartDialog", "Computed deviceIps: $ips")
         ips.distinct()
+    }
+    
+    val hasScannedDevices = remember(networkDevices) {
+        networkDevices.any { it.ipAddress != "Unknown" }
     }
 
     LaunchedEffect(detectedInterface, detectedIp) {
@@ -386,6 +415,34 @@ fun StartDNSSpoofingDialog(
         title = { Text("Start DNS Spoofing") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                if (!hasScannedDevices) {
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.Warning,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = "Run network scan first to populate device list",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
+                
                 OutlinedTextField(
                     value = domain,
                     onValueChange = { domain = it },
@@ -402,13 +459,13 @@ fun StartDNSSpoofingDialog(
                         label = { Text("Spoofed IP") },
                         placeholder = { Text("Select or enter IP") },
                         modifier = Modifier.fillMaxWidth(),
-                        readOnly = true,
-                        trailingIcon = { Icon(Icons.Default.ArrowDropDown, null) }
-                    )
-                    Box(
-                        modifier = Modifier
-                            .matchParentSize()
-                            .clickable { showIpDropdown = true }
+                        trailingIcon = { 
+                            Icon(
+                                Icons.Default.ArrowDropDown, 
+                                null,
+                                modifier = Modifier.clickable { showIpDropdown = !showIpDropdown }
+                            )
+                        }
                     )
                     DropdownMenu(
                         expanded = showIpDropdown,
@@ -477,20 +534,30 @@ fun StartDNSSpoofingDialog(
 @Composable
 fun EditDNSSpoofingDialog(
     session: SpoofingSession.Dns,
+    networkDevices: List<com.vishal.harpy.core.utils.NetworkDevice>,
+    detectedIp: String?,
+    availableInterfaces: List<String>,
     onConfirm: (String, String, String) -> Unit,
-    onDismiss: () -> Unit,
-    viewModel: NetworkMonitorViewModel = hiltViewModel()
+    onDismiss: () -> Unit
 ) {
-    val networkDevices by viewModel.networkDevices.collectAsStateWithLifecycle()
-    val detectedIp by viewModel.detectedIp.collectAsStateWithLifecycle()
-    
     var domain by remember { mutableStateOf(session.domain) }
     var ip by remember { mutableStateOf(session.spoofedIP) }
     var interface_ by remember { mutableStateOf(session.interfaceName) }
     var showIpDropdown by remember { mutableStateOf(false) }
     var showInterfaceDropdown by remember { mutableStateOf(false) }
     
-    val availableInterfaces = remember { viewModel.getAvailableNetworkInterfaces() }
+    android.util.Log.d("DNSEditDialog", "=== DNS Edit Dialog Debug ===")
+    android.util.Log.d("DNSEditDialog", "networkDevices.size: ${networkDevices.size}")
+    android.util.Log.d("DNSEditDialog", "detectedIp: $detectedIp")
+    android.util.Log.d("DNSEditDialog", "Device IPs breakdown:")
+    val unknownCount = networkDevices.count { it.ipAddress == "Unknown" }
+    val validCount = networkDevices.count { it.ipAddress != "Unknown" }
+    android.util.Log.d("DNSEditDialog", "  - Valid IPs: $validCount")
+    android.util.Log.d("DNSEditDialog", "  - Unknown IPs: $unknownCount")
+    if (validCount > 0) {
+        android.util.Log.d("DNSEditDialog", "Valid device IPs: ${networkDevices.filter { it.ipAddress != "Unknown" }.map { it.ipAddress }}")
+    }
+    
     val deviceIps = remember(networkDevices, detectedIp) {
         val ips = mutableListOf<String>()
         detectedIp?.let { ips.add(it) }
@@ -499,7 +566,12 @@ fun EditDNSSpoofingDialog(
                 ips.add(device.ipAddress)
             }
         }
+        android.util.Log.d("DNSEditDialog", "Computed deviceIps: $ips")
         ips.distinct()
+    }
+    
+    val hasScannedDevices = remember(networkDevices) {
+        networkDevices.any { it.ipAddress != "Unknown" }
     }
 
     AlertDialog(
@@ -507,6 +579,34 @@ fun EditDNSSpoofingDialog(
         title = { Text("Edit DNS Rule") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                if (!hasScannedDevices) {
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.Warning,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = "Run network scan first to populate device list",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
+                
                 OutlinedTextField(
                     value = domain,
                     onValueChange = { domain = it },
@@ -521,13 +621,13 @@ fun EditDNSSpoofingDialog(
                         onValueChange = { ip = it },
                         label = { Text("Spoofed IP") },
                         modifier = Modifier.fillMaxWidth(),
-                        readOnly = true,
-                        trailingIcon = { Icon(Icons.Default.ArrowDropDown, null) }
-                    )
-                    Box(
-                        modifier = Modifier
-                            .matchParentSize()
-                            .clickable { showIpDropdown = true }
+                        trailingIcon = { 
+                            Icon(
+                                Icons.Default.ArrowDropDown, 
+                                null,
+                                modifier = Modifier.clickable { showIpDropdown = !showIpDropdown }
+                            )
+                        }
                     )
                     DropdownMenu(
                         expanded = showIpDropdown,

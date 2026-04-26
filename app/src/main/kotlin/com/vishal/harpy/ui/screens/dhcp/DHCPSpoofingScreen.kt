@@ -30,8 +30,16 @@ fun DHCPSpoofingScreen(
     onManageSessions: () -> Unit = {}
 ) {
     val dhcpSessions by viewModel.dhcpSessions.collectAsStateWithLifecycle()
+    val networkTopology by viewModel.networkTopology.collectAsStateWithLifecycle()
     var showStartDialog by remember { mutableStateOf(false) }
     var showClearDialog by remember { mutableStateOf(false) }
+    
+    // Map network topology on screen init to detect gateway (only if not already mapped)
+    LaunchedEffect(Unit) {
+        if (networkTopology == null) {
+            viewModel.mapNetworkTopology()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -102,7 +110,30 @@ fun DHCPSpoofingScreen(
     }
 
     if (showStartDialog) {
+        val networkDevices by viewModel.networkDevices.collectAsStateWithLifecycle()
+        val detectedIp by viewModel.detectedIp.collectAsStateWithLifecycle()
+        val detectedInterface by viewModel.detectedInterface.collectAsStateWithLifecycle()
+        val networkTopology by viewModel.networkTopology.collectAsStateWithLifecycle()
+        
+        android.util.Log.d("DHCPDialog", "=== DHCP Start Dialog Debug ===")
+        android.util.Log.d("DHCPDialog", "networkDevices.size: ${networkDevices.size}")
+        android.util.Log.d("DHCPDialog", "detectedIp: $detectedIp")
+        android.util.Log.d("DHCPDialog", "gatewayDevice IP: ${networkTopology?.gatewayDevice?.ipAddress}")
+        android.util.Log.d("DHCPDialog", "Device IPs breakdown:")
+        val unknownCount = networkDevices.count { it.ipAddress == "Unknown" }
+        val validCount = networkDevices.count { it.ipAddress != "Unknown" }
+        android.util.Log.d("DHCPDialog", "  - Valid IPs: $validCount")
+        android.util.Log.d("DHCPDialog", "  - Unknown IPs: $unknownCount")
+        if (validCount > 0) {
+            android.util.Log.d("DHCPDialog", "Valid device IPs: ${networkDevices.filter { it.ipAddress != "Unknown" }.map { it.ipAddress }}")
+        }
+        
         StartDHCPSpoofingDialog(
+            networkDevices = networkDevices,
+            detectedIp = detectedIp,
+            detectedInterface = detectedInterface,
+            networkTopology = networkTopology,
+            availableInterfaces = viewModel.getAvailableNetworkInterfaces(),
             onConfirm = { targetMac, spoofedIp, gatewayIp, dnsServer, interface_ ->
                 viewModel.startDHCPSpoofing(
                     interfaceName = interface_,
@@ -297,15 +328,14 @@ fun EmptySessionsState(
 
 @Composable
 fun StartDHCPSpoofingDialog(
+    networkDevices: List<com.vishal.harpy.core.utils.NetworkDevice>,
+    detectedIp: String?,
+    detectedInterface: String?,
+    networkTopology: com.vishal.harpy.core.utils.NetworkTopology?,
+    availableInterfaces: List<String>,
     onConfirm: (String, String, String, String, String) -> Unit,
-    onDismiss: () -> Unit,
-    viewModel: NetworkMonitorViewModel = hiltViewModel()
+    onDismiss: () -> Unit
 ) {
-    val detectedInterface by viewModel.detectedInterface.collectAsStateWithLifecycle()
-    val networkDevices by viewModel.networkDevices.collectAsStateWithLifecycle()
-    val networkTopology by viewModel.networkTopology.collectAsStateWithLifecycle()
-    val detectedIp by viewModel.detectedIp.collectAsStateWithLifecycle()
-    
     var targetMac by remember { mutableStateOf("") }
     var spoofedIp by remember { mutableStateOf("") }
     var gatewayIp by remember { mutableStateOf("") }
@@ -313,9 +343,13 @@ fun StartDHCPSpoofingDialog(
     var interface_ by remember { mutableStateOf("") }
     var showMacDropdown by remember { mutableStateOf(false) }
     var showIpDropdown by remember { mutableStateOf(false) }
+    var showGatewayDropdown by remember { mutableStateOf(false) }
     var showInterfaceDropdown by remember { mutableStateOf(false) }
+
+    val gatewayIpValue = networkTopology?.gatewayDevice?.ipAddress ?: ""
     
-    val availableInterfaces = remember { viewModel.getAvailableNetworkInterfaces() }
+    android.util.Log.d("DHCPDialog", "gatewayIpValue computed: '$gatewayIpValue' from networkTopology: ${networkTopology != null}, gatewayDevice: ${networkTopology?.gatewayDevice != null}")
+
     val deviceIps = remember(networkDevices, detectedIp) {
         val ips = mutableListOf<String>()
         detectedIp?.let { ips.add(it) }
@@ -324,26 +358,24 @@ fun StartDHCPSpoofingDialog(
                 ips.add(device.ipAddress)
             }
         }
+        android.util.Log.d("DHCPDialog", "Computed deviceIps: $ips")
         ips.distinct()
     }
-
-    LaunchedEffect(Unit) {
-        if (networkDevices.isEmpty()) {
-            viewModel.scanNetwork()
-        }
+    
+    val hasScannedDevices = remember(networkDevices) {
+        networkDevices.any { it.ipAddress != "Unknown" }
     }
 
-    LaunchedEffect(networkTopology, detectedInterface, detectedIp) {
+    LaunchedEffect(detectedInterface, detectedIp, gatewayIpValue) {
+        android.util.Log.d("DHCPDialog", "LaunchedEffect triggered - gatewayIpValue: $gatewayIpValue, gatewayIp.isEmpty: ${gatewayIp.isEmpty()}")
         if (interface_.isEmpty()) interface_ = detectedInterface ?: "wlan0"
         if (dnsServer.isEmpty()) dnsServer = detectedIp ?: ""
         if (spoofedIp.isEmpty()) spoofedIp = detectedIp ?: ""
-        // Gateway IP from topology (auto-populate after scan)
-        val topology = networkTopology
-        if (gatewayIp.isEmpty() && topology != null) {
-            val gateway = topology.gatewayDevice
-            if (gateway != null) {
-                gatewayIp = gateway.ipAddress
-            }
+        if (gatewayIp.isEmpty() && gatewayIpValue.isNotEmpty()) {
+            android.util.Log.d("DHCPDialog", "Setting gatewayIp to: $gatewayIpValue")
+            gatewayIp = gatewayIpValue
+        } else {
+            android.util.Log.d("DHCPDialog", "NOT setting gatewayIp - isEmpty: ${gatewayIp.isEmpty()}, valueNotEmpty: ${gatewayIpValue.isNotEmpty()}")
         }
     }
 
@@ -352,6 +384,34 @@ fun StartDHCPSpoofingDialog(
         title = { Text("Start DHCP Spoofing") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                if (!hasScannedDevices) {
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.Warning,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = "Run network scan first to populate device list",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
+                
                 Box(modifier = Modifier.fillMaxWidth()) {
                     OutlinedTextField(
                         value = targetMac,
@@ -382,21 +442,20 @@ fun StartDHCPSpoofingDialog(
                         }
                     }
                 }
-                
+
                 Box(modifier = Modifier.fillMaxWidth()) {
                     OutlinedTextField(
                         value = spoofedIp,
                         onValueChange = { spoofedIp = it },
                         label = { Text("Spoofed IP") },
-                        placeholder = { Text("Select or enter IP") },
                         modifier = Modifier.fillMaxWidth(),
-                        readOnly = true,
-                        trailingIcon = { Icon(Icons.Default.ArrowDropDown, null) }
-                    )
-                    Box(
-                        modifier = Modifier
-                            .matchParentSize()
-                            .clickable { showIpDropdown = true }
+                        trailingIcon = { 
+                            Icon(
+                                Icons.Default.ArrowDropDown, 
+                                null,
+                                modifier = Modifier.clickable { showIpDropdown = !showIpDropdown }
+                            )
+                        }
                     )
                     DropdownMenu(
                         expanded = showIpDropdown,
@@ -413,14 +472,48 @@ fun StartDHCPSpoofingDialog(
                         }
                     }
                 }
-                
-                OutlinedTextField(
-                    value = gatewayIp,
-                    onValueChange = { gatewayIp = it },
-                    label = { Text("Gateway IP") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                
+
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = gatewayIp,
+                        onValueChange = { gatewayIp = it },
+                        label = { Text("Gateway IP") },
+                        placeholder = { Text("Auto-detected from scan") },
+                        modifier = Modifier.fillMaxWidth(),
+                        trailingIcon = { 
+                            Icon(
+                                Icons.Default.ArrowDropDown, 
+                                null,
+                                modifier = Modifier.clickable { showGatewayDropdown = !showGatewayDropdown }
+                            )
+                        }
+                    )
+                    DropdownMenu(
+                        expanded = showGatewayDropdown,
+                        onDismissRequest = { showGatewayDropdown = false }
+                    ) {
+                        if (gatewayIpValue.isNotEmpty()) {
+                            DropdownMenuItem(
+                                text = { Text("$gatewayIpValue (Gateway)") },
+                                onClick = {
+                                    gatewayIp = gatewayIpValue
+                                    showGatewayDropdown = false
+                                }
+                            )
+                            Divider()
+                        }
+                        deviceIps.forEach { deviceIp ->
+                            DropdownMenuItem(
+                                text = { Text(deviceIp) },
+                                onClick = {
+                                    gatewayIp = deviceIp
+                                    showGatewayDropdown = false
+                                }
+                            )
+                        }
+                    }
+                }
+
                 Box(modifier = Modifier.fillMaxWidth()) {
                     OutlinedTextField(
                         value = interface_,
