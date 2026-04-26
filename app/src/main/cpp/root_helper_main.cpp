@@ -18,9 +18,8 @@ void print_usage(const char* prog) {
     std::cerr << "  scan <interface> <subnet_prefix>    Scan network" << std::endl;
     std::cerr << "  mac <interface> <ip>               Get MAC for IP" << std::endl;
     std::cerr << "  block <interface> <target_ip> <gateway_ip> <our_mac>" << std::endl;
-    std::cerr << "  block_iptables_drop <target_ip>    Block via iptables DROP" << std::endl;
-    std::cerr << "  block_iptables_redirect <target_ip> Redirect to null route" << std::endl;
-    std::cerr << "  block_traffic_control <interface> <target_ip>  Block via tc rate limit" << std::endl;
+    std::cerr << "  block_iptables_drop <target_ip>    Block via blackhole route" << std::endl;
+    std::cerr << "  block_traffic_control <interface> <target_ip> [rate_kbps]  Block via tc rate limit (0=block, >0=rate limit)" << std::endl;
     std::cerr << "  dns_spoof <interface> <domain> <spoofed_ip> [upstream_dns]    DNS spoofing" << std::endl;
     std::cerr << "  dhcp_spoof <interface> <target_mac> <spoofed_ip> <gateway_ip> [dns_server]    DHCP spoofing" << std::endl;
 }
@@ -191,7 +190,7 @@ int main(int argc, char* argv[]) {
         }
         const char* target_ip = argv[2];
         
-        std::cout << "DEBUG: Blocking " << target_ip << " via blackhole route (DROP method)" << std::endl;
+        std::cout << "DEBUG: Blocking " << target_ip << " via blackhole route" << std::endl;
         fflush(stdout);
         
         // Use blackhole route - most reliable method
@@ -218,74 +217,70 @@ int main(int argc, char* argv[]) {
             return 1;
         }
     }
-    else if (command == "block_iptables_redirect") {
-        if (argc < 3) {
-            print_usage(argv[0]);
-            return 1;
-        }
-        const char* target_ip = argv[2];
-        
-        std::cout << "DEBUG: Blocking " << target_ip << " via blackhole route" << std::endl;
-        
-        // Use blackhole route
-        char cmd[256];
-        snprintf(cmd, sizeof(cmd),
-            "ip route add blackhole %s 2>&1; echo 'ROUTE_DONE'",
-            target_ip);
-        
-        FILE* fp = popen(cmd, "r");
-        if (fp) {
-            char buf[256] = {0};
-            while (fgets(buf, sizeof(buf), fp)) {
-                std::cout << "ROUTE: " << buf;
-                fflush(stdout);
-            }
-            pclose(fp);
-            std::cout << "BLOCK_IPTABLES_REDIRECT_STARTED: " << target_ip << std::endl;
-            fflush(stdout);
-            // Route persists in kernel - no need to keep process alive
-            return 0;
-        } else {
-            std::cerr << "ERROR: Failed to execute ip route" << std::endl;
-            fflush(stderr);
-            return 1;
-        }
-    }
     else if (command == "block_traffic_control") {
         if (argc < 4) {
             print_usage(argv[0]);
             return 1;
         }
         const char* target_ip = argv[3];
+        int rate_kbps = (argc > 4) ? std::stoi(argv[4]) : 0;  // Rate in kbit/s, 0 = block completely
         
-        std::cout << "DEBUG: Blocking " << target_ip << " via iptables DROP (tc fallback)" << std::endl;
+        std::cout << "DEBUG: Blocking " << target_ip << " via traffic control (rate=" << rate_kbps << " kbit/s)" << std::endl;
         
-        // Use iptables DROP (same as DROP method)
-        char cmd[512];
-        snprintf(cmd, sizeof(cmd),
-            "iptables -I FORWARD -s %s -j DROP 2>&1; "
-            "iptables -I FORWARD -d %s -j DROP 2>&1; "
-            "iptables -I INPUT -s %s -j DROP 2>&1; "
-            "iptables -I OUTPUT -d %s -j DROP 2>&1; "
-            "echo 'TC_DONE'",
-            target_ip, target_ip, target_ip, target_ip);
-        
-        FILE* fp = popen(cmd, "r");
-        if (fp) {
-            char buf[256] = {0};
-            while (fgets(buf, sizeof(buf), fp)) {
-                std::cout << "TC: " << buf;
+        if (rate_kbps <= 0) {
+            // Rate 0 = block completely, use blackhole route
+            std::cout << "DEBUG: Rate 0 - using blackhole route for complete block" << std::endl;
+            char cmd[256];
+            snprintf(cmd, sizeof(cmd),
+                "ip route add blackhole %s 2>&1; echo 'TC_DONE'",
+                target_ip);
+            
+            FILE* fp = popen(cmd, "r");
+            if (fp) {
+                char buf[256] = {0};
+                while (fgets(buf, sizeof(buf), fp)) {
+                    std::cout << "TC: " << buf;
+                    fflush(stdout);
+                }
+                pclose(fp);
+                std::cout << "BLOCK_TRAFFIC_CONTROL_STARTED: " << target_ip << std::endl;
                 fflush(stdout);
+                return 0;
+            } else {
+                std::cerr << "ERROR: Failed to execute ip route" << std::endl;
+                fflush(stderr);
+                return 1;
             }
-            pclose(fp);
-            std::cout << "BLOCK_TRAFFIC_CONTROL_STARTED: " << target_ip << std::endl;
-            fflush(stdout);
-            // Rules persist in kernel - no need to keep process alive
-            return 0;
         } else {
-            std::cerr << "ERROR: Failed to execute iptables" << std::endl;
-            fflush(stderr);
-            return 1;
+            // Rate > 0 = rate limit using tc (traffic control)
+            std::cout << "DEBUG: Rate " << rate_kbps << " kbit/s - using tc for rate limiting" << std::endl;
+            
+            // Use tc (traffic control) to rate limit
+            // Create qdisc on root, then add filter for target IP
+            char cmd[1024];
+            snprintf(cmd, sizeof(cmd),
+                "tc qdisc add dev wlan0 root handle 1: htb default 10 2>/dev/null || true; "
+                "tc class add dev wlan0 parent 1: classid 1:1 htb rate %dkbit 2>/dev/null || true; "
+                "tc filter add dev wlan0 protocol ip parent 1: prio 1 u32 match ip dst %s flowid 1:1 2>/dev/null || true; "
+                "echo 'TC_DONE'",
+                rate_kbps, target_ip);
+            
+            FILE* fp = popen(cmd, "r");
+            if (fp) {
+                char buf[256] = {0};
+                while (fgets(buf, sizeof(buf), fp)) {
+                    std::cout << "TC: " << buf;
+                    fflush(stdout);
+                }
+                pclose(fp);
+                std::cout << "BLOCK_TRAFFIC_CONTROL_STARTED: " << target_ip << " at " << rate_kbps << " kbit/s" << std::endl;
+                fflush(stdout);
+                return 0;
+            } else {
+                std::cerr << "ERROR: Failed to execute tc" << std::endl;
+                fflush(stderr);
+                return 1;
+            }
         }
     }
     else if (command == "dhcp_spoof") {

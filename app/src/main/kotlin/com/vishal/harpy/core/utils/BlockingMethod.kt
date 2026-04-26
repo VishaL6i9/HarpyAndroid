@@ -1,8 +1,7 @@
 package com.vishal.harpy.core.utils
 
 enum class BlockingMethod {
-    ARP_SPOOF,           // Current: ARP spoofing (works on Android)
-    IPTABLES_DROP,       // Drop all packets from device
-    IPTABLES_REDIRECT,   // Redirect to null route (127.0.0.1)
-    TRAFFIC_CONTROL      // Use tc (traffic control) to rate limit to 0
+    ARP_SPOOF,           // ARP spoofing (works on Android)
+    BLACKHOLE_ROUTE,     // Blackhole route (drop all packets)
+    TRAFFIC_CONTROL      // TC rate limit (0 = block, >0 = rate limit)
 }

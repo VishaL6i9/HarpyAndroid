@@ -16,7 +16,8 @@ data class NetworkDevice(
     var deviceName: String? = null, // User-defined device name (e.g., "My Laptop", "Guest Phone")
     var isPinned: Boolean = false,  // Whether device is pinned
     val isCurrentDevice: Boolean = false, // Whether it's the current device
-    val isGateway: Boolean = false // Whether it's the gateway
+    val isGateway: Boolean = false, // Whether it's the gateway
+    var rateLimit: Int = 0  // Rate limit in kbit/s (0 = use global setting)
 ) {
     /**
      * Get display name - prioritizes device name over vendor

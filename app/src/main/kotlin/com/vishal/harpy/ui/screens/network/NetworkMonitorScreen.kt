@@ -4,12 +4,14 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -45,6 +47,7 @@ fun NetworkMonitorScreen(
     var selectedDevice by remember { mutableStateOf<NetworkDevice?>(null) }
     var showDeviceActionsSheet by remember { mutableStateOf(false) }
     var showEditNameDialog by remember { mutableStateOf(false) }
+    var showRateLimitDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(scanSuccess) {
         if (scanSuccess) {
@@ -154,7 +157,11 @@ fun NetworkMonitorScreen(
                                     selectedDevice = device
                                     showDeviceActionsSheet = true
                                 },
-                                onPingClick = { viewModel.testPing(device) }
+                                onPingClick = { viewModel.testPing(device) },
+                                onSetRateLimitClick = {
+                                    selectedDevice = device
+                                    showRateLimitDialog = true
+                                }
                             )
                         }
                     }
@@ -204,6 +211,14 @@ fun NetworkMonitorScreen(
                 showEditNameDialog = false
             },
             onDismiss = { showEditNameDialog = false }
+        )
+    }
+
+    if (showRateLimitDialog && selectedDevice != null) {
+        DeviceRateLimitDialog(
+            device = selectedDevice!!,
+            viewModel = viewModel,
+            onDismiss = { showRateLimitDialog = false }
         )
     }
 }
@@ -418,6 +433,99 @@ fun NuclearWarningDialog(
         dismissButton = {
             TextButton(onClick = onDismiss) {
                 Text("Abort")
+            }
+        }
+    )
+}
+
+@Composable
+fun DeviceRateLimitDialog(
+    device: NetworkDevice,
+    viewModel: NetworkMonitorViewModel,
+    onDismiss: () -> Unit
+) {
+    var rateKbps by remember { mutableStateOf("0") }
+    var useSlider by remember { mutableStateOf(true) }
+    var sliderValue by remember { mutableStateOf(0f) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Set Rate Limit for ${device.deviceName ?: device.ipAddress}") },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    text = "0 = Block completely | >0 = Rate limit in kbit/s",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                if (useSlider) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Rate: ${sliderValue.toInt()} kbit/s")
+                        Slider(
+                            value = sliderValue,
+                            onValueChange = {
+                                sliderValue = it
+                                rateKbps = it.toInt().toString()
+                            },
+                            valueRange = 0f..10000f,
+                            steps = 99,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = rateKbps,
+                        onValueChange = {
+                            rateKbps = it
+                            if (it.isNotEmpty()) {
+                                sliderValue = it.toIntOrNull()?.coerceIn(0, 10000)?.toFloat() ?: 0f
+                            }
+                        },
+                        label = { Text("kbit/s") },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Number
+                        )
+                    )
+                    TextButton(onClick = { useSlider = !useSlider }) {
+                        Text(if (useSlider) "Manual" else "Slider")
+                    }
+                }
+
+                Text(
+                    text = "Examples: 0 (block), 512 (512 kbit/s), 1024 (1 Mbit/s), 5000 (5 Mbit/s)",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val rate = rateKbps.toIntOrNull() ?: 0
+                    viewModel.setDeviceRateLimit(device, rate)
+                    onDismiss()
+                }
+            ) {
+                Text("Set")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
             }
         }
     )

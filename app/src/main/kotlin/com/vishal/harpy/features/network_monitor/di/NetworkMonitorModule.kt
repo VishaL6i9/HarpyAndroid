@@ -3,6 +3,8 @@ package com.vishal.harpy.features.network_monitor.di
 import android.content.Context
 import com.vishal.harpy.features.network_monitor.data.repository.NetworkMonitorRepository
 import com.vishal.harpy.features.network_monitor.data.repository.impl.NetworkMonitorRepositoryImpl
+import com.vishal.harpy.core.state.DeviceBlockingConfigRepository
+import com.vishal.harpy.core.utils.SettingsRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -16,7 +18,11 @@ object NetworkMonitorModule {
 
     @Provides
     @Singleton
-    fun provideRepository(@ApplicationContext context: Context): NetworkMonitorRepository {
-        return NetworkMonitorRepositoryImpl(context)
+    fun provideRepository(
+        @ApplicationContext context: Context,
+        deviceBlockingConfigRepository: DeviceBlockingConfigRepository,
+        settingsRepository: SettingsRepository
+    ): NetworkMonitorRepository {
+        return NetworkMonitorRepositoryImpl(context, deviceBlockingConfigRepository, settingsRepository)
     }
 }

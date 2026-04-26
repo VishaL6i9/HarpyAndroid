@@ -12,5 +12,6 @@ data class AppSettings(
     val fallbackDnsServer: String = "8.8.4.4",
     val dhcpLeaseTimeSeconds: Int = 3600,
     val enableWhitelist: Boolean = false,
-    val blockingMethod: BlockingMethod = BlockingMethod.ARP_SPOOF
+    val blockingMethod: BlockingMethod = BlockingMethod.ARP_SPOOF,
+    val trafficControlRateKbps: Int = 0  // 0 = block, >0 = rate limit in kbit/s
 )

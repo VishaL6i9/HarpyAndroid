@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.*
@@ -14,6 +15,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -32,6 +34,7 @@ fun SettingsScreen(
     onNavigateToDeviceManagement: () -> Unit = {},
     onNavigateToPerformanceMonitor: () -> Unit = {},
     onNavigateToBlockingMethodSettings: () -> Unit = {},
+    onShowTrafficControlRate: () -> Unit = {},
     savedScrollOffset: Int = 0,
     onScrollOffsetChanged: (Int) -> Unit = {},
     viewModel: NetworkMonitorViewModel = hiltViewModel()
@@ -47,6 +50,7 @@ fun SettingsScreen(
     var showDhcpSettingsDialog by remember { mutableStateOf(false) }
     var showWhitelistDialog by remember { mutableStateOf(false) }
     var showThemeDialog by remember { mutableStateOf(false) }
+    var showTrafficControlRateDialog by remember { mutableStateOf(false) }
 
     val settings by viewModel.appSettings.collectAsStateWithLifecycle()
 
@@ -80,6 +84,7 @@ fun SettingsScreen(
             onNavigateToDeviceManagement = onNavigateToDeviceManagement,
             onNavigateToPerformanceMonitor = onNavigateToPerformanceMonitor,
             onNavigateToBlockingMethodSettings = onNavigateToBlockingMethodSettings,
+            onShowTrafficControlRate = { showTrafficControlRateDialog = true },
             onShowAbout = { showAboutScreen = true },
             onShowClearNamesDialog = { showClearNamesDialog = true },
             onShowScanSettings = { showScanSettingsDialog = true },
@@ -226,6 +231,17 @@ fun SettingsScreen(
             onDismiss = { showThemeDialog = false }
         )
     }
+
+    if (showTrafficControlRateDialog) {
+        TrafficControlRateDialog(
+            currentRateKbps = settings.trafficControlRateKbps,
+            onConfirm = { rate ->
+                viewModel.updateTrafficControlRate(rate)
+                showTrafficControlRateDialog = false
+            },
+            onDismiss = { showTrafficControlRateDialog = false }
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -235,6 +251,7 @@ private fun SettingsContent(
     onNavigateToDeviceManagement: () -> Unit,
     onNavigateToPerformanceMonitor: () -> Unit,
     onNavigateToBlockingMethodSettings: () -> Unit,
+    onShowTrafficControlRate: () -> Unit,
     onShowAbout: () -> Unit,
     onShowClearNamesDialog: () -> Unit,
     onShowScanSettings: () -> Unit,
@@ -427,6 +444,15 @@ private fun SettingsContent(
                         summary = "Configure how devices are blocked (Current: ${settings.blockingMethod.name.lowercase().replaceFirstChar { it.uppercase() }})",
                         icon = Icons.Outlined.Security,
                         onClick = onNavigateToBlockingMethodSettings
+                    )
+                    
+                    SettingsDivider()
+                    
+                    SettingsItem(
+                        title = "Traffic Control Rate",
+                        summary = "Rate limit for TC method (Current: ${if (settings.trafficControlRateKbps == 0) "Block" else "${settings.trafficControlRateKbps} kbit/s"})",
+                        icon = Icons.Outlined.Speed,
+                        onClick = onShowTrafficControlRate
                     )
                     
                     SettingsDivider()
@@ -1037,6 +1063,79 @@ fun ThemeDialog(
         },
         confirmButton = {
             TextButton(onClick = { onConfirm(selectedTheme) }) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+
+@Composable
+fun TrafficControlRateDialog(
+    currentRateKbps: Int,
+    onConfirm: (Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var rateKbps by remember { mutableStateOf(currentRateKbps.toFloat()) }
+    var manualInput by remember { mutableStateOf(currentRateKbps.toString()) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Traffic Control Rate Limit") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    text = "Set rate limit for traffic control method",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                
+                Text(
+                    text = "Rate: ${rateKbps.toInt()} kbit/s (0 = block completely)",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                
+                Slider(
+                    value = rateKbps,
+                    onValueChange = { 
+                        rateKbps = it
+                        manualInput = it.toInt().toString()
+                    },
+                    valueRange = 0f..10000f,
+                    steps = 99
+                )
+                
+                OutlinedTextField(
+                    value = manualInput,
+                    onValueChange = { input ->
+                        manualInput = input
+                        input.toIntOrNull()?.let { 
+                            if (it in 0..10000) {
+                                rateKbps = it.toFloat()
+                            }
+                        }
+                    },
+                    label = { Text("Manual Input (kbit/s)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                )
+                
+                Text(
+                    text = "0 = block all traffic, 1-10000 = rate limit in kbit/s",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(rateKbps.toInt()) }) {
                 Text("Save")
             }
         },

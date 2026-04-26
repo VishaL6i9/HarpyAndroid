@@ -21,7 +21,8 @@ fun DeviceCard(
     onBlockClick: () -> Unit,
     onPinClick: () -> Unit,
     onEditNameClick: () -> Unit,
-    onPingClick: () -> Unit
+    onPingClick: () -> Unit,
+    onSetRateLimitClick: () -> Unit = {}
 ) {
     Card(
         modifier = Modifier
@@ -189,6 +190,16 @@ fun DeviceCard(
                     Icon(
                         imageVector = Icons.Default.NetworkPing,
                         contentDescription = "Test Ping"
+                    )
+                }
+                
+                IconButton(
+                    onClick = onSetRateLimitClick,
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Speed,
+                        contentDescription = "Set Rate Limit"
                     )
                 }
             }

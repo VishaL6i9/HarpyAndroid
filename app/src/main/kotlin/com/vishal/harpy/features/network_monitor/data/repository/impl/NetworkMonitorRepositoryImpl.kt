@@ -11,6 +11,7 @@ import com.vishal.harpy.core.utils.VendorLookup
 import com.vishal.harpy.core.native.NativeNetworkWrapper
 import android.util.Log
 import com.vishal.harpy.core.utils.LogUtils
+import com.vishal.harpy.core.state.DeviceBlockingConfigRepository
 import java.io.BufferedReader
 import java.io.DataOutputStream
 import java.io.IOException
@@ -20,7 +21,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 
-class NetworkMonitorRepositoryImpl(private val context: android.content.Context) : NetworkMonitorRepository {
+import com.vishal.harpy.core.utils.SettingsRepository
+
+class NetworkMonitorRepositoryImpl(
+    private val context: android.content.Context,
+    private val deviceBlockingConfigRepository: DeviceBlockingConfigRepository,
+    private val settingsRepository: SettingsRepository
+) : NetworkMonitorRepository {
 
     companion object {
         private const val TAG = "NetworkMonitorRepoImpl"
@@ -608,17 +615,18 @@ class NetworkMonitorRepositoryImpl(private val context: android.content.Context)
                         "chmod 755 $helperPath && LD_LIBRARY_PATH=$libDir $helperPath block $activeIface ${device.ipAddress} $gatewayIp $ourMac\n"
                     }
                 }
-                com.vishal.harpy.core.utils.BlockingMethod.IPTABLES_DROP -> {
-                    Log.d(TAG, "Blocking device via iptables DROP")
+                com.vishal.harpy.core.utils.BlockingMethod.BLACKHOLE_ROUTE -> {
+                    Log.d(TAG, "Blocking device via blackhole route")
                     "chmod 755 $helperPath && LD_LIBRARY_PATH=$libDir $helperPath block_iptables_drop ${device.ipAddress}\n"
-                }
-                com.vishal.harpy.core.utils.BlockingMethod.IPTABLES_REDIRECT -> {
-                    Log.d(TAG, "Blocking device via iptables REDIRECT to null route")
-                    "chmod 755 $helperPath && LD_LIBRARY_PATH=$libDir $helperPath block_iptables_redirect ${device.ipAddress}\n"
                 }
                 com.vishal.harpy.core.utils.BlockingMethod.TRAFFIC_CONTROL -> {
                     Log.d(TAG, "Blocking device via traffic control rate limit")
-                    "chmod 755 $helperPath && LD_LIBRARY_PATH=$libDir $helperPath block_traffic_control $activeIface ${device.ipAddress}\n"
+                    val effectiveRate = deviceBlockingConfigRepository.getEffectiveRateLimit(
+                        device.macAddress,
+                        settingsRepository.getTrafficControlRate()
+                    )
+                    Log.d(TAG, "Effective rate limit: $effectiveRate kbit/s")
+                    "chmod 755 $helperPath && LD_LIBRARY_PATH=$libDir $helperPath block_traffic_control $activeIface ${device.ipAddress} $effectiveRate\n"
                 }
             }
             

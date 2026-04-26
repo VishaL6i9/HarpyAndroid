@@ -28,6 +28,7 @@ class SettingsRepository @Inject constructor(
         private const val KEY_DHCP_LEASE_TIME = "dhcp_lease_time"
         private const val KEY_ENABLE_WHITELIST = "enable_whitelist"
         private const val KEY_BLOCKING_METHOD = "blocking_method"
+        private const val KEY_TRAFFIC_CONTROL_RATE = "traffic_control_rate_kbps"
     }
 
     private val sharedPreferences: SharedPreferences =
@@ -50,7 +51,8 @@ class SettingsRepository @Inject constructor(
                 BlockingMethod.valueOf(sharedPreferences.getString(KEY_BLOCKING_METHOD, BlockingMethod.ARP_SPOOF.name) ?: BlockingMethod.ARP_SPOOF.name)
             } catch (e: Exception) {
                 BlockingMethod.ARP_SPOOF
-            }
+            },
+            trafficControlRateKbps = sharedPreferences.getInt(KEY_TRAFFIC_CONTROL_RATE, 0)
         )
     }
 
@@ -109,5 +111,15 @@ class SettingsRepository @Inject constructor(
         sharedPreferences.edit().putString(KEY_BLOCKING_METHOD, method.name).apply()
         _settings.value = _settings.value.copy(blockingMethod = method)
         Log.d(TAG, "Blocking method updated to: ${method.name}")
+    }
+
+    suspend fun updateTrafficControlRate(rateKbps: Int) = withContext(Dispatchers.IO) {
+        sharedPreferences.edit().putInt(KEY_TRAFFIC_CONTROL_RATE, rateKbps).apply()
+        _settings.value = _settings.value.copy(trafficControlRateKbps = rateKbps)
+        Log.d(TAG, "Traffic control rate updated to: ${rateKbps} kbit/s")
+    }
+
+    fun getTrafficControlRate(): Int {
+        return sharedPreferences.getInt(KEY_TRAFFIC_CONTROL_RATE, 0)
     }
 }

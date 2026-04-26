@@ -70,6 +70,7 @@ class NetworkMonitorViewModel @Inject constructor(
     private val getOurIpUseCase: GetOurIpUseCase,
     private val sessionManager: SpoofingSessionManager,
     private val settingsRepository: SettingsRepository,
+    private val deviceBlockingConfigRepository: com.vishal.harpy.core.state.DeviceBlockingConfigRepository,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -1198,6 +1199,32 @@ class NetworkMonitorViewModel @Inject constructor(
     }
 
     /**
+     * Update traffic control rate limit
+     */
+    fun updateTrafficControlRate(rateKbps: Int) {
+        viewModelScope.launch {
+            settingsRepository.updateTrafficControlRate(rateKbps)
+        }
+    }
+
+    /**
+     * Set device-specific rate limit
+     */
+    fun setDeviceRateLimit(macAddress: String, rateKbps: Int) {
+        viewModelScope.launch {
+            deviceBlockingConfigRepository.setDeviceRateLimit(macAddress, rateKbps)
+        }
+    }
+
+    /**
+     * Get effective rate limit for device
+     */
+    fun getEffectiveRateLimit(macAddress: String): Int {
+        val globalRate = appSettings.value.trafficControlRateKbps
+        return deviceBlockingConfigRepository.getEffectiveRateLimit(macAddress, globalRate)
+    }
+
+    /**
      * Get available network interfaces on device
      */
     fun getAvailableNetworkInterfaces(): List<String> {
@@ -1289,5 +1316,23 @@ class NetworkMonitorViewModel @Inject constructor(
                 sessionManager.removeSession(it.id)
             }
         }
+    }
+
+    /**
+     * Set per-device rate limit
+     */
+    fun setDeviceRateLimit(device: NetworkDevice, rateKbps: Int) {
+        viewModelScope.launch {
+            deviceBlockingConfigRepository.setDeviceRateLimit(device.macAddress, rateKbps)
+            Log.d(TAG, "Set rate limit for ${device.ipAddress} to $rateKbps kbit/s")
+        }
+    }
+
+    /**
+     * Get effective rate limit for device (device-specific or global fallback)
+     */
+    fun getEffectiveRateLimit(device: NetworkDevice): Int {
+        val globalRate = settingsRepository.getTrafficControlRate()
+        return deviceBlockingConfigRepository.getEffectiveRateLimit(device.macAddress, globalRate)
     }
 }

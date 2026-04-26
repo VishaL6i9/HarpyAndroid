@@ -92,25 +92,17 @@ fun BlockingMethodSettings(
             )
 
             BlockingMethodOption(
-                method = BlockingMethod.IPTABLES_DROP,
-                title = "iptables DROP",
-                description = "Drops all packets from/to device. Works on iOS and Android.",
-                isSelected = selectedMethod == BlockingMethod.IPTABLES_DROP,
-                onSelect = { selectedMethod = it }
-            )
-
-            BlockingMethodOption(
-                method = BlockingMethod.IPTABLES_REDIRECT,
-                title = "iptables Redirect",
-                description = "Redirects traffic to null route (127.0.0.1). Reliable on iOS.",
-                isSelected = selectedMethod == BlockingMethod.IPTABLES_REDIRECT,
+                method = BlockingMethod.BLACKHOLE_ROUTE,
+                title = "Blackhole Route",
+                description = "Drops all packets via kernel routing. Works on iOS and Android.",
+                isSelected = selectedMethod == BlockingMethod.BLACKHOLE_ROUTE,
                 onSelect = { selectedMethod = it }
             )
 
             BlockingMethodOption(
                 method = BlockingMethod.TRAFFIC_CONTROL,
                 title = "Traffic Control (tc)",
-                description = "Rate limits to 0kbit/s. Most aggressive method.",
+                description = "Rate limits or blocks. Most flexible method.",
                 isSelected = selectedMethod == BlockingMethod.TRAFFIC_CONTROL,
                 onSelect = { selectedMethod = it }
             )
