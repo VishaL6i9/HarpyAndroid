@@ -160,6 +160,7 @@ fun SpoofingManagementScreen(
                             session = session,
                             onStop = { viewModel.stopDnsSpoofing(session.id) },
                             onRemove = { viewModel.removeSession(session.id) },
+                            onResume = { viewModel.resumeSession(session.id) },
                             isLoading = isLoading
                         )
                     }
@@ -279,6 +280,7 @@ private fun SessionCard(
     session: SpoofingSession,
     onStop: () -> Unit,
     onRemove: () -> Unit,
+    onResume: () -> Unit,
     isLoading: Boolean
 ) {
     Card(
@@ -404,6 +406,25 @@ private fun SessionCard(
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text("Stop")
+                    }
+                } else {
+                    Button(
+                        onClick = onResume,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(40.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary
+                        ),
+                        enabled = !isLoading
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PlayArrow,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Resume")
                     }
                 }
 

@@ -212,7 +212,7 @@ class SpoofingManagementViewModel @Inject constructor(
                         val result = stopDnsSpoofingUseCase(session.domain)
                         if (result is NetworkResult.Success) {
                             successCount++
-                            sessionManager.removeSession(session.id)
+                            sessionManager.updateSession(session.copy(isActive = false))
                         } else {
                             failureCount++
                         }
@@ -221,7 +221,7 @@ class SpoofingManagementViewModel @Inject constructor(
                         val result = stopDhcpSpoofingUseCase()
                         if (result is NetworkResult.Success) {
                             successCount++
-                            sessionManager.removeSession(session.id)
+                            sessionManager.updateSession(session.copy(isActive = false))
                         } else {
                             failureCount++
                         }
@@ -245,6 +245,60 @@ class SpoofingManagementViewModel @Inject constructor(
 
     fun removeSession(sessionId: String) {
         sessionManager.removeSession(sessionId)
+    }
+
+    fun resumeSession(sessionId: String) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            _error.value = null
+
+            val session = sessionManager.getSession(sessionId)
+            if (session != null) {
+                when (session) {
+                    is SpoofingSession.Dns -> {
+                        val result = startDnsSpoofingUseCase(session.domain, session.spoofedIP, session.interfaceName)
+                        when (result) {
+                            is NetworkResult.Success -> {
+                                val activeSession = session.copy(
+                                    isActive = true,
+                                    startTime = LocalDateTime.now()
+                                )
+                                sessionManager.updateSession(activeSession)
+                                _successMessage.value = "DNS spoofing resumed for ${session.domain}"
+                            }
+                            is NetworkResult.Error -> {
+                                _error.value = "Failed to resume DNS spoofing: ${result.error.message}"
+                            }
+                        }
+                    }
+                    is SpoofingSession.Dhcp -> {
+                        val result = startDhcpSpoofingUseCase(
+                            interfaceName = session.interfaceName,
+                            targetMacs = session.rules.map { it.targetMac }.toTypedArray(),
+                            spoofedIPs = session.rules.map { it.spoofedIP }.toTypedArray(),
+                            gatewayIPs = session.rules.map { it.gatewayIP }.toTypedArray(),
+                            subnetMasks = session.rules.map { it.subnetMask }.toTypedArray(),
+                            dnsServers = session.rules.map { it.dnsServer }.toTypedArray()
+                        )
+                        when (result) {
+                            is NetworkResult.Success -> {
+                                val activeSession = session.copy(
+                                    isActive = true,
+                                    startTime = LocalDateTime.now()
+                                )
+                                sessionManager.updateSession(activeSession)
+                                _successMessage.value = "DHCP spoofing resumed for ${session.rules.size} device(s)"
+                            }
+                            is NetworkResult.Error -> {
+                                _error.value = "Failed to resume DHCP spoofing: ${result.error.message}"
+                            }
+                        }
+                    }
+                }
+            }
+
+            _isLoading.value = false
+        }
     }
 
     // Reactive flow replaces manual updateStats
