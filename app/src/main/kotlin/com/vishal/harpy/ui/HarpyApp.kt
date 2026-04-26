@@ -247,13 +247,15 @@ fun HarpyApp() {
                             )
                         }
                         composable(Screen.DHCPSpoofing.route) { backStackEntry ->
-                            val sharedViewModel: NetworkMonitorViewModel = hiltViewModel(
+                            val networkViewModel: NetworkMonitorViewModel = hiltViewModel(
                                 remember(backStackEntry) {
                                     navController.getBackStackEntry(Screen.NetworkMonitor.route)
                                 }
                             )
+                            val dhcpViewModel: com.vishal.harpy.features.spoofing.presentation.viewmodel.SpoofingManagementViewModel = hiltViewModel()
                             DHCPSpoofingScreen(
-                                viewModel = sharedViewModel,
+                                networkViewModel = networkViewModel,
+                                dhcpViewModel = dhcpViewModel,
                                 onSettingsClick = { navigateTo(AppScreen.Settings) },
                                 onManageSessions = { navigateTo(AppScreen.SpoofingManagement) }
                             )

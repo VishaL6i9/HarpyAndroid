@@ -25,11 +25,17 @@ import com.vishal.harpy.core.utils.SpoofingSession
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DHCPSpoofingScreen(
-    viewModel: NetworkMonitorViewModel = hiltViewModel(),
+    networkViewModel: NetworkMonitorViewModel = hiltViewModel(),
+    dhcpViewModel: com.vishal.harpy.features.spoofing.presentation.viewmodel.SpoofingManagementViewModel = hiltViewModel(),
     onSettingsClick: () -> Unit = {},
     onManageSessions: () -> Unit = {}
 ) {
-    val dhcpSessions by viewModel.dhcpSessions.collectAsStateWithLifecycle()
+    val allSessions by dhcpViewModel.sessions.collectAsStateWithLifecycle()
+    val dhcpSessions = allSessions.filterIsInstance<SpoofingSession.Dhcp>()
+    val networkDevices by networkViewModel.networkDevices.collectAsStateWithLifecycle()
+    val detectedIp by networkViewModel.detectedIp.collectAsStateWithLifecycle()
+    val detectedInterface by networkViewModel.detectedInterface.collectAsStateWithLifecycle()
+    val networkTopology by networkViewModel.networkTopology.collectAsStateWithLifecycle()
     var showStartDialog by remember { mutableStateOf(false) }
     var showClearDialog by remember { mutableStateOf(false) }
 
@@ -93,7 +99,7 @@ fun DHCPSpoofingScreen(
                     items(dhcpSessions, key = { it.id }) { session ->
                         DhcpSessionCard(
                             session = session,
-                            onStop = { viewModel.stopDhcpSpoofing(session.id) }
+                            onStop = { dhcpViewModel.stopDhcpSpoofing(session.id) }
                         )
                     }
                 }
@@ -102,32 +108,14 @@ fun DHCPSpoofingScreen(
     }
 
     if (showStartDialog) {
-        val networkDevices by viewModel.networkDevices.collectAsStateWithLifecycle()
-        val detectedIp by viewModel.detectedIp.collectAsStateWithLifecycle()
-        val detectedInterface by viewModel.detectedInterface.collectAsStateWithLifecycle()
-        val networkTopology by viewModel.networkTopology.collectAsStateWithLifecycle()
-        
-        android.util.Log.d("DHCPDialog", "=== DHCP Start Dialog Debug ===")
-        android.util.Log.d("DHCPDialog", "networkDevices.size: ${networkDevices.size}")
-        android.util.Log.d("DHCPDialog", "detectedIp: $detectedIp")
-        android.util.Log.d("DHCPDialog", "gatewayDevice IP: ${networkTopology?.gatewayDevice?.ipAddress}")
-        android.util.Log.d("DHCPDialog", "Device IPs breakdown:")
-        val unknownCount = networkDevices.count { it.ipAddress == "Unknown" }
-        val validCount = networkDevices.count { it.ipAddress != "Unknown" }
-        android.util.Log.d("DHCPDialog", "  - Valid IPs: $validCount")
-        android.util.Log.d("DHCPDialog", "  - Unknown IPs: $unknownCount")
-        if (validCount > 0) {
-            android.util.Log.d("DHCPDialog", "Valid device IPs: ${networkDevices.filter { it.ipAddress != "Unknown" }.map { it.ipAddress }}")
-        }
-        
         StartDHCPSpoofingDialog(
             networkDevices = networkDevices,
             detectedIp = detectedIp,
             detectedInterface = detectedInterface,
             networkTopology = networkTopology,
-            availableInterfaces = viewModel.getAvailableNetworkInterfaces(),
+            availableInterfaces = networkViewModel.getAvailableNetworkInterfaces(),
             onConfirm = { targetMac, spoofedIp, gatewayIp, dnsServer, interface_ ->
-                viewModel.startDHCPSpoofing(
+                networkViewModel.startDHCPSpoofing(
                     interfaceName = interface_,
                     targetMacs = arrayOf(targetMac),
                     spoofedIPs = arrayOf(spoofedIp),
@@ -149,7 +137,9 @@ fun DHCPSpoofingScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        viewModel.clearInactiveDHCPRules()
+                        dhcpSessions.filter { !it.isActive }.forEach { session ->
+                            dhcpViewModel.removeSession(session.id)
+                        }
                         showClearDialog = false
                     }
                 ) {
