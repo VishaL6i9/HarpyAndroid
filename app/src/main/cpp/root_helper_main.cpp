@@ -18,7 +18,7 @@ void print_usage(const char* prog) {
     std::cerr << "  scan <interface> <subnet_prefix>    Scan network" << std::endl;
     std::cerr << "  mac <interface> <ip>               Get MAC for IP" << std::endl;
     std::cerr << "  block <interface> <target_ip> <gateway_ip> <our_mac>" << std::endl;
-    std::cerr << "  dns_spoof <interface> <domain> <spoofed_ip>    DNS spoofing" << std::endl;
+    std::cerr << "  dns_spoof <interface> <domain> <spoofed_ip> [upstream_dns]    DNS spoofing" << std::endl;
     std::cerr << "  dhcp_spoof <interface> <target_mac> <spoofed_ip> <gateway_ip> [dns_server]    DHCP spoofing" << std::endl;
 }
 
@@ -222,8 +222,9 @@ int main(int argc, char* argv[]) {
         }
         const char* domain = argv[3];
         const char* spoofed_ip = argv[4];
+        const char* upstream_dns = (argc > 5) ? argv[5] : "8.8.8.8";  // Default upstream DNS
 
-        std::cout << "DEBUG: Starting DNS spoofing for " << domain << " -> " << spoofed_ip << std::endl;
+        std::cout << "DEBUG: Starting DNS spoofing for " << domain << " -> " << spoofed_ip << " (upstream: " << upstream_dns << ")" << std::endl;
 
         // Create a UDP socket to listen for DNS queries
         int sockfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
@@ -274,14 +275,15 @@ int main(int argc, char* argv[]) {
                 continue;
             }
 
-            // Handle the DNS query with spoofing
+            // Handle the DNS query with spoofing (and forwarding for non-matching queries)
             bool response_sent = handle_dns_query_with_spoof(
                 buffer,
                 bytes_received,
                 &client_addr,
                 client_len,
                 sockfd,
-                rule
+                rule,
+                std::string(upstream_dns)
             );
 
             if (!response_sent) {

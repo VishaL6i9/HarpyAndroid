@@ -162,7 +162,8 @@ bool handle_dns_query_with_spoof(
     struct sockaddr_in* client_addr, 
     socklen_t client_len, 
     int sockfd, 
-    const DNSSpoofRule& rule
+    const DNSSpoofRule& rule,
+    const std::string& upstream_dns
 ) {
     struct dns_header *header = (struct dns_header*)query_buffer;
     
@@ -202,5 +203,64 @@ bool handle_dns_query_with_spoof(
         }
     }
     
-    return false;
+    // Domain doesn't match spoofing rule - forward to upstream DNS
+    std::cout << "DNS_FORWARD: Query for '" << domain << "' doesn't match rule, forwarding to " << upstream_dns << std::endl;
+    
+    // Create socket to query upstream DNS
+    int upstream_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if(upstream_socket < 0) {
+        std::cerr << "ERROR: Failed to create upstream DNS socket: " << strerror(errno) << std::endl;
+        return false;
+    }
+    
+    // Set socket timeout (2 seconds)
+    struct timeval tv;
+    tv.tv_sec = 2;
+    tv.tv_usec = 0;
+    setsockopt(upstream_socket, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+    
+    // Configure upstream DNS server address
+    struct sockaddr_in upstream_addr;
+    memset(&upstream_addr, 0, sizeof(upstream_addr));
+    upstream_addr.sin_family = AF_INET;
+    upstream_addr.sin_port = htons(53);
+    inet_pton(AF_INET, upstream_dns.c_str(), &upstream_addr.sin_addr);
+    
+    // Forward query to upstream DNS
+    ssize_t sent_bytes = sendto(upstream_socket, query_buffer, query_size, 0,
+                               (struct sockaddr*)&upstream_addr, sizeof(upstream_addr));
+    
+    if(sent_bytes < 0) {
+        std::cerr << "ERROR: Failed to forward DNS query to upstream: " << strerror(errno) << std::endl;
+        close(upstream_socket);
+        return false;
+    }
+    
+    // Receive response from upstream DNS
+    char response_buffer[512];
+    struct sockaddr_in upstream_response_addr;
+    socklen_t upstream_addr_len = sizeof(upstream_response_addr);
+    
+    ssize_t response_size = recvfrom(upstream_socket, response_buffer, sizeof(response_buffer), 0,
+                                     (struct sockaddr*)&upstream_response_addr, &upstream_addr_len);
+    
+    close(upstream_socket);
+    
+    if(response_size < 0) {
+        std::cerr << "ERROR: Failed to receive DNS response from upstream: " << strerror(errno) << std::endl;
+        return false;
+    }
+    
+    // Relay response back to original client
+    sent_bytes = sendto(sockfd, response_buffer, response_size, 0,
+                       (struct sockaddr*)client_addr, client_len);
+    
+    if(sent_bytes > 0) {
+        std::cout << "DNS_FORWARD_RESPONSE_SENT: Relayed " << sent_bytes << " bytes to " 
+                  << inet_ntoa(client_addr->sin_addr) << std::endl;
+        return true;
+    } else {
+        std::cerr << "ERROR: Failed to relay DNS response to client: " << strerror(errno) << std::endl;
+        return false;
+    }
 }

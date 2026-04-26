@@ -55,4 +55,10 @@ bool dns_is_active();
  */
 void dns_spoof_cleanup();
 
+/**
+ * Set upstream DNS server for forwarding non-spoofed queries
+ * @param upstream_ip IP address of upstream DNS server (e.g., "8.8.8.8")
+ */
+void dns_set_upstream_dns(const char *upstream_ip);
+
 #endif // DNS_SPOOFING_H

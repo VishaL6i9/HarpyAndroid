@@ -1,6 +1,7 @@
 package com.vishal.harpy.features.dns.di
 
 import android.content.Context
+import com.vishal.harpy.core.utils.SettingsRepository
 import com.vishal.harpy.features.dns.data.repository.DnsRepositoryImpl
 import com.vishal.harpy.features.dns.domain.repository.DnsRepository
 import com.vishal.harpy.features.network_monitor.domain.usecases.IsDeviceRootedUseCase
@@ -19,8 +20,9 @@ object DnsModule {
     @Singleton
     fun provideDnsRepository(
         @ApplicationContext context: Context,
-        isDeviceRootedUseCase: IsDeviceRootedUseCase
+        isDeviceRootedUseCase: IsDeviceRootedUseCase,
+        settingsRepository: SettingsRepository
     ): DnsRepository {
-        return DnsRepositoryImpl(context, isDeviceRootedUseCase)
+        return DnsRepositoryImpl(context, isDeviceRootedUseCase, settingsRepository)
     }
 }

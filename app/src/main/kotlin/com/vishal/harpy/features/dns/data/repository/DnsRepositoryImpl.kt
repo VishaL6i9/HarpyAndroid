@@ -5,6 +5,7 @@ import com.vishal.harpy.core.utils.NetworkResult
 import com.vishal.harpy.core.utils.NetworkError
 import com.vishal.harpy.core.utils.LogUtils
 import com.vishal.harpy.core.utils.ProcessUtils
+import com.vishal.harpy.core.utils.SettingsRepository
 import com.vishal.harpy.core.native.NativeNetworkWrapper
 import com.vishal.harpy.features.network_monitor.domain.usecases.IsDeviceRootedUseCase
 import kotlinx.coroutines.Dispatchers
@@ -16,7 +17,8 @@ import java.util.concurrent.ConcurrentHashMap
 
 class DnsRepositoryImpl @Inject constructor(
     private val context: Context,
-    private val isDeviceRootedUseCase: IsDeviceRootedUseCase
+    private val isDeviceRootedUseCase: IsDeviceRootedUseCase,
+    private val settingsRepository: SettingsRepository
 ) : DnsRepository {
 
     private val dnsSpoofingProcesses = ConcurrentHashMap<String, Process>()
@@ -41,12 +43,15 @@ class DnsRepositoryImpl @Inject constructor(
                 return@withContext NetworkResult.error(NetworkError.DeviceNotRootedError())
             }
 
+            // Get upstream DNS from settings
+            val upstreamDns = settingsRepository.settings.value.customDnsServer
+
             // Kill any existing DNS spoofing process for this domain
             val processKey = "dns_$domain"
             dnsSpoofingProcesses[processKey]?.let { com.vishal.harpy.core.utils.ProcessUtils.destroyForcibly(it) }
 
             // Build the command to execute the root helper with DNS spoofing
-            val command = arrayOf("su", "-c", "$helperPath dns_spoof $interfaceName $domain $spoofedIP")
+            val command = arrayOf("su", "-c", "$helperPath dns_spoof $interfaceName $domain $spoofedIP $upstreamDns")
 
             LogUtils.d(TAG, "Executing DNS spoofing command: ${command.joinToString(" ")}")
 

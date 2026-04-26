@@ -27,6 +27,7 @@ static std::atomic<bool> g_dns_spoof_active(false);
 static std::thread *g_dns_spoof_thread = nullptr;
 static int g_dns_socket = -1;
 static std::atomic<bool> g_stop_spoofing(false);
+static std::string g_upstream_dns = "8.8.8.8"; // Default upstream DNS
 
 // Main DNS spoofing thread function
 void dns_spoof_thread_func(const std::string& interface) {
@@ -95,7 +96,8 @@ void dns_spoof_thread_func(const std::string& interface) {
                     &client_addr, 
                     addr_len, 
                     g_dns_socket, 
-                    spoof_rule
+                    spoof_rule,
+                    g_upstream_dns
                 );
                 
                 if(response_sent) {
@@ -211,4 +213,12 @@ void dns_spoof_cleanup() {
     LOGD("Cleaning up DNS spoofing operations");
     dns_stop_spoofing();
     dns_clear_rules();
+}
+
+void dns_set_upstream_dns(const char *upstream_ip) {
+    if(upstream_ip) {
+        std::lock_guard<std::mutex> lock(g_rules_mutex);
+        g_upstream_dns = upstream_ip;
+        LOGD("Set upstream DNS to %s", upstream_ip);
+    }
 }
