@@ -79,6 +79,9 @@ class DnsRepositoryImpl @Inject constructor(
                             break
                         }
                     }
+                } catch (e: java.io.InterruptedIOException) {
+                    // Expected when process is stopped - read thread interrupted by close
+                    LogUtils.d(TAG, "DNS output reading interrupted (process stopped)")
                 } catch (e: Exception) {
                     LogUtils.e(TAG, "Error reading DNS spoofing output: ${e.message}", e)
                 } finally {

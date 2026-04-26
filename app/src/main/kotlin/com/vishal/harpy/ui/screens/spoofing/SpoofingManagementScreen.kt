@@ -159,9 +159,18 @@ fun SpoofingManagementScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(sessions) { session ->
+                        val onStopClick = {
+                            when (session) {
+                                is SpoofingSession.Dns -> {
+                                    val dnsSession = session as SpoofingSession.Dns
+                                    viewModel.stopDnsSpoofing(dnsSession.id)
+                                }
+                                is SpoofingSession.Dhcp -> viewModel.stopDhcpSpoofing(session.id)
+                            }
+                        }
                         SessionCard(
                             session = session,
-                            onStop = { viewModel.stopDnsSpoofing(session.id) },
+                            onStop = onStopClick,
                             onRemove = { viewModel.removeSession(session.id) },
                             onResume = { viewModel.resumeSession(session.id) },
                             onEdit = {

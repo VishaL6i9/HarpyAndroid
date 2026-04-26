@@ -1,6 +1,7 @@
 package com.vishal.harpy.features.spoofing.presentation.viewmodel
 
 import android.content.Context
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.vishal.harpy.core.state.SpoofingSessionManager
@@ -22,6 +23,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.time.LocalDateTime
 import javax.inject.Inject
+
+private const val TAG = "SpoofingManagement"
 
 @HiltViewModel
 class SpoofingManagementViewModel @Inject constructor(
@@ -136,6 +139,11 @@ class SpoofingManagementViewModel @Inject constructor(
             _isLoading.value = true
             _error.value = null
 
+            Log.d(TAG, "Starting DHCP spoofing on interface: $interfaceName with ${rules.size} rule(s)")
+            rules.forEachIndexed { index, rule ->
+                Log.d(TAG, "  Rule $index: ${rule.targetMac} -> ${rule.spoofedIP} (gw: ${rule.gatewayIP}, mask: ${rule.subnetMask}, dns: ${rule.dnsServer})")
+            }
+
             val session = SpoofingSession.Dhcp(
                 interfaceName = interfaceName,
                 rules = rules,
@@ -144,6 +152,7 @@ class SpoofingManagementViewModel @Inject constructor(
             )
 
             sessionManager.addSession(session)
+            Log.d(TAG, "Created DHCP session: ${session.id}")
 
             val result = startDhcpSpoofingUseCase(
                 interfaceName = interfaceName,
@@ -161,9 +170,11 @@ class SpoofingManagementViewModel @Inject constructor(
                         startTime = LocalDateTime.now()
                     )
                     sessionManager.updateSession(activeSession)
+                    Log.d(TAG, "✓ DHCP spoofing started successfully for ${rules.size} device(s)")
                     _successMessage.value = "DHCP spoofing started for ${rules.size} device(s)"
                 }
                 is NetworkResult.Error -> {
+                    Log.e(TAG, "✗ Failed to start DHCP spoofing: ${result.error.message}")
                     _error.value = "Failed to start DHCP spoofing: ${result.error.message}"
                     sessionManager.removeSession(session.id)
                 }
@@ -178,19 +189,26 @@ class SpoofingManagementViewModel @Inject constructor(
             _isLoading.value = true
             _error.value = null
 
+            Log.d(TAG, "Stopping DHCP spoofing for session: $sessionId")
+
             val session = sessionManager.getSession(sessionId) as? SpoofingSession.Dhcp
             if (session != null) {
+                Log.d(TAG, "Found DHCP session with ${session.rules.size} rule(s)")
                 val result = stopDhcpSpoofingUseCase()
 
                 when (result) {
                     is NetworkResult.Success -> {
                         sessionManager.updateSession(session.copy(isActive = false))
+                        Log.d(TAG, "✓ DHCP spoofing stopped successfully")
                         _successMessage.value = "DHCP spoofing stopped"
                     }
                     is NetworkResult.Error -> {
+                        Log.e(TAG, "✗ Failed to stop DHCP spoofing: ${result.error.message}")
                         _error.value = "Failed to stop DHCP spoofing: ${result.error.message}"
                     }
                 }
+            } else {
+                Log.w(TAG, "DHCP session not found: $sessionId")
             }
 
             _isLoading.value = false
@@ -272,6 +290,7 @@ class SpoofingManagementViewModel @Inject constructor(
                         }
                     }
                     is SpoofingSession.Dhcp -> {
+                        Log.d(TAG, "Resuming DHCP spoofing for session: ${session.id} with ${session.rules.size} rule(s)")
                         val result = startDhcpSpoofingUseCase(
                             interfaceName = session.interfaceName,
                             targetMacs = session.rules.map { it.targetMac }.toTypedArray(),
@@ -287,9 +306,11 @@ class SpoofingManagementViewModel @Inject constructor(
                                     startTime = LocalDateTime.now()
                                 )
                                 sessionManager.updateSession(activeSession)
+                                Log.d(TAG, "✓ DHCP spoofing resumed for ${session.rules.size} device(s)")
                                 _successMessage.value = "DHCP spoofing resumed for ${session.rules.size} device(s)"
                             }
                             is NetworkResult.Error -> {
+                                Log.e(TAG, "✗ Failed to resume DHCP spoofing: ${result.error.message}")
                                 _error.value = "Failed to resume DHCP spoofing: ${result.error.message}"
                             }
                         }

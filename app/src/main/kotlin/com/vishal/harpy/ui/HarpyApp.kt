@@ -61,6 +61,7 @@ sealed class AppScreen {
     object ProcessList : AppScreen()
     object About : AppScreen()
     object SpoofingManagement : AppScreen()
+    object BlockingMethodSettings : AppScreen()
 }
 
 /**
@@ -136,6 +137,7 @@ fun HarpyApp() {
                     onNavigateBack = { navigateBack() },
                     onNavigateToDeviceManagement = { navigateTo(AppScreen.DeviceManagement) },
                     onNavigateToPerformanceMonitor = { navigateTo(AppScreen.PerformanceMonitor) },
+                    onNavigateToBlockingMethodSettings = { navigateTo(AppScreen.BlockingMethodSettings) },
                     savedScrollOffset = screenToShow.scrollOffset,
                     onScrollOffsetChanged = { updateScrollOffset(it) }
                 )
@@ -178,6 +180,11 @@ fun HarpyApp() {
             }
             AppScreen.SpoofingManagement -> {
                 com.vishal.harpy.ui.screens.spoofing.SpoofingManagementScreen(
+                    onNavigateBack = { navigateBack() }
+                )
+            }
+            AppScreen.BlockingMethodSettings -> {
+                com.vishal.harpy.ui.screens.settings.BlockingMethodSettings(
                     onNavigateBack = { navigateBack() }
                 )
             }

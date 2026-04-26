@@ -1,5 +1,6 @@
 package com.vishal.harpy.core.state
 
+import android.util.Log
 import com.vishal.harpy.core.utils.SpoofingSession
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -13,9 +14,14 @@ import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+
+private const val TAG = "SpoofingSessionManager"
 
 @Singleton
-class SpoofingSessionManager @Inject constructor() {
+class SpoofingSessionManager @Inject constructor(
+    private val sessionRepository: SpoofingSessionRepository
+) {
 
     private val managerScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
@@ -33,11 +39,23 @@ class SpoofingSessionManager @Inject constructor() {
         initialValue = calculateStats(emptyList())
     )
 
+    init {
+        // Load sessions on initialization
+        managerScope.launch {
+            val loadedSessions = sessionRepository.loadSessions()
+            _sessions.value = loadedSessions
+            updateActiveSessions()
+            Log.d(TAG, "Loaded ${loadedSessions.size} sessions from storage")
+        }
+    }
+
     fun addSession(session: SpoofingSession) {
         val updated = _sessions.value.toMutableList()
         updated.add(session)
         _sessions.value = updated
         updateActiveSessions()
+        persistSessions()
+        Log.d(TAG, "Added session: ${session.id}")
     }
 
     fun updateSession(session: SpoofingSession) {
@@ -47,6 +65,8 @@ class SpoofingSessionManager @Inject constructor() {
             updated[index] = session
             _sessions.value = updated
             updateActiveSessions()
+            persistSessions()
+            Log.d(TAG, "Updated session: ${session.id}")
         }
     }
 
@@ -54,6 +74,8 @@ class SpoofingSessionManager @Inject constructor() {
         val updated = _sessions.value.filter { it.id != sessionId }
         _sessions.value = updated
         updateActiveSessions()
+        persistSessions()
+        Log.d(TAG, "Removed session: $sessionId")
     }
 
     fun getSession(sessionId: String): SpoofingSession? {
@@ -75,10 +97,18 @@ class SpoofingSessionManager @Inject constructor() {
     fun clearAllSessions() {
         _sessions.value = emptyList()
         updateActiveSessions()
+        persistSessions()
+        Log.d(TAG, "Cleared all sessions")
     }
 
     private fun updateActiveSessions() {
         _activeSessions.value = _sessions.value.filter { it.isActive }
+    }
+
+    private fun persistSessions() {
+        managerScope.launch {
+            sessionRepository.saveSessions(_sessions.value)
+        }
     }
 
     fun getSessionStats(): SessionStats {

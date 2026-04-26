@@ -3,11 +3,12 @@ package com.vishal.harpy.features.network_monitor.data.repository
 import com.vishal.harpy.core.utils.NetworkDevice
 import com.vishal.harpy.core.utils.NetworkTopology
 import com.vishal.harpy.core.utils.NetworkResult
+import com.vishal.harpy.core.utils.BlockingMethod
 
 interface NetworkMonitorRepository {
     suspend fun scanNetwork(interfaceName: String? = null): NetworkResult<List<NetworkDevice>>
     suspend fun isDeviceRooted(): NetworkResult<Boolean>
-    suspend fun blockDevice(device: NetworkDevice, interfaceName: String? = null): NetworkResult<Boolean>
+    suspend fun blockDevice(device: NetworkDevice, interfaceName: String? = null, blockingMethod: BlockingMethod = BlockingMethod.ARP_SPOOF): NetworkResult<Boolean>
     suspend fun unblockDevice(device: NetworkDevice, interfaceName: String? = null): NetworkResult<Boolean>
     suspend fun unblockAllDevices(interfaceName: String? = null): NetworkResult<Int>
     suspend fun mapNetworkTopology(interfaceName: String? = null): NetworkResult<NetworkTopology>

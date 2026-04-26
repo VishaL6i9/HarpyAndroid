@@ -1,6 +1,7 @@
 package com.vishal.harpy.features.network_monitor.presentation.viewmodel
 
 import android.content.Context
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.vishal.harpy.features.network_monitor.domain.usecases.ScanNetworkUseCase
@@ -45,6 +46,8 @@ import com.vishal.harpy.core.utils.AppSettings
 enum class LoadingState {
     None, Scanning, Blocking, Unblocking, MappingTopology, TestingPing, DNSSpoofing, DHCPSpoofing
 }
+
+private const val TAG = "NetworkMonitorVM"
 
 @HiltViewModel
 class NetworkMonitorViewModel @Inject constructor(
@@ -410,7 +413,8 @@ class NetworkMonitorViewModel @Inject constructor(
             _loadingState.value = LoadingState.Blocking
             _error.value = null
             try {
-                val result = blockDeviceUseCase(device, appSettings.value.networkInterface)
+                Log.d(TAG, "Blocking device ${device.ipAddress} using method: ${appSettings.value.blockingMethod}")
+                val result = blockDeviceUseCase(device, appSettings.value.networkInterface, appSettings.value.blockingMethod)
                 when (result) {
                     is NetworkResult.Success -> {
                         if (result.data) {
@@ -425,15 +429,18 @@ class NetworkMonitorViewModel @Inject constructor(
                                 }
                             }
                             applyFilters()
+                            Log.d(TAG, "✓ Device blocked successfully")
                         }
                     }
 
                     is NetworkResult.Error -> {
+                        Log.e(TAG, "✗ Failed to block device: ${result.error.message}")
                         _lastError.value = result.error
                         _error.value = result.error.message
                     }
                 }
             } catch (e: Exception) {
+                Log.e(TAG, "✗ Block device exception: ${e.message}", e)
                 val error = NetworkError.UnknownError(e)
                 _lastError.value = error
                 _error.value = e.message
@@ -917,16 +924,19 @@ class NetworkMonitorViewModel @Inject constructor(
     ) {
         if (!_isRooted.value) {
             _error.value = "Root access is required for DHCP spoofing"
+            Log.e(TAG, "DHCP spoofing requires root access")
             return
         }
 
         val activeIface = interfaceName ?: appSettings.value.networkInterface
+        Log.d(TAG, "Starting DHCP spoofing on interface: $activeIface with ${targetMacs.size} device(s)")
 
         viewModelScope.launch {
             _loadingState.value = LoadingState.DHCPSpoofing
             _error.value = null
 
             val dhcpRules = targetMacs.mapIndexed { index, mac ->
+                Log.d(TAG, "  Rule $index: $mac -> ${spoofedIPs[index]} (gw: ${gatewayIPs[index]}, mask: ${subnetMasks[index]}, dns: ${dnsServers[index]})")
                 DhcpSpoofingRule(
                     targetMac = mac,
                     spoofedIP = spoofedIPs[index],
@@ -943,6 +953,7 @@ class NetworkMonitorViewModel @Inject constructor(
                 startTime = null
             )
             sessionManager.addSession(session)
+            Log.d(TAG, "Created DHCP session: ${session.id}")
 
             try {
                 val result = startDhcpSpoofingUseCase(
@@ -961,20 +972,24 @@ class NetworkMonitorViewModel @Inject constructor(
                                 startTime = java.time.LocalDateTime.now()
                             )
                             sessionManager.updateSession(activeSession)
+                            Log.d(TAG, "✓ DHCP spoofing started successfully for ${targetMacs.size} devices")
                             com.vishal.harpy.core.utils.LogUtils.i("NetworkMonitorVM", "DHCP spoofing started for ${targetMacs.size} devices")
                             _error.value = null
                         } else {
+                            Log.e(TAG, "✗ DHCP spoofing returned false")
                             _error.value = "Failed to start DHCP spoofing"
                             sessionManager.removeSession(session.id)
                         }
                     }
                     is NetworkResult.Error -> {
+                        Log.e(TAG, "✗ DHCP spoofing error: ${result.error.message}")
                         _lastError.value = result.error
                         _error.value = "DHCP spoofing failed: ${result.error.message}"
                         sessionManager.removeSession(session.id)
                     }
                 }
             } catch (e: Exception) {
+                Log.e(TAG, "✗ DHCP spoofing exception: ${e.message}", e)
                 val error = NetworkError.UnknownError(e)
                 _lastError.value = error
                 _error.value = "DHCP spoofing error: ${e.message}"
@@ -991,8 +1006,11 @@ class NetworkMonitorViewModel @Inject constructor(
     fun stopDHCPSpoofing() {
         if (!_isRooted.value) {
             _error.value = "Root access is required for DHCP spoofing"
+            Log.e(TAG, "Stop DHCP spoofing requires root access")
             return
         }
+
+        Log.d(TAG, "Stopping DHCP spoofing")
 
         viewModelScope.launch {
             _loadingState.value = LoadingState.DHCPSpoofing
@@ -1007,22 +1025,28 @@ class NetworkMonitorViewModel @Inject constructor(
                                 .filterIsInstance<SpoofingSession.Dhcp>()
                                 .filter { it.isActive }
                             
+                            Log.d(TAG, "Found ${activeDhcpSessions.size} active DHCP session(s)")
                             activeDhcpSessions.forEach { session ->
+                                Log.d(TAG, "Marking session ${session.id} as inactive")
                                 sessionManager.updateSession(session.copy(isActive = false))
                             }
                             
+                            Log.d(TAG, "✓ DHCP spoofing stopped successfully")
                             com.vishal.harpy.core.utils.LogUtils.i("NetworkMonitorVM", "DHCP spoofing stopped")
                             _error.value = "DHCP spoofing stopped"
                         } else {
+                            Log.w(TAG, "No active DHCP spoofing found")
                             _error.value = "No active DHCP spoofing found"
                         }
                     }
                     is NetworkResult.Error -> {
+                        Log.e(TAG, "✗ Stop DHCP spoofing error: ${result.error.message}")
                         _lastError.value = result.error
                         _error.value = "Stop DHCP spoofing failed: ${result.error.message}"
                     }
                 }
             } catch (e: Exception) {
+                Log.e(TAG, "✗ Stop DHCP spoofing exception: ${e.message}", e)
                 val error = NetworkError.UnknownError(e)
                 _lastError.value = error
                 _error.value = "Stop DHCP spoofing error: ${e.message}"
@@ -1161,6 +1185,15 @@ class NetworkMonitorViewModel @Inject constructor(
     fun updateWhitelistEnabled(enabled: Boolean) {
         viewModelScope.launch {
             settingsRepository.updateWhitelistEnabled(enabled)
+        }
+    }
+
+    /**
+     * Update blocking method setting
+     */
+    fun updateBlockingMethod(method: com.vishal.harpy.core.utils.BlockingMethod) {
+        viewModelScope.launch {
+            settingsRepository.updateBlockingMethod(method)
         }
     }
 

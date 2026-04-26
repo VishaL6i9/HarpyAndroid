@@ -85,10 +85,17 @@ class DhcpRepositoryImpl @Inject constructor(
                             break
                         }
                     }
+                } catch (e: java.io.InterruptedIOException) {
+                    // Expected when process is stopped - read thread interrupted by close
+                    LogUtils.d(TAG, "DHCP output reading interrupted (process stopped)")
                 } catch (e: Exception) {
                     LogUtils.e(TAG, "Error reading DHCP spoofing output: ${e.message}", e)
                 } finally {
-                    reader.close()
+                    try {
+                        reader.close()
+                    } catch (e: Exception) {
+                        // Ignore close errors
+                    }
                 }
             }
 
@@ -104,10 +111,17 @@ class DhcpRepositoryImpl @Inject constructor(
                             break
                         }
                     }
+                } catch (e: java.io.InterruptedIOException) {
+                    // Expected when process is stopped - read thread interrupted by close
+                    LogUtils.d(TAG, "DHCP error stream reading interrupted (process stopped)")
                 } catch (e: Exception) {
                     LogUtils.e(TAG, "Error reading DHCP spoofing error stream: ${e.message}", e)
                 } finally {
-                    errorReader.close()
+                    try {
+                        errorReader.close()
+                    } catch (e: Exception) {
+                        // Ignore close errors
+                    }
                 }
             }
 

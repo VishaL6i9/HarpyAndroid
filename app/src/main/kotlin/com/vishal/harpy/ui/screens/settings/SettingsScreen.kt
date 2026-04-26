@@ -31,6 +31,7 @@ fun SettingsScreen(
     onNavigateBack: () -> Unit,
     onNavigateToDeviceManagement: () -> Unit = {},
     onNavigateToPerformanceMonitor: () -> Unit = {},
+    onNavigateToBlockingMethodSettings: () -> Unit = {},
     savedScrollOffset: Int = 0,
     onScrollOffsetChanged: (Int) -> Unit = {},
     viewModel: NetworkMonitorViewModel = hiltViewModel()
@@ -78,6 +79,7 @@ fun SettingsScreen(
             onNavigateBack = onNavigateBack,
             onNavigateToDeviceManagement = onNavigateToDeviceManagement,
             onNavigateToPerformanceMonitor = onNavigateToPerformanceMonitor,
+            onNavigateToBlockingMethodSettings = onNavigateToBlockingMethodSettings,
             onShowAbout = { showAboutScreen = true },
             onShowClearNamesDialog = { showClearNamesDialog = true },
             onShowScanSettings = { showScanSettingsDialog = true },
@@ -232,6 +234,7 @@ private fun SettingsContent(
     onNavigateBack: () -> Unit,
     onNavigateToDeviceManagement: () -> Unit,
     onNavigateToPerformanceMonitor: () -> Unit,
+    onNavigateToBlockingMethodSettings: () -> Unit,
     onShowAbout: () -> Unit,
     onShowClearNamesDialog: () -> Unit,
     onShowScanSettings: () -> Unit,
@@ -419,6 +422,15 @@ private fun SettingsContent(
 
             item {
                 SettingsCard {
+                    SettingsItem(
+                        title = "Blocking Method",
+                        summary = "Configure how devices are blocked (Current: ${settings.blockingMethod.name.lowercase().replaceFirstChar { it.uppercase() }})",
+                        icon = Icons.Outlined.Security,
+                        onClick = onNavigateToBlockingMethodSettings
+                    )
+                    
+                    SettingsDivider()
+                    
                     SettingsItem(
                         title = "Root Helper",
                         summary = "Configure root helper binary settings",

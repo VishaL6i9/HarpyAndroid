@@ -559,53 +559,103 @@ class NetworkMonitorRepositoryImpl(private val context: android.content.Context)
         }
     }
 
-    override suspend fun blockDevice(device: NetworkDevice, interfaceName: String?): NetworkResult<Boolean> = withContext(Dispatchers.IO) {
+    override suspend fun blockDevice(device: NetworkDevice, interfaceName: String?, blockingMethod: com.vishal.harpy.core.utils.BlockingMethod): NetworkResult<Boolean> = withContext(Dispatchers.IO) {
         try {
+            Log.d(TAG, "=== BLOCK DEVICE START ===")
+            Log.d(TAG, "Device: ${device.ipAddress} (${device.macAddress})")
+            Log.d(TAG, "Method: $blockingMethod")
+            Log.d(TAG, "Interface: $interfaceName")
+            
             val isRootedResult = isDeviceRooted()
             if (!(isRootedResult is NetworkResult.Success && isRootedResult.data)) {
+                Log.e(TAG, "✗ Device not rooted")
                 return@withContext NetworkResult.error(NetworkError.DeviceNotRootedError())
             }
+            Log.d(TAG, "✓ Root access verified")
             
             val activeIface = interfaceName ?: getActiveInterface() ?: "wlan0"
+            Log.d(TAG, "Active interface: $activeIface")
 
             // Check if already blocking
             if (blockingProcesses.containsKey(device.ipAddress)) {
+                Log.w(TAG, "Device already being blocked")
                 return@withContext NetworkResult.success(true)
             }
 
-            val gatewayIp = getGatewayIp(activeIface) ?: run {
-                Log.e(TAG, "Failed to get gateway IP")
-                return@withContext NetworkResult.error(NetworkError.NetworkAccessError(Exception("Gateway IP lookup failed. Please check your network connection.")))
-            }
             val helperPath = NativeNetworkWrapper.getRootHelperPath(context) ?: run {
-                Log.e(TAG, "Failed to find root helper binary")
+                Log.e(TAG, "✗ Root helper binary not found")
                 return@withContext NetworkResult.error(NetworkError.NativeLibraryError(Exception("Root helper binary not found at expected path")))
             }
-            val ourMac = getOurMacAddress(activeIface) ?: "00:00:00:00:00:00"
+            Log.d(TAG, "Helper path: $helperPath")
             
-            Log.d(TAG, "Gateway: $gatewayIp, Helper: $helperPath, Interface: $activeIface, OurMac: $ourMac")
-
-            // Start blocking process in background
             val libDir = context.applicationInfo.nativeLibraryDir
-            val cmd = if (device.isGateway) {
-                "chmod 755 $helperPath && LD_LIBRARY_PATH=$libDir $helperPath block_all $activeIface $gatewayIp $ourMac\n"
-            } else {
-                "chmod 755 $helperPath && LD_LIBRARY_PATH=$libDir $helperPath block $activeIface ${device.ipAddress} $gatewayIp $ourMac\n"
+            Log.d(TAG, "Lib dir: $libDir")
+            
+            val cmd = when (blockingMethod) {
+                com.vishal.harpy.core.utils.BlockingMethod.ARP_SPOOF -> {
+                    val gatewayIp = getGatewayIp(activeIface) ?: run {
+                        Log.e(TAG, "✗ Failed to get gateway IP for ARP spoof")
+                        return@withContext NetworkResult.error(NetworkError.NetworkAccessError(Exception("Gateway IP lookup failed")))
+                    }
+                    val ourMac = getOurMacAddress(activeIface) ?: "00:00:00:00:00:00"
+                    Log.d(TAG, "Gateway: $gatewayIp, Our MAC: $ourMac")
+                    
+                    if (device.isGateway) {
+                        Log.d(TAG, "Blocking gateway (NUCLEAR mode)")
+                        "chmod 755 $helperPath && LD_LIBRARY_PATH=$libDir $helperPath block_all $activeIface $gatewayIp $ourMac\n"
+                    } else {
+                        Log.d(TAG, "Blocking device via ARP spoof")
+                        "chmod 755 $helperPath && LD_LIBRARY_PATH=$libDir $helperPath block $activeIface ${device.ipAddress} $gatewayIp $ourMac\n"
+                    }
+                }
+                com.vishal.harpy.core.utils.BlockingMethod.IPTABLES_DROP -> {
+                    Log.d(TAG, "Blocking device via iptables DROP")
+                    "chmod 755 $helperPath && LD_LIBRARY_PATH=$libDir $helperPath block_iptables_drop ${device.ipAddress}\n"
+                }
+                com.vishal.harpy.core.utils.BlockingMethod.IPTABLES_REDIRECT -> {
+                    Log.d(TAG, "Blocking device via iptables REDIRECT to null route")
+                    "chmod 755 $helperPath && LD_LIBRARY_PATH=$libDir $helperPath block_iptables_redirect ${device.ipAddress}\n"
+                }
+                com.vishal.harpy.core.utils.BlockingMethod.TRAFFIC_CONTROL -> {
+                    Log.d(TAG, "Blocking device via traffic control rate limit")
+                    "chmod 755 $helperPath && LD_LIBRARY_PATH=$libDir $helperPath block_traffic_control $activeIface ${device.ipAddress}\n"
+                }
             }
             
-            Log.d(TAG, "Starting ${if (device.isGateway) "NUCLEAR" else "blocking"} process: $cmd")
+            Log.d(TAG, "Command: $cmd")
+            Log.d(TAG, "Executing blocking process...")
+            
             val process = Runtime.getRuntime().exec("su")
             val out = DataOutputStream(process.outputStream)
             out.writeBytes(cmd)
             out.flush()
-            // Keep output stream open or the process might exit depending on su implementation
+            out.writeBytes("exit\n")
+            out.flush()
+            
+            // Read output from root helper (like scan does)
+            val helperReader = java.io.BufferedReader(java.io.InputStreamReader(process.inputStream))
+            var helperLine: String?
+            while (helperReader.readLine().also { helperLine = it } != null) {
+                Log.d(TAG, "Root helper output: $helperLine")
+            }
+            helperReader.close()
+            
+            // Also read error stream
+            val errorReader = java.io.BufferedReader(java.io.InputStreamReader(process.errorStream))
+            while (errorReader.readLine().also { helperLine = it } != null) {
+                Log.e(TAG, "Root helper error: $helperLine")
+            }
+            errorReader.close()
             
             blockingProcesses[device.ipAddress] = process
+            Log.d(TAG, "Process started, PID stored")
             
-            Log.i(TAG, "${if (device.isGateway) "NUCLEAR blocking" else "Persistent blocking"} started for ${device.ipAddress}")
+            Log.i(TAG, "✓ Device ${device.ipAddress} blocked using $blockingMethod")
+            Log.d(TAG, "=== BLOCK DEVICE SUCCESS ===")
             NetworkResult.success(true)
         } catch (e: Exception) {
-            Log.e(TAG, "Error blocking device ${device.ipAddress}: ${e.message}", e)
+            Log.e(TAG, "✗ Error blocking device ${device.ipAddress}: ${e.message}", e)
+            Log.e(TAG, "=== BLOCK DEVICE FAILED ===")
             NetworkResult.error(NetworkError.BlockDeviceError(e))
         }
     }
