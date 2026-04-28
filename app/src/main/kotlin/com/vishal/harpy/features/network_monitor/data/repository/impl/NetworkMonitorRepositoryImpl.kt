@@ -593,10 +593,8 @@ class NetworkMonitorRepositoryImpl(
                 Log.e(TAG, "✗ Root helper binary not found")
                 return@withContext NetworkResult.error(NetworkError.NativeLibraryError(Exception("Root helper binary not found at expected path")))
             }
-            Log.d(TAG, "Helper path: $helperPath")
             
             val libDir = context.applicationInfo.nativeLibraryDir
-            Log.d(TAG, "Lib dir: $libDir")
             
             val cmd = when (blockingMethod) {
                 com.vishal.harpy.core.utils.BlockingMethod.ARP_SPOOF -> {
@@ -605,32 +603,25 @@ class NetworkMonitorRepositoryImpl(
                         return@withContext NetworkResult.error(NetworkError.NetworkAccessError(Exception("Gateway IP lookup failed")))
                     }
                     val ourMac = getOurMacAddress(activeIface) ?: "00:00:00:00:00:00"
-                    Log.d(TAG, "Gateway: $gatewayIp, Our MAC: $ourMac")
                     
                     if (device.isGateway) {
-                        Log.d(TAG, "Blocking gateway (NUCLEAR mode)")
                         "chmod 755 $helperPath && LD_LIBRARY_PATH=$libDir $helperPath block_all $activeIface $gatewayIp $ourMac\n"
                     } else {
-                        Log.d(TAG, "Blocking device via ARP spoof")
                         "chmod 755 $helperPath && LD_LIBRARY_PATH=$libDir $helperPath block $activeIface ${device.ipAddress} $gatewayIp $ourMac\n"
                     }
                 }
                 com.vishal.harpy.core.utils.BlockingMethod.BLACKHOLE_ROUTE -> {
-                    Log.d(TAG, "Blocking device via blackhole route")
                     "chmod 755 $helperPath && LD_LIBRARY_PATH=$libDir $helperPath block_iptables_drop ${device.ipAddress}\n"
                 }
                 com.vishal.harpy.core.utils.BlockingMethod.TRAFFIC_CONTROL -> {
-                    Log.d(TAG, "Blocking device via traffic control rate limit")
                     val effectiveRate = deviceBlockingConfigRepository.getEffectiveRateLimit(
                         device.macAddress,
                         settingsRepository.getTrafficControlRate()
                     )
-                    Log.d(TAG, "Effective rate limit: $effectiveRate kbit/s")
                     "chmod 755 $helperPath && LD_LIBRARY_PATH=$libDir $helperPath block_traffic_control $activeIface ${device.ipAddress} $effectiveRate\n"
                 }
             }
             
-            Log.d(TAG, "Command: $cmd")
             Log.d(TAG, "Executing blocking process...")
             
             val process = Runtime.getRuntime().exec("su")
@@ -640,26 +631,9 @@ class NetworkMonitorRepositoryImpl(
             out.writeBytes("exit\n")
             out.flush()
             
-            // Read output from root helper (like scan does)
-            val helperReader = java.io.BufferedReader(java.io.InputStreamReader(process.inputStream))
-            var helperLine: String?
-            while (helperReader.readLine().also { helperLine = it } != null) {
-                Log.d(TAG, "Root helper output: $helperLine")
-            }
-            helperReader.close()
-            
-            // Also read error stream
-            val errorReader = java.io.BufferedReader(java.io.InputStreamReader(process.errorStream))
-            while (errorReader.readLine().also { helperLine = it } != null) {
-                Log.e(TAG, "Root helper error: $helperLine")
-            }
-            errorReader.close()
-            
             blockingProcesses[device.ipAddress] = process
-            Log.d(TAG, "Process started, PID stored")
             
             Log.i(TAG, "✓ Device ${device.ipAddress} blocked using $blockingMethod")
-            Log.d(TAG, "=== BLOCK DEVICE SUCCESS ===")
             NetworkResult.success(true)
         } catch (e: Exception) {
             Log.e(TAG, "✗ Error blocking device ${device.ipAddress}: ${e.message}", e)
