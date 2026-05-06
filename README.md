@@ -27,16 +27,17 @@ Harpy is a network monitoring application that gives you complete visibility and
 - **Smart Device Name Caching**: Device names persist even before first network scan after app restart
 
 ### Network Control
-- **Block/unblock devices** using ARP spoofing
+- **Block/unblock devices** using multiple methods: ARP spoofing, Blackhole routing, or Traffic Control
+- **Per-Device Rate Limiting**: Set custom bandwidth limits for specific devices instead of a full block
 - **Persistent blocking** that survives app restarts
 - **Bulk operations** to unblock all devices at once
 - **Ping testing** to verify device connectivity
 - **Gateway blocking** (nuclear option) to disconnect all devices
 
 ### Advanced Features
-- **DNS spoofing** with auto-fill domain and smart IP selection
+- **DNS spoofing** with auto-fill domain, smart IP selection, and upstream query forwarding
 - **DHCP spoofing** with auto-detected gateway and interface
-- **Spoofing session management** with real-time stats and session history
+- **Spoofing session management**: Centralized control to pause, resume, and edit active DNS/DHCP sessions
 - **Performance monitoring** with real-time CPU/memory charts and process management
 - **Network topology mapping**
 - **Real-time logging** with export functionality
@@ -331,6 +332,8 @@ The helper supports these commands:
 - `scan` - Network device discovery
 - `mac` - MAC address resolution
 - `block` - Device blocking via ARP spoofing
+- `block_iptables_drop` - Device blocking via blackhole route
+- `block_traffic_control` - Device rate limiting/blocking via tc
 - `unblock` - Device unblocking
 - `dns_spoof` - DNS query interception
 - `dhcp_spoof` - DHCP request interception
@@ -379,6 +382,9 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## Roadmap
 
 ### Completed ✅
+- [x] **Centralized Session Management** - Unified DNS/DHCP session tracking with pause/resume
+- [x] **Advanced Blocking Methods** - Integration of Blackhole routing and Traffic Control (TC)
+- [x] **Per-Device Rate Limiting** - Custom bandwidth control via native `tc` commands
 - [x] Jetpack Compose migration with Material 3
 - [x] Network device discovery and management
 - [x] Device blocking/unblocking with ARP spoofing
