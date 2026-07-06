@@ -34,6 +34,7 @@ fun SettingsScreen(
     onNavigateToDeviceManagement: () -> Unit = {},
     onNavigateToPerformanceMonitor: () -> Unit = {},
     onNavigateToBlockingMethodSettings: () -> Unit = {},
+    onNavigateToIosAttack: () -> Unit = {},
     onShowTrafficControlRate: () -> Unit = {},
     savedScrollOffset: Int = 0,
     onScrollOffsetChanged: (Int) -> Unit = {},
@@ -82,9 +83,9 @@ fun SettingsScreen(
         SettingsContent(
             onNavigateBack = onNavigateBack,
             onNavigateToDeviceManagement = onNavigateToDeviceManagement,
-            onNavigateToPerformanceMonitor = onNavigateToPerformanceMonitor,
-            onNavigateToBlockingMethodSettings = onNavigateToBlockingMethodSettings,
-            onShowTrafficControlRate = { showTrafficControlRateDialog = true },
+            onNavigateToPerformanceMonitor = onNavigateToPerformanceMonitor,                    onNavigateToBlockingMethodSettings = onNavigateToBlockingMethodSettings,
+                    onNavigateToIosAttack = onNavigateToIosAttack,
+                    onShowTrafficControlRate = { showTrafficControlRateDialog = true },
             onShowAbout = { showAboutScreen = true },
             onShowClearNamesDialog = { showClearNamesDialog = true },
             onShowScanSettings = { showScanSettingsDialog = true },
@@ -251,6 +252,7 @@ private fun SettingsContent(
     onNavigateToDeviceManagement: () -> Unit,
     onNavigateToPerformanceMonitor: () -> Unit,
     onNavigateToBlockingMethodSettings: () -> Unit,
+    onNavigateToIosAttack: () -> Unit,
     onShowTrafficControlRate: () -> Unit,
     onShowAbout: () -> Unit,
     onShowClearNamesDialog: () -> Unit,
@@ -462,6 +464,15 @@ private fun SettingsContent(
                         summary = "Configure root helper binary settings",
                         icon = Icons.Outlined.Security,
                         onClick = onShowRootHelper
+                    )
+                    
+                    SettingsDivider()
+                    
+                    SettingsItem(
+                        title = "iOS Void Attacks",
+                        summary = "Layer 3/4 iOS network nullification toolkit",
+                        icon = Icons.Outlined.Warning,
+                        onClick = onNavigateToIosAttack
                     )
                     
                     SettingsDivider()

@@ -36,6 +36,7 @@ import com.vishal.harpy.features.network_monitor.presentation.viewmodel.NetworkM
 import com.vishal.harpy.ui.screens.dhcp.DHCPSpoofingScreen
 import com.vishal.harpy.ui.screens.dns.DNSSpoofingScreen
 import com.vishal.harpy.ui.screens.network.NetworkMonitorScreen
+import com.vishal.harpy.ui.screens.ios_attack.IosAttackScreen
 import com.vishal.harpy.ui.screens.settings.SettingsScreen
 import com.vishal.harpy.ui.screens.spoofing.SpoofingManagementScreen
 import com.vishal.harpy.ui.theme.HarpyTheme
@@ -62,6 +63,7 @@ sealed class AppScreen {
     object About : AppScreen()
     object SpoofingManagement : AppScreen()
     object BlockingMethodSettings : AppScreen()
+    object IosAttack : AppScreen()
 }
 
 /**
@@ -138,6 +140,7 @@ fun HarpyApp() {
                     onNavigateToDeviceManagement = { navigateTo(AppScreen.DeviceManagement) },
                     onNavigateToPerformanceMonitor = { navigateTo(AppScreen.PerformanceMonitor) },
                     onNavigateToBlockingMethodSettings = { navigateTo(AppScreen.BlockingMethodSettings) },
+                    onNavigateToIosAttack = { navigateTo(AppScreen.IosAttack) },
                     savedScrollOffset = screenToShow.scrollOffset,
                     onScrollOffsetChanged = { updateScrollOffset(it) }
                 )
@@ -185,6 +188,11 @@ fun HarpyApp() {
             }
             AppScreen.BlockingMethodSettings -> {
                 com.vishal.harpy.ui.screens.settings.BlockingMethodSettings(
+                    onNavigateBack = { navigateBack() }
+                )
+            }
+            AppScreen.IosAttack -> {
+                IosAttackScreen(
                     onNavigateBack = { navigateBack() }
                 )
             }
