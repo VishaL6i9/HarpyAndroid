@@ -46,7 +46,7 @@ static uint16_t icmp_checksum(uint16_t *buf, int len) {
 static int send_icmp_redirect(int raw_sock, const char *iface,
                                const uint8_t *client_mac, uint32_t client_ip,
                                uint32_t router_ip, uint32_t gateway_to_advertise,
-                               uint32_t dest_ip, const uint8_t *client_mac_bytes) {
+                               uint32_t dest_ip) {
     uint8_t buffer[1024];
     memset(buffer, 0, sizeof(buffer));
 
@@ -208,8 +208,7 @@ static void icmp_redirect_thread_func() {
                                    g_current_icmp_target.interface_name.c_str(),
                                    client_mac, client_ip, router_ip,
                                    client_ip, // Advertise client as the gateway
-                                   common_dsts[i],
-                                   client_mac);
+                                   common_dsts[i]);
                 usleep(10000); // 10ms between each
             }
 
@@ -218,14 +217,14 @@ static void icmp_redirect_thread_func() {
                 send_icmp_redirect(g_icmp_raw_sock,
                                    g_current_icmp_target.interface_name.c_str(),
                                    client_mac, client_ip, router_ip,
-                                   client_ip, half1_start, client_mac);
+                                   client_ip, half1_start);
                 usleep(10000);
             }
             if (!g_icmp_stop) {
                 send_icmp_redirect(g_icmp_raw_sock,
                                    g_current_icmp_target.interface_name.c_str(),
                                    client_mac, client_ip, router_ip,
-                                   client_ip, half2_start, client_mac);
+                                   client_ip, half2_start);
                 usleep(10000);
             }
         } else {
@@ -234,7 +233,7 @@ static void icmp_redirect_thread_func() {
             send_icmp_redirect(g_icmp_raw_sock,
                                g_current_icmp_target.interface_name.c_str(),
                                client_mac, client_ip, router_ip,
-                               client_ip, target_dst, client_mac);
+                               client_ip, target_dst);
         }
 
         cycle_count++;

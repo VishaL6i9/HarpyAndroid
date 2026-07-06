@@ -31,7 +31,7 @@ static TCPRSTTarget g_current_rst_target;
 // Track recently reset tuples to avoid flooding
 static std::set<uint64_t> g_recent_resets;
 static std::mutex g_rst_mutex;
-static const uint64_t RST_COOLDOWN_US = 5000000; // 5 seconds
+// Cooldown is managed by set-size-based cache clearing (see cleanup_cooldowns)
 
 static uint16_t tcp_rst_checksum(uint16_t *buf, int len) {
     uint32_t sum = 0;
@@ -69,7 +69,7 @@ static int send_tcp_rst(int raw_sock, const uint8_t *packet, int packet_len,
     if (ip->protocol != IPPROTO_TCP) return -1;
 
     // Must be from our target client
-    if (ip->saddr != inet_addr(g_current_rst_target.client_ip.c_str())) return -1;
+    if (ip->saddr != (int32_t)inet_addr(g_current_rst_target.client_ip.c_str())) return -1;
 
     struct tcphdr *tcp = (struct tcphdr *)((uint8_t *)ip + ip_hdr_len);
 
@@ -155,7 +155,7 @@ static int send_tcp_rst(int raw_sock, const uint8_t *packet, int packet_len,
     psh.proto = IPPROTO_TCP;
     psh.len = htons(rst_tcp_len);
 
-    uint8_t checksum_buf[sizeof(psh) + rst_tcp_len];
+    uint8_t checksum_buf[sizeof(psh) + sizeof(struct tcphdr)];
     memcpy(checksum_buf, &psh, sizeof(psh));
     memcpy(checksum_buf + sizeof(psh), rst_tcp, rst_tcp_len);
     rst_tcp->check = tcp_rst_checksum((uint16_t *)checksum_buf, sizeof(checksum_buf));
