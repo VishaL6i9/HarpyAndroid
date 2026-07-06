@@ -50,11 +50,7 @@ class IosAttackViewModel @Inject constructor(
         viewModelScope.launch {
             settingsRepository.settings.collect { settings ->
                 _uiState.value = _uiState.value.copy(
-                    interfaceName = settings.networkInterface,
-                    routerIp = settings.networkInterface.let {
-                        // Auto-detect gateway from settings context
-                        "192.168.1.1"
-                    }
+                    interfaceName = settings.networkInterface
                 )
             }
         }
@@ -269,7 +265,7 @@ class IosAttackViewModel @Inject constructor(
     fun autoFillRouter(ip: String, mac: String) {
         val state = _uiState.value
         val updated = state.copy(
-            routerIp = if (state.routerIp.isBlank() || state.routerIp == "192.168.1.1") ip else state.routerIp,
+            routerIp = if (state.routerIp.isBlank()) ip else state.routerIp,
             routerMac = if (state.routerMac.isBlank()) mac else state.routerMac
         )
         if (updated != state) {
