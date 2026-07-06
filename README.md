@@ -6,6 +6,7 @@ A powerful network monitoring and management tool for Android, built with modern
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.22-blue.svg)](https://kotlinlang.org/)
 [![Compose](https://img.shields.io/badge/Jetpack%20Compose-2024.02-brightgreen.svg)](https://developer.android.com/jetpack/compose)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/Version-0.14.0--beta-blue.svg)](RELEASE_NOTES_0.13.0.md)
 
 ## Overview
 
@@ -38,6 +39,7 @@ Harpy is a network monitoring application that gives you complete visibility and
 - **DNS spoofing** with auto-fill domain, smart IP selection, and upstream query forwarding
 - **DHCP spoofing** with auto-detected gateway and interface
 - **Spoofing session management**: Centralized control to pause, resume, and edit active DNS/DHCP sessions
+- **iOS Void Attack Toolkit**: Four Layer 3/4 vectors to nullify iOS network connectivity — DHCP self-implosion, ICMP redirect forge, DNS nullification, and TCP RST asymmetry
 - **Performance monitoring** with real-time CPU/memory charts and process management
 - **Network topology mapping**
 - **Real-time logging** with export functionality
@@ -171,6 +173,19 @@ Or build and install in one step:
 3. Enter the target device's MAC address
 4. Configure the spoofed IP, gateway, and DNS settings
 5. Tap **Start**
+
+### iOS Void Attacks
+
+1. Navigate to **Settings > Advanced > iOS Void Attacks**
+2. Target configuration (most fields auto-fill from scanned network devices):
+   - Enter the **Target IP** — MAC auto-fills if a matching device was scanned
+   - **Router IP** and **Router MAC** auto-detect from the network gateway
+3. Deploy one or more void vectors independently:
+   - **① DHCP Self-Implosion** — Forges unicast DHCPACK with router=client's own IP, /32 subnet. iOS deletes its default gateway.
+   - **② ICMP Redirect Forge** — Forges ICMP Type 5 redirects covering the entire IPv4 space via client's own IP.
+   - **③ DNS Nullification** — Sets DNS Server to 0.0.0.0. Network stays up, no names resolve.
+   - **④ TCP RST Asymmetry** — Sniffs every SYN, replies with forged RST. Works when DHCP is locked.
+4. Tap **DEPLOY** on any vector to activate it. Tap **STOP ATTACK** to disable.
 
 ### Performance Monitoring
 
@@ -337,6 +352,10 @@ The helper supports these commands:
 - `unblock` - Device unblocking
 - `dns_spoof` - DNS query interception
 - `dhcp_spoof` - DHCP request interception
+- `ios_dhcp_void` - iOS DHCP self-implosion (XID sniff + unicast self-router ACK)
+- `ios_dhcp_nullify_dns` - iOS DNS nullification via DHCPACK
+- `icmp_redirect` - ICMP Type 5 redirect forge
+- `tcp_rst` - TCP RST asymmetry (SYN sniff → forged RST)
 
 ## Performance
 
@@ -404,6 +423,8 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 - [x] **Dynamic Network Interface Detection** - Auto-detect available interfaces across all screens
 - [x] **Smart Spoofing Dialog Auto-fill** - Domain, IP, gateway, and interface auto-population with dropdown selectors
 - [x] **Device Name Persistence Fix** - Synchronous SharedPreferences writes and cache loading on app startup
+- [x] **iOS Void Attack Toolkit** - DHCP self-implosion, ICMP redirect forge, DNS nullification, and TCP RST asymmetry
+- [x] **Auto-detection for iOS Attacks** - Router IP/MAC and target device MAC auto-filled from network scan
 
 ### In Progress 🚧
 - [ ] Comprehensive unit testing
