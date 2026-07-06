@@ -192,7 +192,12 @@ fun HarpyApp() {
                 )
             }
             AppScreen.IosAttack -> {
+                // Share the same NetworkMonitorViewModel so auto-detection has access to scanned devices
+                val networkViewModel: NetworkMonitorViewModel = hiltViewModel(
+                    remember { navController.getBackStackEntry(Screen.NetworkMonitor.route) }
+                )
                 IosAttackScreen(
+                    networkViewModel = networkViewModel,
                     onNavigateBack = { navigateBack() }
                 )
             }

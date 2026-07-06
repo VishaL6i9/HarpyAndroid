@@ -17,27 +17,58 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.vishal.harpy.core.utils.NetworkDevice
 import com.vishal.harpy.features.ios_attack.presentation.IosAttackViewModel
+import com.vishal.harpy.features.network_monitor.presentation.viewmodel.NetworkMonitorViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun IosAttackScreen(
     viewModel: IosAttackViewModel = hiltViewModel(),
+    networkViewModel: NetworkMonitorViewModel = hiltViewModel(),
     onNavigateBack: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val settings by viewModel.appSettings.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
+    val networkDevices by networkViewModel.networkDevices.collectAsStateWithLifecycle()
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     LaunchedEffect(Unit) {
         viewModel.refreshState()
+    }
+
+    // Auto-detect gateway IP and MAC from scanned network devices
+    val gatewayDevice = remember(networkDevices) {
+        networkDevices.firstOrNull { it.isGateway }
+    }
+
+    LaunchedEffect(gatewayDevice) {
+        gatewayDevice?.let { gw ->
+            if (gw.ipAddress.isNotBlank() && gw.macAddress.isNotBlank()) {
+                viewModel.autoFillRouter(gw.ipAddress, gw.macAddress)
+            }
+        }
+    }
+
+    // Auto-detect target device info when user types an IP that matches a scanned device
+    val targetDevice = remember(uiState.targetIp, networkDevices) {
+        if (uiState.targetIp.isNotBlank()) {
+            networkDevices.firstOrNull { it.ipAddress == uiState.targetIp }
+        } else null
+    }
+
+    LaunchedEffect(targetDevice) {
+        targetDevice?.let {
+            viewModel.autoFillTargetInfo(it.ipAddress, it.macAddress)
+        }
     }
 
     // Error toasts
     LaunchedEffect(error) {
         error?.let {
             android.widget.Toast.makeText(
-                androidx.compose.ui.platform.LocalContext.current,
+                context,
                 it,
                 android.widget.Toast.LENGTH_SHORT
             ).show()

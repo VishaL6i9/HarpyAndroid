@@ -3,6 +3,7 @@ package com.vishal.harpy.features.ios_attack.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.vishal.harpy.core.utils.AppSettings
+import com.vishal.harpy.core.utils.NetworkResult
 import com.vishal.harpy.core.utils.SettingsRepository
 import com.vishal.harpy.features.ios_attack.domain.IosAttackConfig
 import com.vishal.harpy.features.ios_attack.domain.IosAttackRepository
@@ -104,17 +105,19 @@ class IosAttackViewModel @Inject constructor(
                 routerMac = state.routerMac,
                 interfaceName = state.interfaceName
             )
-            val result = attackRepository.startDhcpSelfGateway(config)
-            if (result.isSuccess) {
-                _uiState.value = _uiState.value.copy(
-                    isDhcpSelfGatewayActive = true,
-                    isLoading = false
-                )
-            } else {
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    errorMessage = result.error?.message
-                )
+            when (val result = attackRepository.startDhcpSelfGateway(config)) {
+                is NetworkResult.Success -> {
+                    _uiState.value = _uiState.value.copy(
+                        isDhcpSelfGatewayActive = true,
+                        isLoading = false
+                    )
+                }
+                is NetworkResult.Error -> {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        errorMessage = result.error.message
+                    )
+                }
             }
         }
     }
@@ -135,17 +138,19 @@ class IosAttackViewModel @Inject constructor(
                 routerMac = state.routerMac,
                 interfaceName = state.interfaceName
             )
-            val result = attackRepository.startDnsNullification(config)
-            if (result.isSuccess) {
-                _uiState.value = _uiState.value.copy(
-                    isDnsNullifyActive = true,
-                    isLoading = false
-                )
-            } else {
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    errorMessage = result.error?.message
-                )
+            when (val result = attackRepository.startDnsNullification(config)) {
+                is NetworkResult.Success -> {
+                    _uiState.value = _uiState.value.copy(
+                        isDnsNullifyActive = true,
+                        isLoading = false
+                    )
+                }
+                is NetworkResult.Error -> {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        errorMessage = result.error.message
+                    )
+                }
             }
         }
     }
@@ -167,17 +172,19 @@ class IosAttackViewModel @Inject constructor(
                 interfaceName = state.interfaceName,
                 redirectAll = true
             )
-            val result = attackRepository.startIcmpRedirect(config)
-            if (result.isSuccess) {
-                _uiState.value = _uiState.value.copy(
-                    isIcmpRedirectActive = true,
-                    isLoading = false
-                )
-            } else {
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    errorMessage = result.error?.message
-                )
+            when (val result = attackRepository.startIcmpRedirect(config)) {
+                is NetworkResult.Success -> {
+                    _uiState.value = _uiState.value.copy(
+                        isIcmpRedirectActive = true,
+                        isLoading = false
+                    )
+                }
+                is NetworkResult.Error -> {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        errorMessage = result.error.message
+                    )
+                }
             }
         }
     }
@@ -198,17 +205,19 @@ class IosAttackViewModel @Inject constructor(
                 routerMac = state.routerMac,
                 interfaceName = state.interfaceName
             )
-            val result = attackRepository.startTcpRst(config)
-            if (result.isSuccess) {
-                _uiState.value = _uiState.value.copy(
-                    isTcpRstActive = true,
-                    isLoading = false
-                )
-            } else {
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    errorMessage = result.error?.message
-                )
+            when (val result = attackRepository.startTcpRst(config)) {
+                is NetworkResult.Success -> {
+                    _uiState.value = _uiState.value.copy(
+                        isTcpRstActive = true,
+                        isLoading = false
+                    )
+                }
+                is NetworkResult.Error -> {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        errorMessage = result.error.message
+                    )
+                }
             }
         }
     }
@@ -254,6 +263,28 @@ class IosAttackViewModel @Inject constructor(
                 isTcpRstActive = false,
                 isLoading = false
             )
+        }
+    }
+
+    fun autoFillRouter(ip: String, mac: String) {
+        val state = _uiState.value
+        val updated = state.copy(
+            routerIp = if (state.routerIp.isBlank() || state.routerIp == "192.168.1.1") ip else state.routerIp,
+            routerMac = if (state.routerMac.isBlank()) mac else state.routerMac
+        )
+        if (updated != state) {
+            _uiState.value = updated
+        }
+    }
+
+    fun autoFillTargetInfo(targetIp: String, targetMac: String) {
+        val state = _uiState.value
+        val updated = state.copy(
+            targetIp = if (state.targetIp.isBlank()) targetIp else state.targetIp,
+            targetMac = if (state.targetMac.isBlank()) targetMac else state.targetMac
+        )
+        if (updated != state) {
+            _uiState.value = updated
         }
     }
 
